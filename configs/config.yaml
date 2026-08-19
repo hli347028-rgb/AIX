@@ -1,0 +1,66 @@
+server:
+  http:
+    addr: 0.0.0.0:9000
+    timeout: 5s
+  grpc:
+    addr: 0.0.0.0:9100
+    timeout: 5s
+data:
+  database:
+    driver: mysql
+    host: 127.0.0.1
+    port: 3306
+    user: root
+    password: root
+    dbname: aix
+  redis:
+    addr: 127.0.0.1:6379
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+auth:
+  jwt_secret: "change-me-in-production"
+  bootstrap_addresses:
+    - "0x0000000000000000000000000000000000000000"
+  admin_addresses:
+    - "0x0000000000000000000000000000000000000000"
+  admin_account: admin
+  admin_password: "aixadmin...123"
+  challenge_ttl: 5m
+  open_api_keys:
+    - "489b30e3d783489e61935824dda76610845ebc284aa905d1"
+wallet:
+  deposit_contract: "0xe11c2F7902CB03cAA38F80B27DC20702af14D5c7"
+  win_deposit_contract: "0x6A82cFF59da0cC4E31C13E92C396Cbdcafcf3cA9"
+  deposit_address: "0xB8726F15099956183C3a0431791458A096404Ca6"
+  deposit_addresses:
+    - "0xB8726F15099956183C3a0431791458A096404Ca6"
+    - "0x9e3730f324476C15b9CF1B1991E0c2CC5C8d1575"
+  usdt_contract: "0x926632975149221891f1b9B56Efd125Dfe90ba2f"  # EOEO USDT
+  usdt_decimals: 18
+  rpc_url: "https://rpc1.eoeo.info"
+  recharge_monitor_enabled: true
+  recharge_scan_interval_seconds: 60
+  recharge_scan_queries_per_cycle: 10
+  recharge_scan_query_interval_seconds: 5
+  recharge_confirmations: 3
+  recharge_scan_start_block: 0
+  recharge_scan_lookback_blocks: 5000
+  recharge_scan_batch_blocks: 1000
+  min_subscribe: "100"
+  min_withdraw: "10"
+  withdraw_fee_rate: 0.06
+  # WinSwap V2 Pair (WWIN/USDT) WIN price oracle
+  # every 60s cycle; 10 queries per cycle; 5s between queries
+  win_pair: "0x15ad085fc866370b59936575565434b14d22281d"
+  win_price_oracle_enabled: true
+  win_price_poll_seconds: 60
+  win_price_queries_per_cycle: 10
+  win_price_query_interval_seconds: 5
+  # WIN ERC20 合约（提现打款目标代币）
+  win_contract: ""
+  win_decimals: 18
+  # WIN 提现链上自动打款（私钥勿写入此文件，见下方 withdraw_private_key_file）
+  withdraw_payout_enabled: true
+  withdraw_private_key_file: ""
+  withdraw_payout_queries_per_cycle: 10
+  withdraw_payout_query_interval_seconds: 5

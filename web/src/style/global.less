@@ -1,0 +1,32 @@
+/* 此文件为less变量、函数 */
+@c1: #08131E;
+@c2: #F4FAFF;
+@c3: #8FDFFF;
+@c4: #FFFFFF;
+@c5: #7089A1;
+@c6: #C8D8E6;
+@c7: #1597E5;
+
+@lg1: #0D1B2A;
+@lg2: #0A1724;
+@lg3: #08131E;
+
+@bs1: 0 0 10px rgba(0, 0, 0, .2);
+
+@p0: 10px;//通用边距0
+@p1: 15px;//通用边距1
+@p2: 20px;//通用边距2
+
+
+/* 渐变函数 */
+.linearGradient(@c1, @c2, @deg: 45deg) {
+    background: linear-gradient(@deg, @c1, @c2);
+}
+
+/* 超出省略 */
+.notwrap {
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

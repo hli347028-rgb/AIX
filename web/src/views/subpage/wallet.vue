@@ -1,0 +1,1101 @@
+<template>
+<div class='page'>
+  <van-nav-bar
+    :title="$t('wallet.title')"
+    left-arrow
+    :border="false"
+    fixed
+    @click-left="handleBack"
+  />
+  <div class="page-main">
+    <div class="usdt-price">
+      <div class="price-list">
+        <div class="price-item">
+          <p>{{ $t('wallet.rechargeBalance') }}</p>
+          <p>{{ rechargeBalance }}</p>
+        </div>
+        <div class="price-item">
+          <p>{{ $t('wallet.rewardBalance') }}</p>
+          <p>{{ rewardBalance }}</p>
+        </div>
+        <div class="price-item price-item-action">
+          <p>{{ $t('wallet.aixBalance') }}</p>
+          <div class="price-value-action">
+            <p>{{ aixBalance }}</p>
+          </div>
+        </div>
+        <div class="price-item">
+          <p>{{ $t('wallet.winBalance') }}</p>
+          <p>{{ winBalance }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="wallet-actions">
+      <button type="button" class="wallet-action" @click="router.push('/exchange')">
+        <van-icon name="exchange" />
+        <span>{{ $t('wallet.exchange') }}</span>
+      </button>
+      <button type="button" class="wallet-action" @click="router.push('/withdrawal')">
+        <van-icon name="balance-pay" />
+        <span>{{ $t('withdraw.title') }}</span>
+      </button>
+    </div>
+    <ul class="wallet-tab">
+      <li :class="tab === 1 ? 'active' : ''" @click="tab = 1">{{ $t('wallet.myIncome') }}</li>
+      <li :class="tab === 2 ? 'active' : ''" @click="tab = 2">{{ $t('wallet.referralRelation') }}</li>
+    </ul>
+    <div class="tab-content" v-if="tab === 1">
+      <div class="pledge">
+        <div class="pledge-info">
+          <div class="pledge-item">
+            <p>{{ $t('wallet.exitRemaining') }}</p>
+            <p>{{ userinfo.unexitedAmount || 0 }}</p>
+          </div>
+          <div class="pledge-item">
+            <p>{{ $t('wallet.earnedIncome') }}</p>
+            <p>{{ userinfo.amountGet || 0 }}</p>
+          </div>
+          <div class="pledge-item">
+            <p>{{ $t('wallet.overflowReward') }}</p>
+            <p>{{ userinfo.overflowReward || 0 }}</p>
+          </div>
+          <div class="pledge-item">
+            <p>AIX-USD</p>
+            <p>{{ profile.points_all || userinfo.points_all || 0 }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="pledge-frame">
+        <div class="pledge-frame-item">
+          <p>{{ $t('wallet.staticIncome') }}</p>
+          <p>{{ formatFour(userinfo.location) }}</p>
+        </div>
+        <div class="pledge-frame-item">
+          <p>{{ $t('wallet.directReferralReward') }}</p>
+          <p>{{ formatFour(userinfo.recommend) }}</p>
+        </div>
+        <div class="pledge-frame-item">
+          <p>{{ $t('wallet.managementReward') }}</p>
+          <p>{{ formatFour(userinfo.team) }}</p>
+        </div>
+        <div class="pledge-frame-item">
+          <p>{{ $t('wallet.totalIncome') }}</p>
+          <p>{{ formatFour(userinfo.all) }}</p>
+        </div>
+      </div>
+      <van-tabs v-model:active="active" scrollable :ellipsis="false" @change="onChangeTab">
+        <van-tab v-for="value in menuType" :title="value[1]" :name="value[0]" :key="value[0]" />
+      </van-tabs>
+      <div class="records-panel" :aria-busy="rewardLoading">
+        <div v-if="rewardLoading" class="records-loading">
+          <van-loading type="spinner" color="#1597E5" />
+        </div>
+        <div v-else-if="isTableTab" class="subscribe-table" :class="{ 'is-two-col': isTwoColTab }">
+          <div class="table-header">
+            <span class="col-amount">{{ active === 'points' ? 'AIX-USD' : $t('node.amount') }}</span>
+            <span v-if="!isTwoColTab" class="col-status">{{ tableMiddleTitle }}</span>
+            <span class="col-time">{{ $t('node.time') }}</span>
+          </div>
+          <van-empty v-if="rewardList.length === 0" :description="emptyRecordsText" :image="emptyImage" />
+          <div v-else class="subscribe-table-body">
+            <div
+              class="income-list-item"
+              v-for="(item, index) in rewardList"
+              :key="item.id || `${active}-${page}-${index}`"
+            >
+              <span class="col-amount">{{ formatFour(item.reward) }}</span>
+              <span v-if="active === '1'" class="col-status" :class="item.exited ? 'is-exited' : 'is-active'">
+                <span class="status-text">{{ item.exited ? $t('node.statusExited') : $t('node.statusActive') }}</span>
+                <template v-if="item.progressAcc != null && item.progressTarget">
+                  <span class="progress-text">{{ item.progressAcc }} / {{ item.progressTarget }}</span>
+                  <span class="progress-bar">
+                    <i :style="{ width: `${progressPercent(item)}%` }" />
+                  </span>
+                </template>
+              </span>
+              <span v-else-if="active === '3'" class="col-status">
+                <span class="status-text">{{ item.address ? formatShortAddr(item.address) : '—' }}</span>
+                <span v-if="item.num" class="progress-text">{{ $t('community.generationNum', { num: item.num }) }}</span>
+              </span>
+              <span class="col-time">
+                <span class="date-text">{{ splitDateTime(item.createdAt).date }}</span>
+                <span class="time-text">{{ splitDateTime(item.createdAt).time }}</span>
+              </span>
+            </div>
+            <Pagination
+              v-if="allPageCount > 1"
+              v-model="page"
+              :page-count="allPageCount"
+              mode="simple"
+              @change="getRewardList"
+            />
+          </div>
+        </div>
+        <van-empty v-else-if="rewardList.length === 0" :description="$t('wallet.noIncomeOfType')" :image="emptyImage" />
+        <div class="income-list" v-else>
+          <div class="income-list-main">
+            <div class="income-list-item" v-for="(item, index) in rewardList" :key="item.id || `${active}-${page}-${index}`">
+              <div class="income-list-item-info">
+                <p>{{ item.name || $t('wallet.income') }}</p>
+                <p class="income-list-item-time">
+                  <span>{{ item.createdAt }}</span>
+                  <span class="income-list-item-money">{{ item.reward }}</span>
+                </p>
+                <p v-if="item.address" style="font-size: 12px; opacity: .7;">{{ formatShortAddr(item.address) }}</p>
+                <p v-if="active === '5'" style="font-size: 12px; opacity: .7;">
+                  {{ $t('wallet.releasedManagementReward') }}: {{ item.released || 0 }} / {{ $t('wallet.pendingManagementReward') }}: {{ item.pending || 0 }}
+                </p>
+              </div>
+            </div>
+            <Pagination
+              v-if="allPageCount > 1"
+              v-model="page"
+              :page-count="allPageCount"
+              mode="simple"
+              @change="getRewardList"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-content" v-if="tab === 2">
+      <van-empty v-if="treeData.length === 0" :description="$t('wallet.noDirectReferral')" :image="emptyImage" />
+      <a-tree
+        v-else
+        v-model:expandedKeys="expandedKeys"
+        v-model:selectedKeys="selectedKeys"
+        :load-data="onLoadData"
+        :tree-data="treeData"
+      />
+    </div>
+  </div>
+</div>
+</template>
+<script setup>
+import userPerson from "@/pinia/person";
+import { useRouter } from 'vue-router'
+import { onMounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import emptyImage from '../../assets/images/custom-empty-image.png'
+import request from "@/tools/request";
+import { listPointsRecords } from "@/api/aix";
+import { Pagination } from "vant"
+
+const { t: $t, locale } = useI18n()
+const router = useRouter()
+const person = userPerson();
+const userinfo = $computed(() => person.userinfo);
+const profile = $computed(() => person.profile);
+const address = $computed(() => person.address);
+
+const pickBalance = (vals) => {
+  let fallback = 0
+  for (const v of vals) {
+    if (v == null || v === '') continue
+    if (fallback === 0 || fallback === '0' || fallback === '0.00') fallback = v
+    const n = Number(v)
+    if (Number.isFinite(n) && n !== 0) return v
+  }
+  return fallback
+}
+const rechargeBalance = $computed(() => pickBalance([userinfo.usdt, profile.usdt_recharge]))
+const rewardBalance = $computed(() => pickBalance([userinfo.reward, profile.usdt_reward]))
+const aixBalance = $computed(() => pickBalance([profile.aix_balance, userinfo.aix]))
+const winBalance = $computed(() => pickBalance([profile.win_balance, userinfo.win]))
+
+let active = $ref('1')
+let page = $ref(1);
+let allPageCount = $ref(1);
+let rewardList = $ref([]);
+let rewardLoading = $ref(false)
+let rewardRequestId = 0
+const tab = $ref(1)
+
+const menuType = computed(() => [
+  ['1', $t('wallet.subscribeRecords')],
+  ['2', $t('wallet.staticIncome')],
+  ['3', $t('wallet.directReferralReward')],
+  ['5', $t('wallet.managementReward')],
+  ['points', 'AIX-USD'],
+])
+
+const isTableTab = computed(() => ['1', '2', '3', 'points'].includes(String(active)))
+const isTwoColTab = computed(() => active === '2' || active === 'points')
+
+const tableMiddleTitle = computed(() => {
+  if (active === '3') return $t('community.source')
+  return $t('node.status')
+})
+
+const emptyRecordsText = computed(() => {
+  if (active === '1') return $t('wallet.noSubscribeRecords')
+  if (active === 'points') return $t('wallet.noPointsRecords')
+  return $t('wallet.noIncomeOfType')
+})
+const expandedKeys = $ref([]);
+const selectedKeys = $ref([]);
+let treeData = $ref([]);
+
+const formatShortAddr = (value) => {
+  if (!value) return ''
+  return `${value.slice(0, 6)}...${value.slice(-4)}`
+}
+
+const formatFour = (value) => {
+  if (value === null || value === undefined || value === '') return '0.0000'
+  const str = String(value).trim()
+  if (!str || Number.isNaN(Number(str))) return '0.0000'
+  const neg = str.startsWith('-')
+  const absStr = neg ? str.slice(1) : str
+  const [intPart = '0', decPart = ''] = absStr.split('.')
+  return `${neg ? '-' : ''}${intPart}.${(decPart + '0000').slice(0, 4)}`
+}
+
+const splitDateTime = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return { date: '—', time: '' }
+  const [date, ...rest] = text.split(/\s+/)
+  return { date, time: rest.join(' ') }
+}
+
+const progressPercent = (item) => {
+  const acc = Number(item?.progressAcc)
+  const target = Number(item?.progressTarget)
+  if (!target || Number.isNaN(acc) || Number.isNaN(target)) return 0
+  return Math.min(100, Math.max(0, (acc / target) * 100))
+}
+
+const formatUnixDisplay = (value) => {
+  const n = Number(value)
+  if (!n) return String(value || '')
+  const d = new Date(n < 1e12 ? n * 1000 : n)
+  const pad = (x) => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const getRewardList = async (pageNum = 1, reqType = active) => {
+  const requestId = ++rewardRequestId
+  const requestedType = String(reqType)
+  rewardLoading = true
+  try {
+    if (requestedType === '1') {
+      const res = await request.get("app_server/order_list", {
+        params: { page: pageNum }
+      });
+      if (requestId !== rewardRequestId || requestedType !== active) return
+      const count = Number(res?.count || 0)
+      allPageCount = Math.max(1, Math.ceil(count / 10));
+      rewardList = (res?.list || []).map((item) => {
+        const exited = String(item.status) === '2'
+        const acc = item.accumulated ?? item.amountGet ?? '0'
+        const target = item.exit_target ?? item.amountMax ?? ''
+        return {
+          name: $t('community.subscribe'),
+          exited,
+          createdAt: item.createdAt || item.created_at || '',
+          reward: item.amount || '0',
+          progressAcc: target ? acc : null,
+          progressTarget: target || '',
+          address: person.address || address || '',
+        }
+      })
+      page = pageNum
+      return
+    }
+    if (requestedType === 'points') {
+      const res = await listPointsRecords()
+      if (requestId !== rewardRequestId || requestedType !== active) return
+      const payload = Array.isArray(res?.records) ? res : (res?.data || res || {})
+      const records = Array.isArray(payload?.records) ? payload.records : []
+      const count = Number(payload?.count || records.length || 0)
+      allPageCount = Math.max(1, Math.ceil(count / 10))
+      const start = (pageNum - 1) * 10
+      rewardList = records.slice(start, start + 10).map((item) => {
+        const status = String(item.status || '').toLowerCase()
+        return {
+          id: item.id || item.order_id,
+          reward: item.points || '0',
+          exited: status === 'exited' || status === '2',
+          createdAt: formatUnixDisplay(item.created_at ?? item.created_time),
+        }
+      })
+      if (payload?.points != null || payload?.points_all != null) {
+        person.userinfo = {
+          ...person.userinfo,
+          points: payload.points ?? person.userinfo.points,
+          points_all: payload.points_all ?? person.userinfo.points_all,
+        }
+        person.profile = {
+          ...person.profile,
+          points: payload.points ?? person.profile.points,
+          points_all: payload.points_all ?? person.profile.points_all,
+        }
+      }
+      page = pageNum
+      return
+    }
+    const res = await request.get("app_server/reward_list", {
+      params: {
+        page: pageNum,
+        reqType: requestedType
+      }
+    });
+    if (requestId !== rewardRequestId || requestedType !== active) return
+    const count = Number(res?.count || 0)
+    allPageCount = Math.max(1, Math.ceil(count / 10));
+    rewardList = res?.list || []
+    page = pageNum
+  } catch {
+    if (requestId !== rewardRequestId || requestedType !== active) return
+    rewardList = []
+    allPageCount = 1
+  } finally {
+    if (requestId === rewardRequestId) rewardLoading = false
+  }
+}
+
+const formatAddress = (value) => {
+  if (!value) return ''
+  const frontSix = value.slice(0, 6);
+  const backSix = value.slice(-4);
+  const middle = '...';
+  return frontSix + middle + backSix;
+}
+
+const buildTreeTag = (item) => {
+  return item.activated === false
+    ? $t('community.inactive')
+    : `${$t('community.subscribe')}:${item.amount}`
+}
+
+const onLoadData = (treeNode) => {
+  return new Promise(async (resolve) => {
+    if (treeNode.dataRef.children) {
+      resolve();
+      return;
+    }
+
+    try {
+      const res = await request.get(`app_server/recommend_list?address=${treeNode.dataRef.address}`);
+      treeNode.dataRef.children = (res.recommends || []).map((item, index) => {
+        const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
+        const tag = buildTreeTag(item)
+        return {
+          title: `${formatAddress(item.address)}（${tag}）`,
+          key: `${treeNode.eventKey}-${index}`,
+          amount: item.amount,
+          address: item.address,
+          isLeaf: !hasChildren
+        }
+      })
+      treeData = [...treeData];
+    } catch {
+      treeNode.dataRef.children = []
+    }
+    resolve();
+  });
+};
+
+const getUserArea = async () => {
+  const addr = person.address || address
+  if (!addr) {
+    treeData = []
+    return
+  }
+  try {
+    const res = await request.get(`app_server/recommend_list?address=${addr}`);
+    treeData = (res.recommends || []).map((item, index) => {
+      const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
+      const tag = buildTreeTag(item)
+      return {
+        title: `${formatAddress(item.address)}（${tag}）`,
+        key: index,
+        address: item.address,
+        isLeaf: !hasChildren
+      }
+    })
+  } catch {
+    treeData = []
+  }
+}
+
+watch(locale, () => {
+  getRewardList(page, active)
+  getUserArea()
+})
+
+onMounted(async () => {
+  await Promise.allSettled([person.getUser?.(), person.refreshProfile()])
+  getRewardList(1)
+  getUserArea()
+})
+
+const onChangeTab = (name) => {
+  active = String(name)
+  page = 1
+  allPageCount = 1
+  rewardList = []
+  getRewardList(1, active)
+}
+
+const handleBack = () => {
+  router.back()
+}
+
+</script>
+<style lang='less' scoped>
+  .page {
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 50px 15px 20px 15px;
+    background: url('../../assets/images/a3.png') no-repeat;
+    background-size: 100% auto;
+    .page-main {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .usdt-price {
+      width: 100%;
+      height: 111px;
+      background-image: url(@/assets/images/a1.png);
+      background-repeat: no-repeat;
+      background-size: 100% 111px;
+      padding: 24px 20px 6px 20px;
+      display: flex;
+      box-sizing: border-box;
+      font-size: 12px;
+      .price-list {
+        width: 60%;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+
+        .price-item {
+          position: relative;
+          width: 100%;
+          min-height: 20px;
+          display: grid;
+          grid-template-columns: 72px minmax(0, 1fr);
+          align-items: center;
+          gap: 8px;
+
+          p {
+            margin: 0;
+          }
+
+          > p:first-child {
+            color: rgba(255, 255, 255, .72);
+            white-space: nowrap;
+          }
+
+          > p:nth-child(2),
+          .price-value-action > p {
+            min-width: 0;
+            overflow: hidden;
+            color: #fff;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .price-value-action {
+            min-width: 0;
+            max-width: 100%;
+            display: grid;
+            grid-template-columns: minmax(0, max-content) auto;
+            align-items: center;
+            justify-content: start;
+            gap: 5px;
+          }
+
+          .exchange-entry {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            min-height: 20px;
+            box-sizing: border-box;
+            border: 1px solid rgba(52, 174, 247, .45);
+            border-radius: 10px;
+            padding: 2px 7px;
+            color: #8ed5ff;
+            background: rgba(8, 123, 193, .2);
+            font-size: 11px;
+            line-height: 1;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color .15s ease, transform .15s ease;
+
+            .van-icon {
+              font-size: 10px;
+            }
+
+            &:active {
+              background: rgba(8, 123, 193, .45);
+              transform: scale(.96);
+            }
+          }
+
+          &.price-item-action {
+            grid-template-columns: 72px minmax(0, 1fr);
+          }
+        }
+      }
+    }
+    .wallet-actions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+
+      .wallet-action {
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        box-sizing: border-box;
+        border: 1px solid rgba(52, 174, 247, .42);
+        border-radius: 20px;
+        color: #b9e5ff;
+        background: rgba(8, 123, 193, .18);
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1;
+        cursor: pointer;
+        transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+
+        .van-icon {
+          color: #39b7ff;
+          font-size: 16px;
+        }
+
+        &:active {
+          border-color: rgba(52, 174, 247, .7);
+          background: rgba(8, 123, 193, .4);
+          transform: scale(.98);
+        }
+      }
+    }
+    .wallet-tab {
+      width: 100%;
+      min-height: 45px;
+      background: #0B1824;
+      border: 1px solid #183247;
+      border-radius: 31px;
+      padding: 5px;
+      box-sizing: border-box;
+      display: flex;
+      li {
+        flex: 1 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        &.active {
+          height: 45px;
+          background: #087BC1;
+          border-radius: 26px;
+          font-weight: 500;
+        }
+      }
+    }
+    .ispay-price {
+      width: 100%;
+      height: 111px;
+      background-image: url(@/assets/images/a2.png);
+      background-repeat: no-repeat;
+      background-size: 100% 111px;
+      padding: 25px 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      font-size: 18px;
+    }
+    .tab-menu {
+      display: flex;
+      height: 55px;
+      background: #0B1824;
+      border: 1px solid #183247;
+      border-radius: 31px;
+      padding: 5px;
+      box-sizing: border-box;
+      .tab-item {
+        flex: 1;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .active-tab {
+        background: #087BC1;
+        border-radius: 32px;
+        font-weight: 500;
+      }
+    }
+    .tab-content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      :deep(.van-tabs__wrap) {
+        overflow: visible;
+      }
+      :deep(.van-tabs__nav) {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      :deep(.van-tab) {
+        flex: none;
+        padding: 0 14px;
+        white-space: nowrap;
+      }
+      :deep(.van-tab__text) {
+        overflow: visible;
+        white-space: nowrap;
+      }
+      :deep(.van-tabs__content) {
+        display: none;
+      }
+      .records-panel {
+        height: clamp(260px, 45vh, 420px);
+        position: relative;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+      .records-loading {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .records-panel > :deep(.van-empty),
+      .subscribe-table > :deep(.van-empty) {
+        min-height: 100%;
+        box-sizing: border-box;
+      }
+      .subscribe-table {
+        min-height: 100%;
+        border: 1px solid #183247;
+        border-radius: 12px;
+        background: #0D1B2A;
+
+        .table-header,
+        .income-list-item {
+          display: grid;
+          grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr) minmax(0, 1fr);
+          align-items: center;
+          column-gap: 6px;
+        }
+
+        &.is-two-col {
+          .table-header,
+          .income-list-item {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          }
+        }
+
+        .table-header {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          padding: 10px 8px;
+          border-radius: 12px 12px 0 0;
+          background: #030A11;
+
+          span {
+            min-width: 0;
+            text-align: center;
+            color: rgba(255, 255, 255, .55);
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.3;
+          }
+        }
+
+        .subscribe-table-body {
+          padding: 0 0 8px;
+        }
+
+        .income-list-item {
+          min-height: 52px;
+          padding: 10px 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, .06);
+          box-sizing: border-box;
+
+          &:nth-child(2n) {
+            background: rgba(8, 123, 193, .06);
+          }
+
+          &:last-of-type {
+            border-bottom: none;
+          }
+
+          > span {
+            min-width: 0;
+            text-align: center;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1.3;
+          }
+        }
+
+        .col-amount {
+          font-weight: 600;
+          font-size: 13px;
+        }
+
+        .col-status {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+
+          .status-text {
+            max-width: 100%;
+            overflow: hidden;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          &.is-active .status-text {
+            color: #39b7ff;
+          }
+
+          &.is-exited .status-text {
+            color: #52c41a;
+          }
+
+          .progress-text {
+            max-width: 100%;
+            overflow: hidden;
+            color: #CCC;
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .progress-bar {
+            width: 100%;
+            max-width: 72px;
+            height: 4px;
+            overflow: hidden;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, .08);
+
+            i {
+              display: block;
+              height: 100%;
+              border-radius: 4px;
+              background: linear-gradient(90deg, #087BC1 0%, #39b7ff 100%);
+            }
+          }
+        }
+
+        .col-time {
+          .date-text,
+          .time-text {
+            display: block;
+            line-height: 1.3;
+            white-space: nowrap;
+          }
+
+          .date-text {
+            font-size: 11px;
+          }
+
+          .time-text {
+            margin-top: 2px;
+            color: rgba(255, 255, 255, .5);
+            font-size: 10px;
+          }
+        }
+
+        :deep(.van-pagination) {
+          padding-top: 8px;
+        }
+      }
+      .pledge {
+        background: #0B1824;
+        border-radius: 18px;
+        overflow: hidden;
+        .pledge-total {
+          display: flex;
+          justify-content: space-between;
+          margin: 15px;
+          height: 57px;
+          background: hsla(0, 0%, 100%, .1);
+          border-radius: 12px;
+          padding: 0 15px;
+          box-sizing: border-box;
+          align-items: center;
+          span {
+            &:nth-child(2) {
+              color: rgb(21, 151, 229);
+              font-weight: 500;
+            }
+          }
+        }
+        .pledge-info {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          margin: 8px 0;
+          .pledge-item {
+            min-height: 76px;
+            padding: 14px 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border-right: 1px solid rgba(255, 255, 255, .08);
+            border-bottom: 1px solid rgba(255, 255, 255, .08);
+            &:nth-child(2n) {
+              border-right: none;
+            }
+            &:nth-last-child(-n + 2) {
+              border-bottom: none;
+            }
+            p {
+              margin: 0;
+              text-align: center;
+              &:first-child {
+                color: rgba(255, 255, 255, .65);
+                font-size: 12px;
+                line-height: 1.3;
+              }
+              &:nth-child(2) {
+                max-width: 100%;
+                overflow: hidden;
+                font-weight: 500;
+                font-size: 18px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+            }
+          }
+        }
+        .pledge-count {
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          background: url('@/assets/images/xian.png') no-repeat;
+          background-size: 100% auto;
+          padding: 60px 0 20px 0;
+          text-align: center;
+          span {
+            color: rgb(21, 151, 229);
+            font-weight: 500;
+            margin-left: 10px;
+          }
+        }
+      }
+      .pledge-frame {
+        background: url('@/assets/images/boxbg1.png') no-repeat;
+        background-size: 100% 100%;
+        box-sizing: border-box;
+        display: flex;
+        flex-wrap: wrap;
+        .pledge-frame-item {
+          width: 50%;
+          height: 110px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 10px;
+          p {
+            &:nth-child(2) {
+              font-size: 18px;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+      .pledge-earnings {
+        min-height: 88px;
+        background: #0B1824;
+        border-radius: 18px;
+        display: flex;
+        .pledge-earnings-item {
+          height: 88px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          p {
+            &:nth-child(2) {
+              font-size: 16px;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+      .pledge-give {
+        height: 58px;
+        background-image: url(@/assets/images/btnbg.png);
+        background-repeat: no-repeat;
+        background-size: 100% 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        padding: 0 20px;
+        span {
+          &:nth-child(2) {
+            font-size: 16px;
+            font-weight: 500;
+          }
+        }
+      }
+    }
+    .income-box {
+      display: flex;
+      flex-direction: column;
+      .income-main {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 20px;
+        align-items: center;
+        position: relative;
+        padding-bottom: 20px;
+        &::after {
+          content: "";
+          position: absolute;
+          z-index: 1;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          height: 0.02564rem;
+          background: linear-gradient(90deg,rgba(179,179,179,0) 0%,rgba(255,255,255,.6) 50.45%,rgba(179,179,179,0) 100%);
+        }
+        p {
+          &:nth-child(1) {
+            font-size: 14px;
+            color: #CCC;
+          }
+          &:nth-child(2) {
+            font-size: 26px;
+            color: #FFF;
+          }
+        }
+      }
+      .income-footer {
+        display: flex;
+        flex-wrap: wrap;
+        padding-top: 20px;
+        gap: 20px 0;
+        .income-footer-item {
+          width: 25%;
+          flex-grow: 1;
+          flex-shrink: 0;
+          align-items: center;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          align-items: center;
+          gap: 5px;
+          p {
+            &:nth-child(1) {
+              font-size: 12px;
+              color: #CCC;
+            }
+            &:nth-child(2) {
+              font-size: 12px;
+              color: #FFF;
+              display: flex;
+              gap: 4px;
+              align-items: center;
+            }
+          }
+        }
+      }
+    }
+    .income-list {
+      min-height: 100%;
+      overflow: hidden;
+      .list-menu-select {
+        width: 100%;
+        height: 40px;
+        background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAQAAAD9CzEMAAAAtUlEQVR42u2VUQqCQBRF3y4FoUAoCooCoUAQnJ21gfl0PzdIbOhS+UbfT/HO53g9B0QYcRzHcX4SBPSICJIJOuV7uGGgzdK3GOinpxEjjVrfYCRqPlHiqtJfkAgieYl6cl0j0QmhSZy/Lk+sn5M4flwdWD83sX+72LF+SWIrBDasX5qoXp5UrLdIrJ+nK9ZbJcrHScn/vWWiQMF64wTrTRP2ek6w3j7BevtERETwa9lxHOfvuAOAC4GPzKVVpAAAAABJRU5ErkJggg==') no-repeat right center;
+        background-size: 18px 18px;
+      }
+      .income-list-header {
+        width: 100%;
+        height: 40px;
+        line-height: 40px;
+        overflow-x: auto;
+        padding-bottom: 10px;
+        &::-webkit-scrollbar {
+          height: 0;
+        }
+        .header-list {
+          height: 40px;
+          line-height: 40px;
+          padding: 0 5px;
+          display: flex;
+          gap: 10px;
+          li {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            padding: 0 15px;
+            border-radius: 6px;
+            &.active {
+              background: #0D1B2A;
+            }
+          }
+        }
+      }
+      .income-list-main {
+        display: flex;
+        flex-direction: column;
+        background: #0D1B2A;
+        padding: 10px;
+        .income-list-item {
+          width: 100%;
+          box-sizing:border-box;
+          -moz-box-sizing:border-box;
+          -webkit-box-sizing:border-box;
+          padding: 10px;
+          border-bottom: 1px solid #0A1724;
+          &:nth-child(2n) {
+            background: #0D1B2A;
+          }
+          .income-list-item-info {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            p {
+              width: 100%;
+              color: #CCC;
+            }
+            .income-list-item-time {
+              font-size: 12px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+            }
+            .income-list-item-money {
+              flex-shrink: 0;
+              color: #CCC;
+              font-size: 15px;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+    }
+  }
+</style>

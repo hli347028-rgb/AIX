@@ -1,0 +1,73 @@
+server:
+  http:
+    addr: 0.0.0.0:9000
+    timeout: 5s
+  grpc:
+    addr: 0.0.0.0:9100
+    timeout: 5s
+data:
+  database:
+    driver: mysql
+    host: 127.0.0.1
+    port: 3306
+    user: aix
+    password: "replace-with-a-strong-database-password"
+    dbname: aix
+  redis:
+    addr: 127.0.0.1:6379
+    read_timeout: 0.2s
+    write_timeout: 0.2s
+auth:
+  jwt_secret: "replace-with-a-long-random-secret"
+  bootstrap_addresses:
+    - "0x0000000000000000000000000000000000000000"
+  admin_addresses:
+    - "0x0000000000000000000000000000000000000000"
+  admin_account: admin
+  admin_password: "replace-with-a-strong-admin-password"
+  challenge_ttl: 5m
+  # 第三方 Open API 密钥（可配置多个）；请求头 X-API-Key: <key>
+  open_api_keys:
+    - "replace-with-open-api-key"
+wallet:
+  deposit_contract: "0xe11c2F7902CB03cAA38F80B27DC20702af14D5c7"
+  # 原生 WIN 充值合约（BuySomething payable）
+  win_deposit_contract: "0x6A82cFF59da0cC4E31C13E92C396Cbdcafcf3cA9"
+  deposit_address: "replace-with-your-deposit-address"
+  deposit_addresses:
+    - "replace-with-your-deposit-address"
+  usdt_contract: "0x926632975149221891f1b9B56Efd125Dfe90ba2f"
+  usdt_decimals: 18
+  # WIN ERC20 合约（用于 WIN 充值链上校验）；留空时仅允许管理端人工入账 / 开发模式
+  win_contract: ""
+  win_decimals: 18
+  rpc_url: "https://rpc1.eoeo.info"
+  # 进程内充值轮询。改用 crontab 时必须为 false，否则会与 cron 重复扫链。
+  # false 时仍可通过 GET /api/admin_dhb/deposit_only 与 deposit_only_win 触发（幂等）。
+  recharge_monitor_enabled: false
+  # 每60秒启动一轮；每轮查询10次，相邻查询间隔5秒。（仅 recharge_monitor_enabled=true 时生效）
+  recharge_scan_interval_seconds: 60
+  recharge_scan_queries_per_cycle: 10
+  recharge_scan_query_interval_seconds: 5
+  recharge_confirmations: 3
+  # 仅首次启动且尚无持久化游标时使用；0 表示从最新安全区块向前回看。
+  recharge_scan_start_block: 0
+  recharge_scan_lookback_blocks: 5000
+  recharge_scan_batch_blocks: 1000
+  min_subscribe: "100"
+  min_withdraw: "10"
+  withdraw_fee_rate: 0.06
+  # WinSwap V2 Pair（WWIN/USDT）链上 WIN 价格预言机
+  win_pair: "0x15ad085fc866370b59936575565434b14d22281d"
+  # 进程内价格轮询。改用 crontab 时必须为 false，与 cron 互斥。
+  # false 时仍可通过 GET /api/admin_dhb/win_price_oracle 触发。
+  win_price_oracle_enabled: false
+  # 以下仅 win_price_oracle_enabled=true 时生效
+  win_price_poll_seconds: 60
+  win_price_queries_per_cycle: 10
+  win_price_query_interval_seconds: 5
+  # WIN 提现自动打款：私钥仅部署在服务器（环境变量或 key 文件），勿提交到 git
+  withdraw_payout_enabled: true
+  withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
+  withdraw_payout_queries_per_cycle: 10
+  withdraw_payout_query_interval_seconds: 5

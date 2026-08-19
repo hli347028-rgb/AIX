@@ -1,0 +1,15 @@
+# Build output
+bin/
+logs/
+*.exe
+*.exe~
+
+# Dependencies
+node_modules/
+
+# Local env (do not commit secrets)
+.env
+.env.local
+.env.prod
+.env.*.local
+!*.env.example
