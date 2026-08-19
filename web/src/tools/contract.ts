@@ -5,32 +5,70 @@ import { showFailToast } from 'vant' // 导入用于显示提示信息的组件
 import abi from './abi.json' // 导入智能合约 ABI
 import lang from '@/i18n/index'
 
-const AIX_CHAIN_ID = Number(import.meta.env.VITE_CHAINID || 86233268)
-const AIX_CHAIN_ID_HEX = `0x${AIX_CHAIN_ID.toString(16)}`
-const AIX_RPC_URL = import.meta.env.VITE_RPC_URL || 'https://rpc1.eoeo.info'
+export type ChainKey = 'eoeo' | 'bsc'
+
+type ChainConfig = {
+  chainId: number
+  chainIdHex: string
+  chainName: string
+  rpcUrl: string
+  nativeCurrency: { name: string; symbol: string; decimals: number }
+  blockExplorerUrls?: string[]
+}
+
+const EOEO_CHAIN_ID = Number(import.meta.env.VITE_CHAINID || 86233268)
+const BSC_CHAIN_ID = Number(import.meta.env.VITE_BSC_CHAINID || 56)
+
+const CHAINS: Record<ChainKey, ChainConfig> = {
+  eoeo: {
+    chainId: EOEO_CHAIN_ID,
+    chainIdHex: `0x${EOEO_CHAIN_ID.toString(16)}`,
+    chainName: 'EOEO',
+    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc1.eoeo.info',
+    nativeCurrency: {
+      name: 'WIN',
+      symbol: 'WIN',
+      decimals: 18
+    }
+  },
+  bsc: {
+    chainId: BSC_CHAIN_ID,
+    chainIdHex: `0x${BSC_CHAIN_ID.toString(16)}`,
+    chainName: 'BNB Smart Chain',
+    rpcUrl: import.meta.env.VITE_BSC_RPC_URL || 'https://bsc-dataseed.binance.org',
+    nativeCurrency: {
+      name: 'BNB',
+      symbol: 'BNB',
+      decimals: 18
+    },
+    blockExplorerUrls: ['https://bscscan.com']
+  }
+}
 
 /* 链接钱包类 */
 export class ETH {
   public static provider: any = undefined // 提供者
   public static account: string = '' // 钱包地址
   public static signer: any = undefined // 用户签名者
-  // 链接钱包返回钱包地址
-  public static async getAccount(): Promise<string> {
+  // 链接钱包返回钱包地址；USDT 充值传 'bsc'，WIN 及其他默认 'eoeo'
+  public static async getAccount(chain: ChainKey = 'eoeo'): Promise<string> {
     const ethereum: any = await detectEthereumProvider()
     if (!ethereum) {
       showFailToast(lang('请安装钱包'))
       throw lang('请安装钱包')
     }
 
+    const target = CHAINS[chain] || CHAINS.eoeo
+
     // 先授权账号，再按需切链。已在目标链时不要再发 switch，
     // 部分手机钱包（TokenPocket / imToken）对已在当前链的 switch 会一直不返回。
     const accounts = await ethereum.request({ method: 'eth_requestAccounts' })
     const currentChainId = Number(await ethereum.request({ method: 'eth_chainId' }))
-    if (currentChainId !== AIX_CHAIN_ID) {
+    if (currentChainId !== target.chainId) {
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: AIX_CHAIN_ID_HEX }]
+          params: [{ chainId: target.chainIdHex }]
         })
       } catch (error: any) {
         const errorCode = error?.code ?? error?.data?.originalError?.code
@@ -39,14 +77,11 @@ export class ETH {
             method: 'wallet_addEthereumChain',
             params: [
               {
-                chainId: AIX_CHAIN_ID_HEX,
-                chainName: 'EOEO',
-                rpcUrls: [AIX_RPC_URL],
-                nativeCurrency: {
-                  name: 'WIN',
-                  symbol: 'WIN',
-                  decimals: 18
-                }
+                chainId: target.chainIdHex,
+                chainName: target.chainName,
+                rpcUrls: [target.rpcUrl],
+                nativeCurrency: target.nativeCurrency,
+                ...(target.blockExplorerUrls ? { blockExplorerUrls: target.blockExplorerUrls } : {})
               }
             ]
           })
@@ -59,8 +94,8 @@ export class ETH {
     ETH.provider = new ethers.providers.Web3Provider(ethereum)
     const chainId = Number(await ethereum.request({ method: 'eth_chainId' }))
     console.log('chainId', chainId)
-    if (chainId !== AIX_CHAIN_ID) {
-      const message = `请切换至 EOEO 网络（Chain ID: ${AIX_CHAIN_ID}）`
+    if (chainId !== target.chainId) {
+      const message = `请切换至 ${target.chainName} 网络（Chain ID: ${target.chainId}）`
       showFailToast(message)
       throw new Error(message)
     }

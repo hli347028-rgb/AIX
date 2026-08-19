@@ -10,7 +10,7 @@ export interface WinChainRechargeRecord {
 
 /** 从 BuySomething 合约读取当前用户的 WIN 充值记录（num 份数） */
 export async function fetchWinRechargeRecords(address?: string): Promise<WinChainRechargeRecord[]> {
-  await ETH.getAccount()
+  await ETH.getAccount('eoeo')
   const userAddress = (address || ETH.account || '').toLowerCase()
   if (!userAddress) return []
 

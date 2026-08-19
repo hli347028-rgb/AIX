@@ -13,7 +13,7 @@
     <div class="withdraw-dialog">
       <h3 class="dialog-heading">{{ $t('recharge.recharge') }}</h3>
 
-      <a-radio-group v-model:value="assetType" button-style="solid" class="asset-tabs" @change="resetAmount">
+      <a-radio-group v-model:value="assetType" button-style="solid" class="asset-tabs" @change="onAssetTypeChange">
         <a-radio-button value="usdt">USDT</a-radio-button>
         <a-radio-button value="win">WIN</a-radio-button>
       </a-radio-group>
@@ -142,21 +142,31 @@ const stopRechargeLoading = () => {
   closeToast()
 }
 
+const rechargeChain = () => (assetType.value === 'usdt' ? 'bsc' : 'eoeo')
+
+const ensureRechargeChain = async () => {
+  await ETH.getAccount(rechargeChain())
+}
+
 const open = async () => {
   assetType.value = 'usdt'
   amount.value = null
   await person.refreshProfile?.()
-  await refreshNativeBalance()
+  await ensureRechargeChain()
   isOpen.value = true
 }
 
-const resetAmount = () => {
+const onAssetTypeChange = async () => {
   amount.value = null
+  await ensureRechargeChain()
+  if (assetType.value === 'win') {
+    await refreshNativeBalance()
+  }
 }
 
 const refreshNativeBalance = async () => {
   try {
-    await ETH.getAccount()
+    await ETH.getAccount('eoeo')
     nativeWinBalance.value = await ETH.getNativeBalance()
   } catch {
     nativeWinBalance.value = '0'
@@ -221,7 +231,7 @@ const submitUsdtRecharge = async () => {
   }
 
   // 无论余额够不够，都先唤起钱包支付；授权查询 / 余额判断放在钱包弹出之后
-  await ETH.getAccount()
+  await ETH.getAccount('bsc')
   try {
     await sendUsdtBuy(count, { silent: true })
   } catch (error) {
@@ -259,7 +269,7 @@ const submitWinRecharge = async () => {
   }
 
   // 无论余额够不够，都先唤起钱包支付；余额判断放在钱包弹出之后
-  await ETH.getAccount()
+  await ETH.getAccount('eoeo')
   const value = ethers.utils.parseEther(String(num))
   const beforeBalance = String(person.profile?.win_recharge_balance || '0')
   let hash = ''
