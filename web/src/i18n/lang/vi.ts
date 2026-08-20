@@ -52,7 +52,7 @@ export default {
     staticIncomeRule: 'Tĩnh: Vốn gốc × 0,5%/ngày, quy đổi sang token AIX theo giá hiện tại',
     directReferralRule: 'Giới thiệu trực tiếp: Chỉ phát sinh từ lệnh ví nạp; 50% USDT vào ví thưởng',
     managementRewardRule: 'Thưởng quản lý: Chênh lệch cấp A1–A10; USDT vào ví thưởng',
-    exitRule: 'Mục tiêu thoát tính theo USDT; chỉ có thể rút AIX',
+    exitRule: 'Mục tiêu thoát tính theo USDT; chỉ có thể rút WIN',
     nodeOutput: 'Đầu ra Node：',
     blockInterval: 'Khoảng thời gian khối：3 seconds/block',
     blocksPerDay: 'Số khối mỗi 24h：22300',

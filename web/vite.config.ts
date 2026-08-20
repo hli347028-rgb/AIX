@@ -6,7 +6,7 @@ import postcssPluginPx2rem from "postcss-plugin-px2rem";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
-    const proxyTarget = env.VITE_PROXY_TARGET || 'http://192.168.3.6:8081'
+    const proxyTarget = env.VITE_PROXY_TARGET || 'https://aixai.pro'
     return {
     plugins: [vue({
         reactivityTransform: true,

@@ -52,7 +52,7 @@ export default {
     staticIncomeRule: 'Static: Principal × 0.5%/day, converted into AIX at the current price',
     directReferralRule: 'Direct referral: Generated only by recharge-wallet orders; 50% USDT enters the reward wallet',
     managementRewardRule: 'Management reward: A1–A10 level difference; USDT enters the reward wallet',
-    exitRule: 'Exit target is calculated in USDT; only AIX can be withdrawn',
+    exitRule: 'Exit target is calculated in USDT; only WIN can be withdrawn',
     nodeOutput: 'Node Output:',
     blockInterval: 'Block Interval: 3 seconds/block',
     blocksPerDay: 'Blocks per 24h: 22300',

@@ -52,7 +52,7 @@ export default {
     staticIncomeRule: '静的収益：元本 × 0.5%/日を現在価格でAIXトークンに換算',
     directReferralRule: '直接紹介：入金ウォレットからの注文のみ対象、50% USDTを報酬ウォレットへ',
     managementRewardRule: '管理報酬：A1～A10のレベル差、USDTを報酬ウォレットへ',
-    exitRule: '退出目標はUSDTで計算し、出金できるのはAIXのみ',
+    exitRule: '退出目標はUSDTで計算し、出金できるのはWINのみ',
     nodeOutput: 'ノード出力：',
     blockInterval: 'ブロック出力間隔：3 seconds/block',
     blocksPerDay: '24時間ブロック数：22300',

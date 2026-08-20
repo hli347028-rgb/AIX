@@ -79,7 +79,7 @@ const navItems = computed(() => [
   { key: 'assets', label: $t('tab.myAssets'), path: '/wallet' },
   { key: 'recharge', label: $t('tab.rechargeZone'), path: '/recharge' },
   { key: 'order', label: $t('tab.orderZone'), path: '/node' },
-  { key: 'announcements', label: $t('announcement.title'), path: '/announcements' },
+  { key: 'announcements', label: $t('announcement.title'), upcoming: true },
   { key: 'bridge', label: $t('tab.crossChain'), href: BRIDGE_URL },
   { key: 'launch', label: $t('tab.globalLaunch'), upcoming: true },
   { key: 'walletDl', label: $t('tab.walletDownload'), upcoming: true },
