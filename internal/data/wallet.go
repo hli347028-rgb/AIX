@@ -1510,7 +1510,8 @@ func (r *walletRepo) ListWithdrawalsByUser(ctx context.Context, userID int64) ([
 		out = append(out, &biz.Withdrawal{
 			ID: po.ID, UserID: po.UserID, ToAddress: po.ToAddress,
 			Amount: po.Amount.String(), Fee: po.Fee.String(), NetAmount: po.PayAmount.String(),
-			Status: po.Status, TxHash: po.TxHash, Asset: po.Asset, CreatedAt: po.CreatedTime,
+			Status: po.Status, TxHash: po.TxHash, Asset: po.Asset, Remark: po.Remark,
+			CreatedAt: po.CreatedTime, UpdatedAt: po.UpdatedTime,
 		})
 	}
 	return out, nil
@@ -1561,7 +1562,10 @@ func withdrawalPOToBiz(po *WithdrawalPO, userAddr string) *biz.Withdrawal {
 		ToAddress: po.ToAddress, Amount: po.Amount.String(),
 		Fee: po.Fee.String(), NetAmount: po.PayAmount.String(),
 		Status: po.Status, TxHash: po.TxHash, Asset: po.Asset,
+		PayoutNonce: po.PayoutNonce,
+		Remark:      po.Remark,
 		CreatedAt: po.CreatedTime,
+		UpdatedAt: po.UpdatedTime,
 	}
 }
 
@@ -1616,20 +1620,52 @@ func (r *walletRepo) SetWithdrawalTxHash(ctx context.Context, id int64, txHash s
 
 func (r *walletRepo) CompleteWithdrawalPayout(ctx context.Context, id int64, txHash string) error {
 	txHash = strings.TrimSpace(txHash)
-	res := r.data.db.WithContext(ctx).Model(&WithdrawalPO{}).
-		Where("id = ? AND status != ?", id, biz.WithdrawStatusCompleted).
-		Updates(map[string]interface{}{
-			"status": biz.WithdrawStatusCompleted,
-			"tx_hash": txHash,
-			"remark":  "chain payout completed",
-		})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return fmt.Errorf("withdrawal %d already completed or not found", id)
-	}
-	return nil
+	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var confirmedCount int64
+		if err := tx.Model(&WithdrawalPayoutPO{}).
+			Where("withdraw_id = ? AND status = ?", id, biz.PayoutStatusConfirmed).
+			Count(&confirmedCount).Error; err != nil {
+			return err
+		}
+		if confirmedCount == 0 {
+			res := tx.Model(&WithdrawalPayoutPO{}).
+				Where("withdraw_id = ? AND tx_hash = ?", id, txHash).
+				Update("status", biz.PayoutStatusConfirmed)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				var po WithdrawalPO
+				if err := tx.Select("pay_amount", "to_address").First(&po, id).Error; err != nil {
+					return fmt.Errorf("payout attempt not found for tx %s", txHash)
+				}
+				if err := tx.Create(&WithdrawalPayoutPO{
+					WithdrawID: id,
+					TxHash:     txHash,
+					ToAddress:  strings.ToLower(po.ToAddress),
+					Amount:     po.PayAmount,
+					Status:     biz.PayoutStatusConfirmed,
+				}).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		res := tx.Model(&WithdrawalPO{}).
+			Where("id = ? AND status != ?", id, biz.WithdrawStatusCompleted).
+			Updates(map[string]interface{}{
+				"status":  biz.WithdrawStatusCompleted,
+				"tx_hash": txHash,
+				"remark":  "chain payout completed",
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return fmt.Errorf("withdrawal %d already completed or not found", id)
+		}
+		return nil
+	})
 }
 
 func (r *walletRepo) ReleaseWithdrawalPayout(ctx context.Context, id int64, remark string) error {
@@ -1649,6 +1685,10 @@ func (r *walletRepo) ReleaseWithdrawalPayout(ctx context.Context, id int64, rema
 		return nil
 	}
 	return nil
+}
+
+func (r *walletRepo) ResetWithdrawalForRetry(ctx context.Context, id int64, remark string) error {
+	return r.safeResetWithdrawalForRetry(ctx, id, remark)
 }
 
 func (r *walletRepo) ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*biz.Withdrawal, error) {

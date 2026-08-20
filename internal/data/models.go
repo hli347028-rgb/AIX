@@ -103,11 +103,28 @@ type WithdrawalPO struct {
 	TxHash      string          `gorm:"column:tx_hash;size:66"`
 	Status      string          `gorm:"size:16;default:pending;not null"`
 	Remark      string          `gorm:"size:255"`
+	PayoutNonce *uint64         `gorm:"column:payout_nonce"`
 	CreatedTime time.Time       `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime time.Time       `gorm:"column:updated_time;autoUpdateTime"`
 }
 
 func (WithdrawalPO) TableName() string { return "withdrawals" }
+
+// WithdrawalPayoutPO tracks each on-chain payout attempt for idempotency.
+type WithdrawalPayoutPO struct {
+	ID           int64           `gorm:"primaryKey;autoIncrement"`
+	WithdrawID   int64           `gorm:"column:withdraw_id;index;not null"`
+	TxHash       string          `gorm:"column:tx_hash;uniqueIndex;size:66;not null"`
+	Nonce        uint64          `gorm:"not null"`
+	FromAddress  string          `gorm:"column:from_address;size:42;not null"`
+	ToAddress    string          `gorm:"column:to_address;size:42;not null"`
+	Amount       decimal.Decimal `gorm:"type:decimal(36,18);not null"`
+	Status       string          `gorm:"size:16;not null"` // submitted, confirmed, failed
+	CreatedTime  time.Time       `gorm:"column:created_time;autoCreateTime"`
+	UpdatedTime  time.Time       `gorm:"column:updated_time;autoUpdateTime"`
+}
+
+func (WithdrawalPayoutPO) TableName() string { return "withdrawal_payouts" }
 
 // ExchangeRecordPO AIX → WIN 兑换记录
 type ExchangeRecordPO struct {

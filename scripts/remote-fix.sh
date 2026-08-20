@@ -1,9 +1,11 @@
 #!/bin/bash
 set -euo pipefail
-export MYSQL_PWD=root
+# 部署时请 export MYSQL_PWD=你的数据库密码（勿把真实密码提交到仓库）
+: "${MYSQL_PWD:?set MYSQL_PWD before running}"
+export MYSQL_PWD
 
-mysql --user=root <<'SQL'
-CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED WITH caching_sha2_password BY 'root';
+mysql --user=root <<SQL
+CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED WITH caching_sha2_password BY '${MYSQL_PWD}';
 GRANT ALL PRIVILEGES ON aix.* TO 'root'@'127.0.0.1';
 FLUSH PRIVILEGES;
 SQL

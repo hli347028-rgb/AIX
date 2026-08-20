@@ -11,33 +11,34 @@ data:
     host: 127.0.0.1
     port: 3306
     user: root
-    password: root
+    password: "******"
     dbname: aix
   redis:
     addr: 127.0.0.1:6379
     read_timeout: 0.2s
     write_timeout: 0.2s
 auth:
-  jwt_secret: "change-me-in-production"
+  jwt_secret: "******"
   bootstrap_addresses:
     - "0x0000000000000000000000000000000000000000"
   admin_addresses:
     - "0x0000000000000000000000000000000000000000"
   admin_account: admin
-  admin_password: "aixadmin...123"
+  admin_password: "******"
   challenge_ttl: 5m
   open_api_keys:
-    - "489b30e3d783489e61935824dda76610845ebc284aa905d1"
+    - "******"
 wallet:
-  deposit_contract: "0xe11c2F7902CB03cAA38F80B27DC20702af14D5c7"
+  deposit_contract: "0xf3cbF4487CaBD4Cd92C3d09d669C43001Ae4E53F"
   win_deposit_contract: "0x6A82cFF59da0cC4E31C13E92C396Cbdcafcf3cA9"
   deposit_address: "0xB8726F15099956183C3a0431791458A096404Ca6"
   deposit_addresses:
     - "0xB8726F15099956183C3a0431791458A096404Ca6"
     - "0x9e3730f324476C15b9CF1B1991E0c2CC5C8d1575"
-  usdt_contract: "0x926632975149221891f1b9B56Efd125Dfe90ba2f"
+  usdt_contract: "0x55d398326f99059fF775485246999027B3197955"
   usdt_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
+  bsc_rpc_url: "https://bsc-dataseed.binance.org"
   recharge_monitor_enabled: false
   recharge_scan_interval_seconds: 60
   recharge_scan_queries_per_cycle: 10
@@ -54,7 +55,7 @@ wallet:
   win_price_poll_seconds: 60
   win_price_queries_per_cycle: 10
   win_price_query_interval_seconds: 5
-  win_contract: ""
+  win_contract: "0x193013574dacbd38bf26ecb654b3fd787b94d216"
   win_decimals: 18
   withdraw_payout_enabled: true
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"

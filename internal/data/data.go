@@ -29,10 +29,13 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		return nil, nil, err
 	}
 	if err := db.AutoMigrate(
-		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{},
+		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
 		&ExchangeRecordPO{},
 	); err != nil {
+		return nil, nil, err
+	}
+	if err := ensureWithdrawalPayoutGuards(db); err != nil {
 		return nil, nil, err
 	}
 	if err := ensureSettlementBatchMultiPerDay(db); err != nil {

@@ -25,6 +25,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/withdraw-aix", wallet.HandleWithdrawAIX)
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
 	r.POST("/v1/wallet/withdraw-win", wallet.HandleWithdrawWIN)
+	r.GET("/v1/wallet/withdraw-records", wallet.HandleWithdrawRecords)
 	r.GET("/v1/wallet/exchange-records", wallet.HandleExchangeRecords)
 	r.GET("/v1/wallet/aix-price", wallet.HandleAixPrice)
 	r.GET("/v1/wallet/rewards", wallet.HandleRewards)
@@ -609,6 +610,36 @@ func (s *WalletService) HandleExchangeRecords(ctx khttp.Context) error {
 			"status":         r.Status,
 			"remark":         r.Remark,
 			"created_at":     r.CreatedTime.Unix(),
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{"records": items})
+}
+
+// HandleWithdrawRecords 用户端：查询本人的 WIN 提现记录
+func (s *WalletService) HandleWithdrawRecords(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	records, err := s.uc.ListWithdrawals(ctx, token)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, r := range records {
+		asset := strings.TrimSpace(r.Asset)
+		if asset == "" {
+			asset = biz.TokenWIN
+		}
+		items = append(items, map[string]any{
+			"id":         r.ID,
+			"asset":      asset,
+			"amount":     r.Amount,
+			"fee":        r.Fee,
+			"net_amount": r.NetAmount,
+			"to_address": r.ToAddress,
+			"status":     r.Status,
+			"tx_hash":    r.TxHash,
+			"remark":     r.Remark,
+			"created_at": r.CreatedAt.Unix(),
+			"updated_at": r.UpdatedAt.Unix(),
 		})
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{"records": items})

@@ -29,6 +29,10 @@ const (
 	WithdrawStatusCompleted = "completed"
 	WithdrawStatusFailed    = "failed"
 
+	PayoutStatusSubmitted = "submitted"
+	PayoutStatusConfirmed = "confirmed"
+	PayoutStatusFailed    = "failed"
+
 	TokenUSDT = "USDT"
 	TokenAIX  = "AIX"
 	TokenWIN  = "WIN"
@@ -182,9 +186,25 @@ type Withdrawal struct {
 	Fee       string
 	NetAmount string
 	Status    string
-	TxHash    string
-	Asset     string
-	CreatedAt time.Time
+	TxHash      string
+	PayoutNonce *uint64
+	Asset       string
+	Remark      string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// WithdrawalPayoutAttempt tracks one on-chain payout broadcast.
+type WithdrawalPayoutAttempt struct {
+	ID          int64
+	WithdrawID  int64
+	TxHash      string
+	Nonce       uint64
+	FromAddress string
+	ToAddress   string
+	Amount      string
+	Status      string
+	CreatedAt   time.Time
 }
 
 // ExchangeRecord AIX → WIN 兑换记录
@@ -307,8 +327,15 @@ type WalletRepo interface {
 	SetWithdrawalTxHash(ctx context.Context, id int64, txHash string) error
 	CompleteWithdrawalPayout(ctx context.Context, id int64, txHash string) error
 	ReleaseWithdrawalPayout(ctx context.Context, id int64, remark string) error
+	ResetWithdrawalForRetry(ctx context.Context, id int64, remark string) error
+	HasConfirmedWithdrawalPayout(ctx context.Context, withdrawID int64) (bool, error)
+	CreateWithdrawalPayoutAttempt(ctx context.Context, withdrawID int64, txHash, fromAddress, toAddress, amount string, nonce uint64) error
+	ListWithdrawalPayoutAttempts(ctx context.Context, withdrawID int64) ([]*WithdrawalPayoutAttempt, error)
+	MarkWithdrawalPayoutFailed(ctx context.Context, withdrawID int64, txHash string) error
+	SetWithdrawalPayoutNonce(ctx context.Context, id int64, nonce uint64) error
+	ListDoingWithdrawalsWithoutTxHash(ctx context.Context) ([]*Withdrawal, error)
+	ListStaleDoingWinWithdrawals(ctx context.Context, staleBefore time.Time) ([]*Withdrawal, error)
 	ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*Withdrawal, error)
-	ReleaseStaleDoingWithdrawals(ctx context.Context, staleBefore time.Time) (int64, error)
 	AdminUpdateOrder(ctx context.Context, update *AdminOrderUpdate) (*Order, error)
 }
 
