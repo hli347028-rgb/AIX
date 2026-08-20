@@ -1133,7 +1133,7 @@ func formatMgmtVIP(level int32) string {
 	if level > 10 {
 		level = 10
 	}
-	return "W" + strconv.Itoa(int(level))
+	return "A" + strconv.Itoa(int(level))
 }
 
 func parseMgmtLevel(raw string) int32 {
@@ -1141,7 +1141,9 @@ func parseMgmtLevel(raw string) int32 {
 	if raw == "" {
 		return 0
 	}
-	raw = strings.TrimPrefix(strings.ToUpper(raw), "W")
+	raw = strings.ToUpper(raw)
+	raw = strings.TrimPrefix(raw, "A")
+	raw = strings.TrimPrefix(raw, "W")
 	raw = strings.TrimPrefix(raw, "V")
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 0 {

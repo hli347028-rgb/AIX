@@ -131,7 +131,7 @@ func CalcExitCap(principal decimal.Decimal) decimal.Decimal {
 	return principal.Mul(mul)
 }
 
-// MgmtLevelByPerf returns W level 0-10 from small-area performance.
+// MgmtLevelByPerf returns A level 0-10 from small-area performance.
 func MgmtLevelByPerf(perf decimal.Decimal) int32 {
 	level := int32(0)
 	for i := len(MgmtThresholds) - 1; i >= 0; i-- {
@@ -143,7 +143,7 @@ func MgmtLevelByPerf(perf decimal.Decimal) int32 {
 	return level
 }
 
-// MgmtRateForLevel returns rate for W level (1-10); 0 for W0.
+// MgmtRateForLevel returns rate for A level (1-10); 0 for A0.
 func MgmtRateForLevel(level int32) float64 {
 	if level < 1 || int(level) > len(MgmtRates) {
 		return 0

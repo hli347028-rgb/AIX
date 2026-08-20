@@ -144,8 +144,17 @@ const inviteUrl = computed(() => {
 })
 
 const levelLabel = computed(() => {
-  const lv = Number(userinfo.value?.level || 0)
-  return lv > 0 ? `V${lv}` : 'V0'
+  const raw = String(
+    userinfo.value?.communityLevel ||
+      userinfo.value?.community_level ||
+      userinfo.value?.level ||
+      '0',
+  )
+    .trim()
+    .toUpperCase()
+  const n = parseInt(raw.replace(/^[WAV]/g, ''), 10)
+  const lv = Number.isFinite(n) && n > 0 ? Math.min(n, 10) : 0
+  return `A${lv}`
 })
 
 let rewardList = $ref<any[]>([])

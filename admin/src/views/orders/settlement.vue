@@ -5,7 +5,7 @@
                 type="info"
                 show-icon
                 style="margin-bottom: 16px"
-                message="每日结算会执行：静态奖（金本位发 AIX）+ 管理奖（W1–W10 级差，USDT 进奖励账本）。系统默认在中国时区 0 点自动跑「昨日」结算；管理端可手动触发。"
+                message="每日结算会执行：静态奖（金本位发 AIX）+ 管理奖（A1–A10 级差，USDT 进奖励账本）。系统默认在中国时区 0 点自动跑「昨日」结算；管理端可手动触发。"
             />
             <a-row :gutter="10" class="inputGroup" style="margin-bottom: 16px">
                 <a-col :xs="24" :md="8" :lg="6" :xl="5">

@@ -295,10 +295,11 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 		updates["role"] = update.Role
 	}
 	if update.SetCommunityLevel {
-		// parse W0-W10 or bare 0-10
+		// parse A0-A10 / W0-W10 / V0-V10 or bare 0-10
 		level := int32(0)
-		lv := strings.TrimSpace(update.CommunityLevel)
-		lv = strings.TrimPrefix(strings.ToUpper(lv), "W")
+		lv := strings.ToUpper(strings.TrimSpace(update.CommunityLevel))
+		lv = strings.TrimPrefix(lv, "A")
+		lv = strings.TrimPrefix(lv, "W")
 		lv = strings.TrimPrefix(lv, "V")
 		if n, err := strconv.Atoi(lv); err == nil && n >= 0 {
 			if n > 10 {
@@ -390,14 +391,17 @@ func (r *userRepo) IsWithdrawReset(ctx context.Context, userID int64) (bool, err
 }
 func (r *userRepo) UpdateCommunityStats(ctx context.Context, userID int64, level string, communityStake, teamStake string) error {
 	lv := int32(0)
-	if len(level) >= 2 && (level[0] == 'W' || level[0] == 'w') {
-		n := 0
-		for i := 1; i < len(level); i++ {
-			if level[i] >= '0' && level[i] <= '9' {
-				n = n*10 + int(level[i]-'0')
+	if len(level) >= 2 {
+		prefix := level[0]
+		if prefix == 'A' || prefix == 'a' || prefix == 'W' || prefix == 'w' || prefix == 'V' || prefix == 'v' {
+			n := 0
+			for i := 1; i < len(level); i++ {
+				if level[i] >= '0' && level[i] <= '9' {
+					n = n*10 + int(level[i]-'0')
+				}
 			}
+			lv = int32(n)
 		}
-		lv = int32(n)
 	}
 	return r.UpdateMgmtStats(ctx, userID, lv, communityStake, teamStake)
 }

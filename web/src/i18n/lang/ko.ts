@@ -51,7 +51,7 @@ export default {
     rulesSummaryTitle: '二、규칙 요약',
     staticIncomeRule: '정적 수익: 원금 × 0.5%/일, 현재 가격으로 AIX 토큰 환산',
     directReferralRule: '직접 추천: 충전 지갑 주문에서만 발생하며 50% USDT가 보상 지갑으로 지급',
-    managementRewardRule: '관리 보상: W1–W10 레벨 차등, USDT가 보상 지갑으로 지급',
+    managementRewardRule: '관리 보상: A1–A10 레벨 차등, USDT가 보상 지갑으로 지급',
     exitRule: '출국 목표는 USDT 기준으로 계산되며 AIX만 출금 가능',
     nodeOutput: '노드 출력：',
     blockInterval: '블록 출력 간격：3 seconds/block',

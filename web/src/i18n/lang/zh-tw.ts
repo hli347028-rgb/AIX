@@ -51,7 +51,7 @@ export default {
     rulesSummaryTitle: '二、規則摘要',
     staticIncomeRule: '靜態：本金 × 0.5%/日，按價格換算為 AIX 代幣',
     directReferralRule: '直推：僅充值錢包報單產生，50% USDT 進入獎勵錢包',
-    managementRewardRule: '管理獎：W1–W10 級差，USDT 進入獎勵錢包',
+    managementRewardRule: '管理獎：A1–A10 級差，USDT 進入獎勵錢包',
     exitRule: '出局目標按 USDT 計算；僅可提現 AIX',
     nodeOutput: '節點輸出：',
     blockInterval: '塊輸出間隔：3 seconds/block',

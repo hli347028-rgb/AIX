@@ -77,12 +77,16 @@ export default {
                     dataIndex: 'amountUsdtCurrent',
                 },
                 {
-                    title: '管理级别',
+                    title: '社区等级',
                     dataIndex: 'mgmt_level',
                     customRender: (v, row) => {
-                        if (row && row.vip) return row.vip
+                        if (row && row.vip) {
+                            const raw = String(row.vip).toUpperCase().replace(/^[WAV]/g, '')
+                            const n = parseInt(raw, 10)
+                            return 'A' + (Number.isFinite(n) ? Math.min(Math.max(n, 0), 10) : 0)
+                        }
                         const n = parseInt(v, 10) || 0
-                        return 'W' + n
+                        return 'A' + Math.min(Math.max(n, 0), 10)
                     }
                 },
                 {
@@ -139,7 +143,7 @@ export default {
                                             </a-menu-item>
 
                                             <a-menu-item onClick={() => this.vip_update(v.userId || v.id, v.vip || v.mgmt_level)}>
-                                                设置级别(W0~W10)
+                                                设置级别(A0~A10)
                                             </a-menu-item>
                                         </a-menu>
                                     </a-dropdown>
@@ -171,25 +175,25 @@ export default {
             })
         },
         vip_update(user_id, defaultValue) {
-            let vip = String(defaultValue == null ? '0' : defaultValue).replace(/^W/i, '').replace(/^V/i, '')
+            let vip = String(defaultValue == null ? '0' : defaultValue).replace(/^[WAV]/gi, '')
             if (!vip) vip = '0'
             this.$confirm({
-                title: `设置级别(W0~W10)`,
+                title: `设置级别(A0~A10)`,
                 content: (
                     <a-select style="width:240px" defaultValue={vip} placeholder="选择级别" onChange={(val) => {
                         vip = val;
                     }}>
-                        <a-select-option value="0">W0（无级别）</a-select-option>
-                        <a-select-option value="1">W1</a-select-option>
-                        <a-select-option value="2">W2</a-select-option>
-                        <a-select-option value="3">W3</a-select-option>
-                        <a-select-option value="4">W4</a-select-option>
-                        <a-select-option value="5">W5</a-select-option>
-                        <a-select-option value="6">W6</a-select-option>
-                        <a-select-option value="7">W7</a-select-option>
-                        <a-select-option value="8">W8</a-select-option>
-                        <a-select-option value="9">W9</a-select-option>
-                        <a-select-option value="10">W10</a-select-option>
+                        <a-select-option value="0">A0（无级别）</a-select-option>
+                        <a-select-option value="1">A1</a-select-option>
+                        <a-select-option value="2">A2</a-select-option>
+                        <a-select-option value="3">A3</a-select-option>
+                        <a-select-option value="4">A4</a-select-option>
+                        <a-select-option value="5">A5</a-select-option>
+                        <a-select-option value="6">A6</a-select-option>
+                        <a-select-option value="7">A7</a-select-option>
+                        <a-select-option value="8">A8</a-select-option>
+                        <a-select-option value="9">A9</a-select-option>
+                        <a-select-option value="10">A10</a-select-option>
                     </a-select>
                 ),
                 centered: true,
@@ -203,7 +207,7 @@ export default {
                             reject()
                             return;
                         }
-                        Gai.vip_update({ user_id, vip: 'W' + vip }).then(() => {
+                        Gai.vip_update({ user_id, vip: 'A' + vip }).then(() => {
                             this.$message.success('级别已更新')
                             resolve()
                             this.getList()

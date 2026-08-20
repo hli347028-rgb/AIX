@@ -150,7 +150,7 @@ func maxMgmtRateBetween(sourceID, claimantID int64, parent map[int64]int64, leve
 }
 
 // ListManagementBaseLines applies the new project's tree-based differential
-// rule using this project's W1-W10 levels and rates:
+// rule using this project's A1-A10 levels and rates:
 //   - a direct downline's static reward uses the claimant's full rate;
 //   - deeper static rewards use claimant rate minus the highest intermediate rate;
 //   - an intermediate equal/higher level blocks the rewards below it.
@@ -319,7 +319,7 @@ func GetLevelByStake(stake decimal.Decimal) (string, decimal.Decimal, bool) {
 	if lv <= 0 {
 		return "", decimal.Zero, false
 	}
-	return "W" + itoa(int(lv)), decimal.NewFromFloat(MgmtRateForLevel(lv)), true
+	return "A" + itoa(int(lv)), decimal.NewFromFloat(MgmtRateForLevel(lv)), true
 }
 
 func NormalizeEcoLevel(level string) string { return level }

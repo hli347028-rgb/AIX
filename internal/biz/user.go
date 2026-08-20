@@ -34,7 +34,7 @@ type User struct {
 	// Compatibility aliases for legacy admin/auth mapping
 	Balance              string // = UsdtRecharge
 	ReleasedBalance      string // = UsdtReward
-	CommunityLevel       string // = W{mgmt_level}
+	CommunityLevel       string // = A{mgmt_level}
 	CommunityStake       string // = SmallAreaPerf
 	TeamStake            string // = TeamPerf
 	ShareProfitTotal     string
@@ -54,9 +54,9 @@ func (u *User) SyncCompatFields() {
 	u.TeamStake = u.TeamPerf
 	u.CreatedAt = u.CreatedTime
 	if u.MgmtLevel > 0 {
-		u.CommunityLevel = "W" + itoa(int(u.MgmtLevel))
+		u.CommunityLevel = "A" + itoa(int(u.MgmtLevel))
 	} else {
-		u.CommunityLevel = "W0"
+		u.CommunityLevel = "A0"
 	}
 	if u.ShareProfitTotal == "" {
 		u.ShareProfitTotal = "0"

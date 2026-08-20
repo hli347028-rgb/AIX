@@ -51,7 +51,7 @@ export default {
     rulesSummaryTitle: '二、ルール概要',
     staticIncomeRule: '静的収益：元本 × 0.5%/日を現在価格でAIXトークンに換算',
     directReferralRule: '直接紹介：入金ウォレットからの注文のみ対象、50% USDTを報酬ウォレットへ',
-    managementRewardRule: '管理報酬：W1～W10のレベル差、USDTを報酬ウォレットへ',
+    managementRewardRule: '管理報酬：A1～A10のレベル差、USDTを報酬ウォレットへ',
     exitRule: '退出目標はUSDTで計算し、出金できるのはAIXのみ',
     nodeOutput: 'ノード出力：',
     blockInterval: 'ブロック出力間隔：3 seconds/block',

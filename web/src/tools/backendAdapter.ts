@@ -270,8 +270,10 @@ async function fetchUserInfo() {
       level: p.community_level || '0',
       communityLevel: (() => {
         const lv = String(p.community_level || '').trim().toUpperCase()
-        if (!lv || lv === '0') return ''
-        return lv.startsWith('V') ? lv : `V${lv}`
+        if (!lv || lv === '0' || lv === 'A0' || lv === 'W0' || lv === 'V0') return 'A0'
+        const n = parseInt(lv.replace(/^[WAV]/g, ''), 10)
+        if (!Number.isFinite(n) || n <= 0) return 'A0'
+        return `A${Math.min(n, 10)}`
       })(),
       locationNum: String(inviteeCount),
       communityStake: p.community_stake || '0',
@@ -748,11 +750,14 @@ function mapInvitees(items: any[]) {
       item.exit_amount != null && item.exit_amount !== ''
         ? numOrZero(item.exit_amount)
         : numOrZero(item.team_stake)
-    const level = String(item.community_level || '').trim()
+    const level = String(item.community_level || '').trim().toUpperCase()
+    const n = parseInt(level.replace(/^[WAV]/g, ''), 10)
+    const levelLabel =
+      level && level !== '0' && Number.isFinite(n) && n > 0 ? `A${Math.min(n, 10)}` : 'A0'
     return {
       address: item.address,
       amount: exitAmount.toFixed(4),
-      level: level && level !== '0' ? level.toUpperCase() : '',
+      level: levelLabel,
       countLow: item.direct_count || 0,
     }
   })
