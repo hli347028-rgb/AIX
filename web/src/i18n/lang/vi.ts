@@ -388,6 +388,8 @@ export default {
     confirm: 'Xác nhận',
     noRemind: 'Không nhắc lại',
     content: 'Aix đã chính thức ra mắt',
-    gotIt: 'Đã hiểu'
+    gotIt: 'Đã hiểu',
+    empty: 'Chưa có thông báo',
+    fetchFailed: 'Không tải được thông báo'
   }
 }

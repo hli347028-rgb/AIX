@@ -45,6 +45,16 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.POST(p+"/upload_two", legacy.HandleUploadGoods)
 	r.POST(p+"/upload_three", legacy.HandleUploadGoods)
 
+	r.GET(p+"/announcement_list", legacy.HandleAnnouncementList)
+	r.GET(p+"/announcement_detail", legacy.HandleAnnouncementDetail)
+	r.POST(p+"/announcement_detail", legacy.HandleAnnouncementDetail)
+	r.POST(p+"/announcement_save", legacy.HandleAnnouncementSave)
+	r.POST(p+"/announcement_delete", legacy.HandleAnnouncementDelete)
+
+	// 用户端公告（无需登录）
+	r.GET("/v1/announcements", legacy.HandlePublicAnnouncementList)
+	r.GET("/v1/announcement/detail", legacy.HandlePublicAnnouncementDetail)
+
 	stub := legacy.HandleStubOK
 	stubRewards := legacy.HandleStubRewards
 	stubLocations := legacy.HandleStubLocations

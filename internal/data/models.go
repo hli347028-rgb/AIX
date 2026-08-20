@@ -231,3 +231,15 @@ type SettingPO struct {
 }
 
 func (SettingPO) TableName() string { return "settings" }
+
+// AnnouncementPO 系统公告（管理端编辑，用户端列表展示）
+type AnnouncementPO struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement"`
+	Title       string    `gorm:"size:256;not null"`
+	Content     string    `gorm:"type:longtext;not null"`
+	Status      int32     `gorm:"default:1;not null"` // 1=发布 0=下架
+	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime"`
+	UpdatedTime time.Time `gorm:"column:updated_time;autoUpdateTime"`
+}
+
+func (AnnouncementPO) TableName() string { return "announcements" }

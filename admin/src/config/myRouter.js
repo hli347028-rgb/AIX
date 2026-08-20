@@ -68,6 +68,19 @@ export const asyncRouterMap = [
                 meta: { title: '每日结算', keepAlive: true, icon: "setting", permission: ['dashboard'] },
             },
             {
+                path: '/news',
+                name: 'news',
+                component: () => import('@/views/public/news'),
+                meta: { title: '公告列表', keepAlive: true, icon: "notification", permission: ['dashboard'] },
+            },
+            {
+                path: '/newsEdit',
+                name: 'newsEdit',
+                component: () => import('@/views/public/newsEdit'),
+                hidden: true,
+                meta: { title: '编辑公告', keepAlive: false, permission: ['dashboard'] },
+            },
+            {
                 path: '/lookChildren',
                 name: 'lookChildren',
                 component: () => import('@/views/member/lookChildren'),

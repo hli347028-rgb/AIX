@@ -77,6 +77,21 @@ export default {
                     dataIndex: 'amountUsdtCurrent',
                 },
                 {
+                    title: '总收益',
+                    dataIndex: 'totalIncome',
+                    customRender: (v) => v || '0'
+                },
+                {
+                    title: '已释放',
+                    dataIndex: 'releasedAmount',
+                    customRender: (v) => v || '0'
+                },
+                {
+                    title: '待释放',
+                    dataIndex: 'pendingRelease',
+                    customRender: (v) => v || '0'
+                },
+                {
                     title: '社区等级',
                     dataIndex: 'mgmt_level',
                     customRender: (v, row) => {

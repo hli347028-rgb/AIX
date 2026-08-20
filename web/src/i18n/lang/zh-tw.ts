@@ -390,6 +390,8 @@ export default {
     confirm: '確認',
     noRemind: '不再提醒',
     content: 'Aix 正式上線啦',
-    gotIt: '我知道了'
+    gotIt: '我知道了',
+    empty: '暫無公告',
+    fetchFailed: '獲取公告失敗'
   }
 }

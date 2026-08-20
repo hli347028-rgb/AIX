@@ -46,9 +46,9 @@ func NewAdminLegacyService(
 }
 
 var legacyMenuPaths = []string{
-	"/home", "/member", "/recharge", "/subscription",
+	"/home", "/member", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
-	"/settlement", "/lookChildren",
+	"/settlement", "/news", "/newsEdit", "/lookChildren",
 }
 
 type legacyConfigItem struct {
@@ -158,6 +158,10 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 	if err != nil {
 		return err
 	}
+	totalIncome, releasedAmt, pendingRelease, err := s.sumOrderReleaseByUser(ctx)
+	if err != nil {
+		return err
+	}
 	directCount := map[int64]int{}
 	for _, u := range users {
 		if u.InviterID != nil {
@@ -203,6 +207,9 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"myRecommendAddress":  u.InviterAddress,
 			"bAmount":             u.UsdtRecharge,
 			"amountUsdtCurrent":   zeroIfEmpty(activeStake[u.ID]),
+			"totalIncome":         zeroIfEmpty(totalIncome[u.ID]),     // 总收益（可释放总额）
+			"releasedAmount":      zeroIfEmpty(releasedAmt[u.ID]),    // 已释放
+			"pendingRelease":      zeroIfEmpty(pendingRelease[u.ID]),  // 待释放
 			"vip":                 vip,
 			"historyRecommend":    strconv.Itoa(inviteeCount),
 		})
@@ -918,6 +925,176 @@ func (s *AdminLegacyService) triggerSettlement(ctx khttp.Context, settlementDate
 	return ctx.Result(200, map[string]string{"status": "ok", "message": "结算任务已触发"})
 }
 
+func mapAnnouncementItem(po data.AnnouncementPO) map[string]interface{} {
+	return map[string]interface{}{
+		"id":         po.ID,
+		"title":      po.Title,
+		"content":    po.Content,
+		"status":     po.Status,
+		"add_time":   po.CreatedTime.Unix(),
+		"created_at": formatLegacyTime(po.CreatedTime),
+		"updated_at": formatLegacyTime(po.UpdatedTime),
+	}
+}
+
+func (s *AdminLegacyService) HandleAnnouncementList(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	q := ctx.Request().URL.Query()
+	page, pageSize, offset := parsePage(q)
+	if num := strings.TrimSpace(q.Get("num")); num != "" {
+		if v, err := strconv.Atoi(num); err == nil && v > 0 && v <= 1000 {
+			pageSize = v
+			offset = (page - 1) * pageSize
+		}
+	}
+	db := s.data.DB().WithContext(ctx).Model(&data.AnnouncementPO{})
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return err
+	}
+	var rows []data.AnnouncementPO
+	if err := db.Order("id desc").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
+		return err
+	}
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, mapAnnouncementItem(row))
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"data":  items,
+		"count": total,
+		"page":  page,
+	})
+}
+
+func (s *AdminLegacyService) HandleAnnouncementDetail(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	_ = ctx.Request().ParseForm()
+	idStr := strings.TrimSpace(ctx.Request().URL.Query().Get("id"))
+	if idStr == "" {
+		idStr = strings.TrimSpace(ctx.Request().Form.Get("id"))
+	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		return errors.BadRequest("INVALID_ID", "公告ID无效")
+	}
+	var po data.AnnouncementPO
+	if err := s.data.DB().WithContext(ctx).First(&po, id).Error; err != nil {
+		return errors.NotFound("NOT_FOUND", "公告不存在")
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"data": mapAnnouncementItem(po),
+	})
+}
+
+func (s *AdminLegacyService) HandleAnnouncementSave(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, _ := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	title := strings.TrimSpace(ctx.Request().Form.Get("title"))
+	content := ctx.Request().Form.Get("content")
+	if title == "" {
+		return errors.BadRequest("INVALID_TITLE", "标题不能为空")
+	}
+	if strings.TrimSpace(content) == "" {
+		return errors.BadRequest("INVALID_CONTENT", "内容不能为空")
+	}
+	db := s.data.DB().WithContext(ctx)
+	if id > 0 {
+		var po data.AnnouncementPO
+		if err := db.First(&po, id).Error; err != nil {
+			return errors.NotFound("NOT_FOUND", "公告不存在")
+		}
+		po.Title = title
+		po.Content = content
+		if err := db.Save(&po).Error; err != nil {
+			return err
+		}
+		return ctx.Result(200, map[string]interface{}{"status": "ok", "data": mapAnnouncementItem(po)})
+	}
+	po := data.AnnouncementPO{Title: title, Content: content, Status: 1}
+	if err := db.Create(&po).Error; err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]interface{}{"status": "ok", "data": mapAnnouncementItem(po)})
+}
+
+func (s *AdminLegacyService) HandleAnnouncementDelete(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	if err != nil || id <= 0 {
+		return errors.BadRequest("INVALID_ID", "公告ID无效")
+	}
+	res := s.data.DB().WithContext(ctx).Delete(&data.AnnouncementPO{}, id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.NotFound("NOT_FOUND", "公告不存在")
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandlePublicAnnouncementList(ctx khttp.Context) error {
+	q := ctx.Request().URL.Query()
+	page, pageSize, offset := parsePage(q)
+	db := s.data.DB().WithContext(ctx).Model(&data.AnnouncementPO{}).Where("status = ?", 1)
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return err
+	}
+	var rows []data.AnnouncementPO
+	if err := db.Order("id desc").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
+		return err
+	}
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, map[string]interface{}{
+			"id":         row.ID,
+			"title":      row.Title,
+			"content":    row.Content,
+			"created_at": formatLegacyTime(row.CreatedTime),
+			"add_time":   row.CreatedTime.Unix(),
+		})
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"list":  items,
+		"count": total,
+		"page":  page,
+	})
+}
+
+func (s *AdminLegacyService) HandlePublicAnnouncementDetail(ctx khttp.Context) error {
+	id, err := strconv.ParseInt(strings.TrimSpace(ctx.Request().URL.Query().Get("id")), 10, 64)
+	if err != nil || id <= 0 {
+		return errors.BadRequest("INVALID_ID", "公告ID无效")
+	}
+	var po data.AnnouncementPO
+	if err := s.data.DB().WithContext(ctx).Where("id = ? AND status = ?", id, 1).First(&po).Error; err != nil {
+		return errors.NotFound("NOT_FOUND", "公告不存在")
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"id":         po.ID,
+		"title":      po.Title,
+		"content":    po.Content,
+		"created_at": formatLegacyTime(po.CreatedTime),
+		"add_time":   po.CreatedTime.Unix(),
+	})
+}
+
 func (s *AdminLegacyService) requireAdmin(ctx khttp.Context) (*biz.User, error) {
 	token := s.token(ctx)
 	if token == "" {
@@ -1067,6 +1244,35 @@ func (s *AdminLegacyService) sumActivePrincipalByUser(ctx context.Context) (map[
 		result[r.UserID] = r.Total.String()
 	}
 	return result, nil
+}
+
+// sumOrderReleaseByUser 汇总用户全部订单的可释放总额 / 已释放 / 待释放。
+func (s *AdminLegacyService) sumOrderReleaseByUser(ctx context.Context) (totalIncome, released, pending map[int64]string, err error) {
+	type row struct {
+		UserID      int64
+		TotalIncome decimal.Decimal
+		Released    decimal.Decimal
+	}
+	var rows []row
+	err = s.data.DB().WithContext(ctx).Table("orders").
+		Select("user_id, COALESCE(SUM(exit_cap),0) as total_income, COALESCE(SUM(earned_total),0) as released").
+		Group("user_id").Scan(&rows).Error
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	totalIncome = make(map[int64]string, len(rows))
+	released = make(map[int64]string, len(rows))
+	pending = make(map[int64]string, len(rows))
+	for _, r := range rows {
+		pend := r.TotalIncome.Sub(r.Released)
+		if pend.IsNegative() {
+			pend = decimal.Zero
+		}
+		totalIncome[r.UserID] = r.TotalIncome.String()
+		released[r.UserID] = r.Released.String()
+		pending[r.UserID] = pend.String()
+	}
+	return totalIncome, released, pending, nil
 }
 
 func mapLegacyBuyOrder(o *biz.AdminOrderDetail) map[string]interface{} {

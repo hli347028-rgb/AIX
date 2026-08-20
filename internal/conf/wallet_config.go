@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DefaultDepositContract    = "0xe11c2F7902CB03cAA38F80B27DC20702af14D5c7"
-	DefaultWinDepositContract = "0x6A82cFF59da0cC4E31C13E92C396Cbdcafcf3cA9"
+	DefaultDepositContract    = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
+	DefaultWinDepositContract = "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
 	DefaultRPCURL             = "https://rpc1.eoeo.info"
 )
 

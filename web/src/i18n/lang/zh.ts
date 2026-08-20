@@ -391,6 +391,8 @@ export default {
     confirm: '确认',
     noRemind: '不再提醒',
     content: 'Aix 正式上线啦',
-    gotIt: '我知道了'
+    gotIt: '我知道了',
+    empty: '暂无公告',
+    fetchFailed: '获取公告失败'
   }
 }

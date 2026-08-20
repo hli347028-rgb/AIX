@@ -388,6 +388,8 @@ export default {
     confirm: '확인',
     noRemind: '다시 보지 않기',
     content: 'Aix 가 정식 출시되었습니다',
-    gotIt: '알겠습니다'
+    gotIt: '알겠습니다',
+    empty: '공지사항이 없습니다',
+    fetchFailed: '공지사항을 불러오지 못했습니다'
   }
 }

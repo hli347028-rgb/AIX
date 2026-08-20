@@ -392,6 +392,8 @@ export default {
     confirm: 'Confirm',
     noRemind: "Don't remind again",
     content: 'Aix is officially live!',
-    gotIt: 'Got it'
+    gotIt: 'Got it',
+    empty: 'No announcements',
+    fetchFailed: 'Failed to load announcements'
   }
 }

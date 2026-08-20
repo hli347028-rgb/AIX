@@ -182,3 +182,19 @@ export function listPointsRecords() {
     records?: PointsRecord[]
   }>('/v1/wallet/points-records')
 }
+
+export interface AnnouncementItem {
+  id?: number
+  title?: string
+  content?: string
+  created_at?: string
+  add_time?: number
+}
+
+export function listAnnouncements(params?: { page?: number; page_size?: number }) {
+  return get<{ list: AnnouncementItem[]; count: number; page: number }>('/v1/announcements', params)
+}
+
+export function getAnnouncementDetail(id: number | string) {
+  return get<AnnouncementItem>('/v1/announcement/detail', { id })
+}

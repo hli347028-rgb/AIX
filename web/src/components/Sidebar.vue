@@ -39,6 +39,9 @@
           <div class="nav-item" :class="{ active: isActive('/wallet') }" @click="go('/wallet')">
             {{ $t('tab.myAssets') }}
           </div>
+          <div class="nav-item" :class="{ active: isActive('/announcements') }" @click="go('/announcements')">
+            {{ $t('announcement.title') }}
+          </div>
           <div class="nav-item external" @click="showToast($t('common.comingSoon'))">
             {{ $t('tab.globalLaunch') }}
           </div>

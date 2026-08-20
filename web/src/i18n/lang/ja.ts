@@ -388,6 +388,8 @@ export default {
     confirm: '確認',
     noRemind: '次回から表示しない',
     content: 'Aix が正式にリリースされました',
-    gotIt: 'わかりました'
+    gotIt: 'わかりました',
+    empty: 'お知らせはありません',
+    fetchFailed: 'お知らせの取得に失敗しました'
   }
 }

@@ -24,6 +24,7 @@ const mainRoutes = [
   { path: "/count", component: Count },
   { path: "/profile", component: () => import("@/views/profile/index.vue") },
   { path: "/mine", component: Mine },
+  { path: "/announcements", component: () => import("@/views/announcements.vue") },
 ];
 
 /** 旧路径 → 主路径（质押入口并到认购） */
