@@ -311,7 +311,17 @@ export default {
     aixChain: 'Aix Chain',
     globalLaunch: 'Khởi động toàn cầu',
     networkHashrate: 'Sức mạnh tính toán toàn mạng',
-    walletDownload: 'Tải xuống ví', orderZone: 'Khu đăng ký', hashrateMall: 'Cửa hàng sức mạnh tính toán'
+    walletDownload: 'Tải xuống ví',
+    orderZone: 'Khu đăng ký',
+    hashrateMall: 'Cửa hàng sức mạnh tính toán',
+    rechargeZone: 'Khu nạp tiền',
+    crossChain: 'Cầu nối chuỗi',
+    digitalBank: 'Ngân hàng số',
+    chainGameZone: 'Khu game chuỗi',
+    predictionZone: 'Khu dự đoán',
+    cloudChat: 'Cloud Chat',
+    faq: 'Hỏi đáp',
+    exchangeDownload: 'Tải sàn giao dịch'
   },
   route: {
     community: 'Cộng đồng',

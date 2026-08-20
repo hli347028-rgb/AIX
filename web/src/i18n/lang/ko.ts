@@ -311,7 +311,17 @@ export default {
     aixChain: 'Aix 체인',
     globalLaunch: '글로벌 출시',
     networkHashrate: '네트워크 해시레이트',
-    walletDownload: '지갑 다운로드', orderZone: '청약 전용', hashrateMall: '해시레이트 몰'
+    walletDownload: '지갑 다운로드',
+    orderZone: '청약 전용',
+    hashrateMall: '해시레이트 몰',
+    rechargeZone: '충전 존',
+    crossChain: '크로스체인',
+    digitalBank: '디지털 뱅크',
+    chainGameZone: '체인 게임',
+    predictionZone: '예측 존',
+    cloudChat: '클라우드 채팅',
+    faq: 'FAQ',
+    exchangeDownload: '거래소 다운로드'
   },
   route: {
     community: '커뮤니티',

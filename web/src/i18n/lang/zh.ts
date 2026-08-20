@@ -313,7 +313,17 @@ export default {
     aixChain: 'Aix链',
     globalLaunch: '全球启动',
     networkHashrate: '全网算力',
-    walletDownload: '钱包下载', orderZone: '报单专区', hashrateMall: '算力商城'
+    walletDownload: '钱包下载',
+    orderZone: '报单专区',
+    hashrateMall: '算力商城',
+    rechargeZone: '充值专区',
+    crossChain: '跨链专区',
+    digitalBank: '数字银行',
+    chainGameZone: '链游专区',
+    predictionZone: '预测专区',
+    cloudChat: '云聊专区',
+    faq: '百问百答',
+    exchangeDownload: '交易所下载'
   },
   route: {
     community: '社区',

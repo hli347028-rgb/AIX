@@ -31,8 +31,12 @@
       </div>
     </div>
     <div class="wallet-actions">
-      <button type="button" class="wallet-action" @click="router.push('/exchange')">
+      <button type="button" class="wallet-action" @click="router.push('/transfer')">
         <van-icon name="exchange" />
+        <span>{{ $t('transfer.title') }}</span>
+      </button>
+      <button type="button" class="wallet-action" @click="router.push('/exchange')">
+        <van-icon name="replay" />
         <span>{{ $t('wallet.exchange') }}</span>
       </button>
       <button type="button" class="wallet-action" @click="router.push('/withdrawal')">
@@ -548,7 +552,7 @@ const handleBack = () => {
     .wallet-actions {
       width: 100%;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
 
       .wallet-action {
@@ -556,13 +560,13 @@ const handleBack = () => {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
         box-sizing: border-box;
         border: 1px solid rgba(52, 174, 247, .42);
         border-radius: 20px;
         color: #b9e5ff;
         background: rgba(8, 123, 193, .18);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 500;
         line-height: 1;
         cursor: pointer;

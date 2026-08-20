@@ -19,39 +19,20 @@
           <span class="copy-mark" aria-hidden="true"></span>
         </div>
 
-        <!-- 菜单项：仅金牛主路径；未接能力不展示入口 -->
         <nav class="sidebar-nav">
-          <div class="nav-item" :class="{ active: isActive('/') }" @click="go('/')">
-            {{ $t('tab.home') }}
+          <div
+            v-for="item in navItems"
+            :key="item.key"
+            class="nav-item"
+            :class="{
+              active: item.path && isActive(item.path),
+              external: !!item.href,
+              upcoming: item.upcoming,
+            }"
+            @click="handleNav(item)"
+          >
+            {{ item.label }}
           </div>
-          <div class="nav-item" :class="{ active: isActive('/recharge') }" @click="go('/recharge')">
-            {{ $t('recharge.recharge') }}
-          </div>
-          <!-- <div class="nav-item" :class="{ active: isActive('/withdrawal') }" @click="go('/withdrawal')">
-            {{ $t('tab.withdraw') }}
-          </div> -->
-          <div class="nav-item" :class="{ active: isActive('/node') }" @click="go('/node')">
-            {{ $t('tab.orderZone') }}
-          </div>
-          <div class="nav-item" :class="{ active: isActive('/community') }" @click="go('/community')">
-            {{ $t('tab.myTeam') }}
-          </div>
-          <div class="nav-item" :class="{ active: isActive('/wallet') }" @click="go('/wallet')">
-            {{ $t('tab.myAssets') }}
-          </div>
-          <div class="nav-item" :class="{ active: isActive('/announcements') }" @click="go('/announcements')">
-            {{ $t('announcement.title') }}
-          </div>
-          <div class="nav-item external" @click="showToast($t('common.comingSoon'))">
-            {{ $t('tab.globalLaunch') }}
-          </div>
-          <div class="nav-item upcoming" @click="showToast($t('common.comingSoon'))">
-            {{ $t('tab.networkHashrate') }}
-          </div>
-          <div class="nav-item upcoming" @click="showToast($t('common.comingSoon'))">
-            {{ $t('tab.walletDownload') }}
-          </div>
-
         </nav>
 
       </div>
@@ -89,6 +70,27 @@ const emit = defineEmits(['close', 'languageClick'])
 const showModal = ref(false)
 const modalMessage = ref('')
 
+const BRIDGE_URL = 'https://bridge.winbit.win/'
+const EXCHANGE_DOWNLOAD_URL = 'https://download.winwallet.co/4i3kho'
+
+const navItems = computed(() => [
+  { key: 'home', label: $t('tab.home'), path: '/' },
+  { key: 'team', label: $t('tab.myTeam'), path: '/community' },
+  { key: 'assets', label: $t('tab.myAssets'), path: '/wallet' },
+  { key: 'recharge', label: $t('tab.rechargeZone'), path: '/recharge' },
+  { key: 'order', label: $t('tab.orderZone'), path: '/node' },
+  { key: 'announcements', label: $t('announcement.title'), path: '/announcements' },
+  { key: 'bridge', label: $t('tab.crossChain'), href: BRIDGE_URL },
+  { key: 'launch', label: $t('tab.globalLaunch'), upcoming: true },
+  { key: 'walletDl', label: $t('tab.walletDownload'), upcoming: true },
+  { key: 'bank', label: $t('tab.digitalBank'), upcoming: true },
+  { key: 'games', label: $t('tab.chainGameZone'), upcoming: true },
+  { key: 'predict', label: $t('tab.predictionZone'), upcoming: true },
+  { key: 'chat', label: $t('tab.cloudChat'), upcoming: true },
+  { key: 'faq', label: $t('tab.faq'), upcoming: true },
+  { key: 'exchange', label: $t('tab.exchangeDownload'), href: EXCHANGE_DOWNLOAD_URL },
+])
+
 const address = computed(() => person.address)
 
 const formatAddress = (value) => {
@@ -110,6 +112,23 @@ const go = (path) => {
     router.push(path)
   }
   close()
+}
+
+const openExternal = (url) => {
+  window.open(url, '_blank', 'noopener,noreferrer')
+  close()
+}
+
+const handleNav = (item) => {
+  if (item.path) {
+    go(item.path)
+    return
+  }
+  if (item.href) {
+    openExternal(item.href)
+    return
+  }
+  showToast($t('common.comingSoon'))
 }
 
 const close = () => {

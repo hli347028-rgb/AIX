@@ -314,7 +314,17 @@ export default {
     aixChain: 'Aix Chain',
     globalLaunch: 'Global Launch',
     networkHashrate: 'Network Hashrate',
-    walletDownload: 'Wallet Download', orderZone: 'Subscription Zone', hashrateMall: 'Hashrate Mall'
+    walletDownload: 'Wallet Download',
+    orderZone: 'Subscription Zone',
+    hashrateMall: 'Hashrate Mall',
+    rechargeZone: 'Recharge Zone',
+    crossChain: 'Cross-chain Zone',
+    digitalBank: 'Digital Bank',
+    chainGameZone: 'Chain Games',
+    predictionZone: 'Prediction Zone',
+    cloudChat: 'Cloud Chat',
+    faq: 'FAQ',
+    exchangeDownload: 'Exchange Download'
   },
   route: {
     community: 'Community',

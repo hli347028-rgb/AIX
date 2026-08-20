@@ -311,7 +311,17 @@ export default {
     aixChain: 'Aixチェーン',
     globalLaunch: 'グローバルローンチ',
     networkHashrate: 'ネットワークハッシュレート',
-    walletDownload: 'ウォレットダウンロード', orderZone: '申込エリア', hashrateMall: 'ハッシュレートモール'
+    walletDownload: 'ウォレットダウンロード',
+    orderZone: '申込エリア',
+    hashrateMall: 'ハッシュレートモール',
+    rechargeZone: 'チャージエリア',
+    crossChain: 'クロスチェーン',
+    digitalBank: 'デジタルバンク',
+    chainGameZone: 'チェーンゲーム',
+    predictionZone: '予測エリア',
+    cloudChat: 'クラウドチャット',
+    faq: 'よくある質問',
+    exchangeDownload: '取引所ダウンロード'
   },
   route: {
     community: 'コミュニティ',

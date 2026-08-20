@@ -8,7 +8,6 @@
       <!-- <p v-if="winPrice > 0" class="withdraw-balance withdraw-price">{{ $t('recharge.winPrice') }}: {{ winPrice }} USDT</p> -->
       <div class="withdraw-actions">
         <button class="withdraw-btn" @click="showRecharge"><van-icon name="balance-pay" />{{ $t('recharge.recharge') }}</button>
-        <button class="withdraw-btn" @click="router.push('/transfer')"><van-icon name="exchange" />{{ $t('transfer.title') }}</button>
       </div>
     </div>
     <div class="withdraw-tab">
@@ -66,7 +65,6 @@
 </template>
 <script setup>
 import userPerson from "@/pinia/person";
-import { useRouter } from 'vue-router'
 import { Contract, ETH } from "@/tools/contract";
 import { ref, computed } from 'vue'
 import request from "@/tools/request";
@@ -82,7 +80,6 @@ const USDT = import.meta.env.VITE_USDT ? new Contract(import.meta.env.VITE_USDT,
 const BUY_USDT = new Contract(import.meta.env.VITE_BUY_USDT || import.meta.env.VITE_BUY, 'BUY')
 const BUY = BUY_USDT // 兼容：USDT 授权检查用 USDT 充值合约
 
-const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson();
 const userinfo = $computed(() => person.userinfo);
