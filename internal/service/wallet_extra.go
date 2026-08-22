@@ -367,10 +367,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 
 	overflow := "0"
 	if user != nil {
-		overflow = user.OverflowReward
-		if overflow == "" {
-			overflow = user.PendingMgmtReward
-		}
+		overflow = user.OverflowTotal()
 		if overflow == "" {
 			overflow = "0"
 		}

@@ -89,8 +89,8 @@ func (j *ChainRechargeJob) Start() {
 	if interval <= 0 {
 		interval = time.Minute
 	}
-	j.log.Infof("depositOnly timers started: usdt=%s win=%s interval=%s",
-		j.cfg.GetDepositContract(), j.cfg.GetWinDepositContract(), interval)
+	j.log.Infof("depositOnly timers started: usdt=%s win=%s rpc=%s interval=%s",
+		j.cfg.GetDepositContract(), j.cfg.GetWinDepositContract(), j.cfg.GetRPCURL(), interval)
 
 	go func() {
 		j.runOnce(context.Background())
@@ -124,16 +124,16 @@ func (j *ChainRechargeJob) runOnce(ctx context.Context) {
 	}
 }
 
-// DepositOnly syncs the USDT BuySomething ledger → usdt_recharge.
+// DepositOnly syncs the USDT BuySomething ledger on EOEO → usdt_recharge.
 func (j *ChainRechargeJob) DepositOnly(ctx context.Context) (*DepositOnlyResult, error) {
-	return j.syncDepositLedger(ctx, "USDT", j.cfg.GetDepositContract(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
+	return j.syncDepositLedger(ctx, "USDT", j.cfg.GetDepositContract(), j.cfg.GetRPCURL(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
 		return j.walletRepo.AutoCreditChainRecharge(ctx, recordHash, fromAddress, contractAddress, amount, index)
 	})
 }
 
-// DepositOnlyWin syncs the native WIN BuySomething ledger → win_recharge_balance.
+// DepositOnlyWin syncs the native WIN BuySomething ledger on EOEO → win_recharge_balance.
 func (j *ChainRechargeJob) DepositOnlyWin(ctx context.Context) (*DepositOnlyResult, error) {
-	return j.syncDepositLedger(ctx, "WIN", j.cfg.GetWinDepositContract(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
+	return j.syncDepositLedger(ctx, "WIN", j.cfg.GetWinDepositContract(), j.cfg.GetRPCURL(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
 		credited, _, err := j.walletRepo.AutoCreditWinRecharge(ctx, recordHash, fromAddress, contractAddress, amount)
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "user not found") {
@@ -223,18 +223,19 @@ func (j *ChainRechargeJob) TriggerDepositOnlyWinCycle() *CycleTriggerResult {
 	return res
 }
 
-func (j *ChainRechargeJob) syncDepositLedger(ctx context.Context, asset, contractRaw string, credit creditFn) (*DepositOnlyResult, error) {
+func (j *ChainRechargeJob) syncDepositLedger(ctx context.Context, asset, contractRaw, rpcURL string, credit creditFn) (*DepositOnlyResult, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
 	if j.cfg == nil {
 		return nil, fmt.Errorf("wallet config is missing")
 	}
-	rpcURL := strings.TrimSpace(j.cfg.GetRPCURL())
+	rpcURL = strings.TrimSpace(rpcURL)
 	contractRaw = strings.TrimSpace(contractRaw)
 	if rpcURL == "" || !common.IsHexAddress(contractRaw) {
 		return nil, fmt.Errorf("rpc or %s deposit contract is not configured", asset)
 	}
+	j.log.Infof("%s depositOnly scanning: contract=%s rpc=%s", asset, contractRaw, rpcURL)
 
 	contractAddress := common.HexToAddress(contractRaw)
 	client, err := ethclient.DialContext(ctx, rpcURL)

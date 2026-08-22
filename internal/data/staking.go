@@ -105,13 +105,18 @@ func (r *stakingRepo) ListStaticRewardsAsRelease(ctx context.Context, userID int
 		if po.Rate != nil {
 			rate = po.Rate.String()
 		}
+		// 与管理端 static_usdt_total 同口径：展示金本位 USDT（exit_applied / base_amount）
+		usdtAmt := po.ExitApplied
+		if !usdtAmt.IsPositive() && po.BaseAmount != nil {
+			usdtAmt = *po.BaseAmount
+		}
 		out = append(out, &biz.ReleaseRecord{
 			ID:             po.ID,
 			UserID:         po.UserID,
 			OrderID:        oid,
 			SettlementDate: date,
 			Rate:           rate,
-			Amount:         po.Amount.String(),
+			Amount:         usdtAmt.String(),
 			CreatedAt:      po.CreatedTime,
 		})
 	}
@@ -121,7 +126,7 @@ func (r *stakingRepo) ListStaticRewardsAsRelease(ctx context.Context, userID int
 func (r *stakingRepo) ListDynamicRewardsAsReferral(ctx context.Context, userID int64) ([]*biz.ReferralReward, error) {
 	var list []RewardLogPO
 	if err := r.data.db.WithContext(ctx).
-		Where("user_id = ? AND type = ?", userID, biz.RewardTypeDynamicUsdt).
+		Where("user_id = ? AND type IN ?", userID, []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease}).
 		Order("id desc").Find(&list).Error; err != nil {
 		return nil, err
 	}

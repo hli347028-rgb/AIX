@@ -104,6 +104,7 @@ export default {
             this.loading = true
             Gai.exchange_list({
                 page: this.current,
+                pageSize: this.pageSize,
                 ...this.searchData
             }).then((res) => {
                 this.data = (res.list || []).map((value, key) => {

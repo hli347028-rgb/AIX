@@ -123,21 +123,18 @@ function mapClaimRecords(list: any[]) {
   })
 }
 
-function calcOrderDailyRelease(o: any, withdrawReset = false) {
+function calcOrderDailyRelease(o: any, _withdrawReset = false) {
   const principal = numOrZero(o.total_amount)
   const released = numOrZero(o.released_amount)
   let exitTarget = numOrZero(o.exit_target)
   const mul = numOrZero(o.exit_multiplier) || 1
   if (exitTarget <= 0) exitTarget = principal * mul
   const status = String(o.status || '').toLowerCase()
-  if (status === 'completed' || status === '2') return 0
+  if (status === 'completed' || status === '2' || status === 'exited') return 0
   if (released >= exitTarget) return 0
-  let rate = 1.4
-  if (!withdrawReset) {
-    const idx = Math.max(0, Math.min(16, Number(o.cycle_day ?? 0)))
-    rate = 0.6 + idx * 0.05
-  }
-  const want = principal * (rate / 100) // 每日静态释放 = 释放系数 × 认购金额；系数 = 日比例%/100
+  // 与后端一致：日静态 = 本金 × StaticRate%(默认 0.5%)，且不超过剩余出局容量
+  const ratePct = 0.5
+  const want = principal * (ratePct / 100)
   const remaining = Math.max(0, exitTarget - released)
   return Math.min(want, remaining)
 }
@@ -231,9 +228,11 @@ async function fetchUserInfo() {
         ? numOrZero(b.claimable_amount)
         : poolBalance
     )
-    const staticFromReleases = releaseList.reduce((sum: number, r: any) => sum + numOrZero(r.amount), 0)
-    // 无释放流水时，用订单已释放金额作为静态收益展示
-    const staticTotal = staticFromReleases > 0 ? staticFromReleases : releasedOnOrders
+    // 每日静态预估（本金×日利率合计，备用字段）
+    const dailyStaticTotal =
+      b.pending_amount != null && b.pending_amount !== ''
+        ? numOrZero(b.pending_amount)
+        : orderStats.pendingTotal
     const serverTime = Number(b.server_time || Math.floor(Date.now() / 1000))
 
     // 直推=1代推荐奖；团队收益=2代及以上；平级=eco equal；全网=eco total
@@ -260,8 +259,15 @@ async function fetchUserInfo() {
     )
     const mgmtRewardAmt = firstAmount(aixProfile.mgmt_reward_total, aixProfile.mgmtRewardTotal)
     const directRewardAmt = referralLoaded ? directProfit : numOrZero(p.share_profit_total)
-    // 收益合计 = 该用户所有订单已释放金额（earned_total / released_amount 合计）
-    const incomeTotal = releasedOnOrders
+    // 静态收益 = 管理端「静态总收益」同一字段 users.static_usdt_total（日结金本位累计）
+    const staticIncomeStr = firstText(
+      aixProfile.static_usdt_total,
+      aixProfile.staticUsdtTotal,
+      b.static_usdt_total,
+      '0',
+    )
+    const staticIncomeAmt = numOrZero(staticIncomeStr)
+    const incomeTotal = staticIncomeAmt + directRewardAmt + mgmtRewardAmt
     // 收益明细：最近结算日当日值（每天结算后变化）
     const dayReward = latestDayRewardBreakdown(releaseList, referralList, ecoList)
 
@@ -312,13 +318,15 @@ async function fetchUserInfo() {
       ),
       totalNodes: String(totalNodes),
       exitTotal: String(exitTotal),
-      // 静态收益（累计，资产页用）
-      location: String(staticTotal),
+      // 静态收益 = 管理端静态总收益 static_usdt_total
+      location: String(staticIncomeStr),
+      staticIncomeDaily: String(dailyStaticTotal),
+      staticIncomeTotal: String(staticIncomeStr),
       recommend: String(directRewardAmt),
       recommendTwo: '0.00',
       // 管理奖 = 该用户全部管理奖总和
       team: String(mgmtRewardAmt),
-      // 溢出奖励 = 直推/管理奖超出全部订单出局剩余后暂存，待新认购再释放
+      // 溢出奖励 = 直推溢出 + 管理奖溢出（均因出局帽发不下而暂存，下次认购再释放）
       overflowReward: String(overflowRewardAmt),
       overflow_reward: String(overflowRewardAmt),
       points: String(aixProfile.points || pickField(aixProfile, 'points') || '0'),

@@ -116,7 +116,7 @@ export default {
     teamTotalPerformance: 'Team Total Performance',
     smallAreaPerformance: 'Small Area Performance',
     generationRewardTotal: 'Generation Reward Total',
-    staticIncomeTotal: 'Static Income Total',
+    staticIncomeTotal: 'Static Income',
     communityBaseRewardTotal: 'Community Base Reward Total',
     peerDividendTotal: 'Peer Dividend Total',
     incomeTotal: 'Total Earnings',

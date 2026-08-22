@@ -37,13 +37,14 @@ const (
 	TokenAIX  = "AIX"
 	TokenWIN  = "WIN"
 
-	RewardTypeStaticAix       = "static_aix"
-	RewardTypeDynamicUsdt     = "dynamic_usdt"
-	RewardTypeMgmt            = "mgmt"
-	RewardTypeMgmtPoolRelease = "mgmt_pool_release"
-	RewardTypeExitAccel       = "exit_accel"
-	RewardTypeTransferIn      = "transfer_in"
-	RewardTypeTransferOut     = "transfer_out"
+	RewardTypeStaticAix         = "static_aix"
+	RewardTypeDynamicUsdt       = "dynamic_usdt"
+	RewardTypeDirectPoolRelease = "direct_pool_release"
+	RewardTypeMgmt              = "mgmt"
+	RewardTypeMgmtPoolRelease   = "mgmt_pool_release"
+	RewardTypeExitAccel         = "exit_accel"
+	RewardTypeTransferIn        = "transfer_in"
+	RewardTypeTransferOut       = "transfer_out"
 )
 
 // GetWinPrice 返回 WIN 代币价格（USDT/枚）。

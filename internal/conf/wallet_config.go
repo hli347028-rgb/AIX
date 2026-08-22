@@ -11,6 +11,7 @@ const (
 	DefaultDepositContract    = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
 	DefaultWinDepositContract = "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
 	DefaultRPCURL             = "https://rpc1.eoeo.info"
+	DefaultBscRPCURL          = "https://bsc-dataseed.binance.org"
 )
 
 // WalletConfig holds wallet and recharge settings.
@@ -23,7 +24,8 @@ type WalletConfig struct {
 	UsdtDecimals                     int32    `json:"usdt_decimals" yaml:"usdt_decimals"`
 	WinContract                      string   `json:"win_contract" yaml:"win_contract"`
 	WinDecimals                      int32    `json:"win_decimals" yaml:"win_decimals"`
-	RPCURL                           string   `json:"rpc_url" yaml:"rpc_url"`
+	RPCURL                           string   `json:"rpc_url" yaml:"rpc_url"`         // EOEO（WIN 充值 / 价格 / 提现）
+	BscRPCURL                        string   `json:"bsc_rpc_url" yaml:"bsc_rpc_url"` // BSC（USDT 充值）
 	RechargeMonitorEnabled           bool     `json:"recharge_monitor_enabled" yaml:"recharge_monitor_enabled"`
 	RechargeScanIntervalSeconds      int64    `json:"recharge_scan_interval_seconds" yaml:"recharge_scan_interval_seconds"`
 	RechargeScanQueriesPerCycle      int32    `json:"recharge_scan_queries_per_cycle" yaml:"recharge_scan_queries_per_cycle"`
@@ -205,6 +207,14 @@ func (w *WalletConfig) GetRPCURL() string {
 		return DefaultRPCURL
 	}
 	return strings.TrimSpace(w.RPCURL)
+}
+
+// GetBscRPCURL is used to scan the USDT BuySomething contract on BSC.
+func (w *WalletConfig) GetBscRPCURL() string {
+	if w == nil || strings.TrimSpace(w.BscRPCURL) == "" {
+		return DefaultBscRPCURL
+	}
+	return strings.TrimSpace(w.BscRPCURL)
 }
 
 // IsRechargeMonitorEnabled controls the in-process depositOnly ticker.

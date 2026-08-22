@@ -116,7 +116,7 @@ export default {
     teamTotalPerformance: '團隊總業績',
     smallAreaPerformance: '小區業績',
     generationRewardTotal: '代數獎勵累計',
-    staticIncomeTotal: '靜態收益累計',
+    staticIncomeTotal: '靜態收益',
     communityBaseRewardTotal: '社區基礎獎累計',
     peerDividendTotal: '平級分紅累計',
     incomeTotal: '收益合計',

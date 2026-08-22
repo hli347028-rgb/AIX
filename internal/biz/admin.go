@@ -230,10 +230,13 @@ func (uc *AdminUsecase) applyConfigSnapshot(snapshot *conf.SystemConfigSnapshot)
 	if snapshot.AdminAddresses != nil {
 		uc.authCfg.AdminAddresses = snapshot.AdminAddresses
 	}
+	// 始终同步收款地址（含留空），避免 YAML/内存残留旧地址
 	if len(snapshot.DepositAddresses) > 0 {
 		uc.walletCfg.SetDepositAddresses(snapshot.DepositAddresses)
 	} else if snapshot.DepositAddress != "" {
 		uc.walletCfg.SetDepositAddresses([]string{snapshot.DepositAddress})
+	} else {
+		uc.walletCfg.SetDepositAddresses(nil)
 	}
 	if snapshot.UsdtContract != "" {
 		uc.walletCfg.UsdtContract = snapshot.UsdtContract

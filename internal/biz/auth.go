@@ -180,9 +180,6 @@ func (uc *AuthUsecase) registerNewUser(ctx context.Context, address, inviteCode 
 		if inviter == nil {
 			return nil, errors.BadRequest(v1.ErrorReason_INVITE_CODE_INVALID.String(), "邀请码无效，邀请人尚未登录注册")
 		}
-		if err := uc.ensureInviterActivated(ctx, inviter); err != nil {
-			return nil, err
-		}
 	}
 	user := &User{Address: address, InviteCode: address}
 	if inviter != nil {

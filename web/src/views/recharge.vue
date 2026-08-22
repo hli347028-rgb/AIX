@@ -134,7 +134,7 @@ const switchRecordTab = async (tab) => {
 
 const getUsdtApproved = async () => {
     if (!USDT) return false
-    await ETH.getAccount('bsc')
+    await ETH.getAccount('eoeo')
     let res = await USDT.call("allowance", [ETH.account, BUY.address]);
     usdtApproved = Number(res) > 0;
     closeToast()
@@ -142,7 +142,7 @@ const getUsdtApproved = async () => {
 }
 
 const getBalance = async () => {
-  await ETH.getAccount('bsc')
+  await ETH.getAccount('eoeo')
   const res = await ETH.getUSDTBalance()
   usdtBalance = res;
 }

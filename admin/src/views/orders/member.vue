@@ -75,6 +75,12 @@ export default {
                 {
                     title: '总订单',
                     dataIndex: 'amountUsdtCurrent',
+                    customRender: (v) => v || '0'
+                },
+                {
+                    title: '进行中订单',
+                    dataIndex: 'amountUsdtActive',
+                    customRender: (v) => v || '0'
                 },
                 {
                     title: '总收益',
@@ -178,6 +184,7 @@ export default {
             this.loading = true
             Gai.user_list({
                 page: this.current,
+                pageSize: this.pageSize,
                 ...this.searchData
             }).then((res) => {
                 this.data = (res.users || []).map((value, key) => {

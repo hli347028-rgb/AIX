@@ -467,8 +467,9 @@ func (r *userRepo) toBiz(ctx context.Context, po *UserPO) *biz.User {
 		AixBalance:           po.AixBalance.String(),
 		WinBalance:          po.WinBalance.String(),
 		WinRechargeBalance:  po.WinRechargeBalance.String(),
-		PendingMgmtReward:    po.OverflowReward.String(), // 兼容旧字段名，映射溢出奖励
+		PendingMgmtReward:    po.OverflowReward.Add(po.OverflowDirect).String(), // 兼容：溢出奖励合计
 		OverflowReward:       po.OverflowReward.String(),
+		OverflowDirect:       po.OverflowDirect.String(),
 		Points:               po.Points.String(),
 		PointsAll:            po.PointsAll.String(),
 		StaticUsdtTotal:      po.StaticUsdtTotal.String(),

@@ -7,6 +7,9 @@ mysql --user=root --execute="CREATE DATABASE IF NOT EXISTS aix DEFAULT CHARACTER
 mysql --user=root aix < /opt/aix/scripts/aix-schema.sql
 mysql --user=root --execute="SHOW TABLES FROM aix;"
 
+echo "=== www perms ==="
+sudo chmod -R a+rX /opt/aix/www
+
 echo "=== nginx ==="
 sudo cp /opt/aix/scripts/aix.nginx.conf /etc/nginx/sites-available/aix
 sudo ln -sfn /etc/nginx/sites-available/aix /etc/nginx/sites-enabled/aix

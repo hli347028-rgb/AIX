@@ -116,7 +116,7 @@ export default {
     teamTotalPerformance: 'Tổng thành tích nhóm',
     smallAreaPerformance: 'Thành tích khu nhỏ',
     generationRewardTotal: 'Tổng thưởng thế hệ',
-    staticIncomeTotal: 'Tổng thu nhập tĩnh',
+    staticIncomeTotal: 'Thu nhập tĩnh',
     communityBaseRewardTotal: 'Tổng thưởng cơ bản cộng đồng',
     peerDividendTotal: 'Tổng cổ tức ngang cấp',
     incomeTotal: 'Tổng thu nhập',

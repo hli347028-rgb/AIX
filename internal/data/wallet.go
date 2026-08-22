@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -403,7 +404,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		if err := r.createManagementRewards(tx, &user, po); err != nil {
 			return err
 		}
-		// 仅在本人新认购时释放溢出奖励（直推/管理奖超出出局容量的部分）
+		// 本人新认购：只释放直推溢出；管理奖已在下级认购时一次性入账
 		if err := r.releasePendingManagementRewards(tx, userID); err != nil {
 			return err
 		}
@@ -415,10 +416,9 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 // createManagementRewards applies the W-level differential to the source
 // order principal. Walking upward, only a positive rate gap creates a reward;
 // equal levels therefore create no reward (the former peer reward is gone).
-// After creating each MgmtRewardPO, the reward is immediately released
-// against the upline's active orders' remaining exit capacity. Any overflow
-// is stored in overflow_reward and only drained when that user themselves
-// subscribes a new order.
+// Each MgmtRewardPO is released against the upline's remaining exit capacity:
+// payable amount enters usdt_reward; the rest goes to overflow_reward and is
+// drained on the upline's next subscription.
 func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, sourceOrder *OrderPO) error {
 	if sourceUser == nil || sourceOrder == nil || sourceUser.InviterID == nil || !sourceOrder.Principal.IsPositive() {
 		return nil
@@ -441,14 +441,21 @@ func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, so
 		if gap.IsPositive() {
 			total := sourceOrder.Principal.Mul(gap).Round(8)
 			if total.IsPositive() {
-				reward := &MgmtRewardPO{
-					UserID: currentID, FromUserID: sourceUser.ID, SourceOrderID: sourceOrder.ID,
-					BaseAmount: sourceOrder.Principal, Rate: gap, TotalAmount: total,
-				}
-				if err := tx.Create(reward).Error; err != nil {
-					return err
-				}
-				if err := r.tryReleaseMgmtAgainstExitCap(tx, currentID, reward); err != nil {
+				var existing MgmtRewardPO
+				err := tx.Where("user_id = ? AND source_order_id = ?", currentID, sourceOrder.ID).
+					First(&existing).Error
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					reward := &MgmtRewardPO{
+						UserID: currentID, FromUserID: sourceUser.ID, SourceOrderID: sourceOrder.ID,
+						BaseAmount: sourceOrder.Principal, Rate: gap, TotalAmount: total,
+					}
+					if err := tx.Create(reward).Error; err != nil {
+						return err
+					}
+					if err := r.tryReleaseMgmtAgainstExitCap(tx, currentID, reward); err != nil {
+						return err
+					}
+				} else if err != nil {
 					return err
 				}
 			}
@@ -464,11 +471,25 @@ func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, so
 	return nil
 }
 
-// tryReleaseMgmtAgainstExitCap 按上级活跃订单出局剩余容量释放管理奖：
-// 可释放部分进 usdt_reward 并加速出局；订单已全部出局/无容量时剩余进 overflow_reward。
+// tryReleaseMgmtAgainstExitCap 管理奖按出局剩余入账：可释放部分进奖励钱包并计入出局；
+// 超出部分进入 overflow_reward，待本人下次认购再释放。同一来源订单只结算一次。
 func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, reward *MgmtRewardPO) error {
 	if reward == nil || !reward.TotalAmount.IsPositive() {
 		return nil
+	}
+	if reward.ReleasedAmount.GreaterThanOrEqual(reward.TotalAmount) {
+		return nil
+	}
+	var logCount int64
+	if err := tx.Model(&RewardLogPO{}).
+		Where("user_id = ? AND order_id = ? AND type = ?", userID, reward.SourceOrderID, biz.RewardTypeMgmt).
+		Count(&logCount).Error; err != nil {
+		return err
+	}
+	if logCount > 0 {
+		// 已有管理奖流水：视为该来源订单已结算完毕（含当时写入溢出的部分）。
+		reward.ReleasedAmount = reward.TotalAmount
+		return tx.Model(reward).Update("released_amount", reward.ReleasedAmount).Error
 	}
 	var orders []OrderPO
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -476,59 +497,33 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 		Order("id asc").Find(&orders).Error; err != nil {
 		return err
 	}
-	remainTotal := decimal.Zero
-	for _, o := range orders {
-		rem := o.ExitCap.Sub(o.EarnedTotal)
-		if rem.IsPositive() {
-			remainTotal = remainTotal.Add(rem)
-		}
-	}
-
 	var user UserPO
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
 		return err
 	}
 
 	want := reward.TotalAmount
-	pay := decimal.Zero
-	exitApplied := decimal.Zero
-	if remainTotal.IsPositive() {
-		pay = want
-		if pay.GreaterThan(remainTotal) {
-			pay = remainTotal
+	remainCap := decimal.Zero
+	for _, o := range orders {
+		rem := o.ExitCap.Sub(o.EarnedTotal)
+		if rem.IsPositive() {
+			remainCap = remainCap.Add(rem)
 		}
-		left := pay
-		for i := range orders {
-			if left.LessThanOrEqual(decimal.Zero) {
-				break
-			}
-			o := &orders[i]
-			rem := o.ExitCap.Sub(o.EarnedTotal)
-			if rem.LessThanOrEqual(decimal.Zero) {
-				continue
-			}
-			apply := left
-			if apply.GreaterThan(rem) {
-				apply = rem
-			}
-			o.EarnedTotal = o.EarnedTotal.Add(apply)
-			status := biz.OrderStatusActive
-			var exitedAt *time.Time
-			if o.EarnedTotal.GreaterThanOrEqual(o.ExitCap) {
-				status = biz.OrderStatusExited
-				t := time.Now()
-				exitedAt = &t
-				o.EarnedTotal = o.ExitCap
-			}
-			if err := tx.Model(o).Updates(map[string]interface{}{
-				"earned_total": o.EarnedTotal,
-				"status":       status,
-				"exited_time":  exitedAt,
-			}).Error; err != nil {
-				return err
-			}
-			exitApplied = exitApplied.Add(apply)
-			left = left.Sub(apply)
+	}
+	pay := decimal.Zero
+	if remainCap.IsPositive() {
+		pay = want
+		if pay.GreaterThan(remainCap) {
+			pay = remainCap
+		}
+	}
+	overflow := want.Sub(pay)
+	exitApplied := decimal.Zero
+	if pay.IsPositive() {
+		var err error
+		exitApplied, err = applyExitToOrders(tx, orders, pay)
+		if err != nil {
+			return err
 		}
 		user.UsdtReward = user.UsdtReward.Add(pay)
 		fromID := reward.FromUserID
@@ -549,13 +544,12 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 			return err
 		}
 	}
-
-	overflow := want.Sub(pay)
 	if overflow.IsPositive() {
 		user.OverflowReward = user.OverflowReward.Add(overflow)
 		user.PendingMgmtReward = user.OverflowReward
 	}
-	reward.ReleasedAmount = want // 全额记账，避免与溢出双计
+	// 应得已拆入「已入账 + 溢出」；标记 ReleasedAmount=Total，避免同一来源重复结算。
+	reward.ReleasedAmount = want
 	if err := tx.Model(reward).Update("released_amount", reward.ReleasedAmount).Error; err != nil {
 		return err
 	}
@@ -566,46 +560,12 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 	}).Error
 }
 
-// drainMgmtPool 将溢出奖励按活跃订单出局容量释放回 usdt_reward。
-func (r *walletRepo) drainMgmtPool(tx *gorm.DB, userID int64) error {
-	var user UserPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
-		return err
+func applyExitToOrders(tx *gorm.DB, orders []OrderPO, amount decimal.Decimal) (decimal.Decimal, error) {
+	applied := decimal.Zero
+	if !amount.IsPositive() {
+		return applied, nil
 	}
-	if !user.OverflowReward.IsPositive() {
-		// 兼容尚未迁移的旧数据
-		if user.PendingMgmtReward.IsPositive() {
-			user.OverflowReward = user.PendingMgmtReward
-		} else {
-			return nil
-		}
-	}
-
-	var orders []OrderPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("user_id = ? AND status = ?", userID, biz.OrderStatusActive).
-		Order("id asc").Find(&orders).Error; err != nil {
-		return err
-	}
-	remainTotal := decimal.Zero
-	for _, o := range orders {
-		rem := o.ExitCap.Sub(o.EarnedTotal)
-		if rem.IsPositive() {
-			remainTotal = remainTotal.Add(rem)
-		}
-	}
-	if remainTotal.LessThanOrEqual(decimal.Zero) {
-		return nil
-	}
-
-	want := user.OverflowReward
-	pay := want
-	if pay.GreaterThan(remainTotal) {
-		pay = remainTotal
-	}
-	exitApplied := decimal.Zero
-
-	left := pay
+	left := amount
 	for i := range orders {
 		if left.LessThanOrEqual(decimal.Zero) {
 			break
@@ -633,21 +593,91 @@ func (r *walletRepo) drainMgmtPool(tx *gorm.DB, userID int64) error {
 			"status":       status,
 			"exited_time":  exitedAt,
 		}).Error; err != nil {
-			return err
+			return decimal.Zero, err
 		}
-		exitApplied = exitApplied.Add(apply)
+		applied = applied.Add(apply)
 		left = left.Sub(apply)
+	}
+	return applied, nil
+}
+
+const (
+	overflowKindMgmt   = "mgmt"
+	overflowKindDirect = "direct"
+)
+
+// drainMgmtPool 将管理奖溢出按活跃订单出局容量释放进奖励钱包。
+func (r *walletRepo) drainMgmtPool(tx *gorm.DB, userID int64) error {
+	return r.drainOverflowPool(tx, userID, overflowKindMgmt)
+}
+
+// drainDirectPool 将直推奖溢出按活跃订单出局容量释放，流水类型为直推奖。
+func (r *walletRepo) drainDirectPool(tx *gorm.DB, userID int64) error {
+	return r.drainOverflowPool(tx, userID, overflowKindDirect)
+}
+
+func (r *walletRepo) drainOverflowPool(tx *gorm.DB, userID int64, kind string) error {
+	var user UserPO
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
+		return err
+	}
+	want := user.OverflowDirect
+	rewardType := biz.RewardTypeDirectPoolRelease
+	if kind == overflowKindMgmt {
+		want = user.OverflowReward
+		rewardType = biz.RewardTypeMgmtPoolRelease
+		if !want.IsPositive() && user.PendingMgmtReward.IsPositive() {
+			// 兼容尚未迁移的旧数据
+			user.OverflowReward = user.PendingMgmtReward
+			want = user.OverflowReward
+		}
+	}
+	if !want.IsPositive() {
+		return nil
+	}
+
+	var orders []OrderPO
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id = ? AND status = ?", userID, biz.OrderStatusActive).
+		Order("id asc").Find(&orders).Error; err != nil {
+		return err
+	}
+	remainTotal := decimal.Zero
+	for _, o := range orders {
+		rem := o.ExitCap.Sub(o.EarnedTotal)
+		if rem.IsPositive() {
+			remainTotal = remainTotal.Add(rem)
+		}
+	}
+	if remainTotal.LessThanOrEqual(decimal.Zero) {
+		return nil
+	}
+
+	pay := want
+	if pay.GreaterThan(remainTotal) {
+		pay = remainTotal
+	}
+	exitApplied, err := applyExitToOrders(tx, orders, pay)
+	if err != nil {
+		return err
 	}
 
 	user.UsdtReward = user.UsdtReward.Add(pay)
-	user.OverflowReward = user.OverflowReward.Sub(pay)
-	if user.OverflowReward.IsNegative() {
-		user.OverflowReward = decimal.Zero
+	if kind == overflowKindDirect {
+		user.OverflowDirect = user.OverflowDirect.Sub(pay)
+		if user.OverflowDirect.IsNegative() {
+			user.OverflowDirect = decimal.Zero
+		}
+	} else {
+		user.OverflowReward = user.OverflowReward.Sub(pay)
+		if user.OverflowReward.IsNegative() {
+			user.OverflowReward = decimal.Zero
+		}
+		user.PendingMgmtReward = user.OverflowReward
 	}
-	user.PendingMgmtReward = user.OverflowReward
 	if err := tx.Create(&RewardLogPO{
 		UserID:      userID,
-		Type:        biz.RewardTypeMgmtPoolRelease,
+		Type:        rewardType,
 		Asset:       biz.TokenUSDT,
 		Amount:      pay,
 		ExitApplied: exitApplied,
@@ -658,84 +688,17 @@ func (r *walletRepo) drainMgmtPool(tx *gorm.DB, userID int64) error {
 		"usdt_reward":         user.UsdtReward,
 		"overflow_reward":     user.OverflowReward,
 		"pending_mgmt_reward": user.OverflowReward,
+		"overflow_direct":     user.OverflowDirect,
 	}).Error
 }
 
-// releasePendingManagementRewards first drains the user's pending_mgmt_reward
-// pool, then releases any remaining mgmt_rewards records against active orders'
-// exit capacity. This is called when a user subscribes so that previously
-// unreleased management rewards can now be claimed.
+// releasePendingManagementRewards 本人新认购时释放溢出：
+// 直推溢出 + 管理奖溢出（均受出局剩余限制，发不完继续留在溢出池）。
 func (r *walletRepo) releasePendingManagementRewards(tx *gorm.DB, userID int64) error {
-	// Step 1: Drain pending_mgmt_reward pool first.
-	if err := r.drainMgmtPool(tx, userID); err != nil {
+	if err := r.drainDirectPool(tx, userID); err != nil {
 		return err
 	}
-
-	// Step 2: Release remaining mgmt_rewards records.
-	var orders []OrderPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("user_id = ? AND status = ?", userID, biz.OrderStatusActive).
-		Order("id asc").Find(&orders).Error; err != nil {
-		return err
-	}
-	remainTotal := decimal.Zero
-	for _, o := range orders {
-		cap, _ := decimal.NewFromString(o.ExitCap.String())
-		earned, _ := decimal.NewFromString(o.EarnedTotal.String())
-		rem := cap.Sub(earned)
-		if rem.IsPositive() {
-			remainTotal = remainTotal.Add(rem)
-		}
-	}
-	if remainTotal.LessThanOrEqual(decimal.Zero) {
-		return nil
-	}
-
-	var rewards []MgmtRewardPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("user_id = ? AND released_amount < total_amount", userID).Order("id asc").Find(&rewards).Error; err != nil {
-		return err
-	}
-	var user UserPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
-		return err
-	}
-	credited := decimal.Zero
-	left := remainTotal
-	for i := range rewards {
-		if left.LessThanOrEqual(decimal.Zero) {
-			break
-		}
-		reward := &rewards[i]
-		pending := reward.TotalAmount.Sub(reward.ReleasedAmount)
-		pay := pending
-		if pay.GreaterThan(left) {
-			pay = left
-		}
-		if !pay.IsPositive() {
-			continue
-		}
-		reward.ReleasedAmount = reward.ReleasedAmount.Add(pay)
-		if err := tx.Model(reward).Update("released_amount", reward.ReleasedAmount).Error; err != nil {
-			return err
-		}
-		fromID, sourceOrderID := reward.FromUserID, reward.SourceOrderID
-		base, rate := reward.BaseAmount, reward.Rate
-		if err := tx.Create(&RewardLogPO{
-			UserID: userID, FromUserID: &fromID, OrderID: &sourceOrderID,
-			Type: biz.RewardTypeMgmt, Asset: biz.TokenUSDT, Amount: pay,
-			BaseAmount: &base, Rate: &rate, ExitApplied: decimal.Zero,
-		}).Error; err != nil {
-			return err
-		}
-		credited = credited.Add(pay)
-		left = left.Sub(pay)
-	}
-	if credited.IsPositive() {
-		user.UsdtReward = user.UsdtReward.Add(credited)
-		return tx.Model(&user).Update("usdt_reward", user.UsdtReward).Error
-	}
-	return nil
+	return r.drainMgmtPool(tx, userID)
 }
 
 func (r *walletRepo) payDirectReward(tx *gorm.DB, inviterID, fromUserID, orderID int64, directBase decimal.Decimal, directRate float64) error {
@@ -811,15 +774,16 @@ func (r *walletRepo) payDirectReward(tx *gorm.DB, inviterID, fromUserID, orderID
 		inviter.UsdtReward = inviter.UsdtReward.Add(pay)
 	}
 	if overflow.IsPositive() {
-		inviter.OverflowReward = inviter.OverflowReward.Add(overflow)
-		inviter.PendingMgmtReward = inviter.OverflowReward
+		inviter.OverflowDirect = inviter.OverflowDirect.Add(overflow)
 	}
 	if err := tx.Model(&inviter).Updates(map[string]interface{}{
-		"usdt_reward":         inviter.UsdtReward,
-		"overflow_reward":     inviter.OverflowReward,
-		"pending_mgmt_reward": inviter.OverflowReward,
+		"usdt_reward":     inviter.UsdtReward,
+		"overflow_direct": inviter.OverflowDirect,
 	}).Error; err != nil {
 		return err
+	}
+	if !pay.IsPositive() {
+		return nil
 	}
 	return tx.Create(&RewardLogPO{
 		UserID:      inviterID,
@@ -827,7 +791,7 @@ func (r *walletRepo) payDirectReward(tx *gorm.DB, inviterID, fromUserID, orderID
 		OrderID:     &oid,
 		Type:        biz.RewardTypeDynamicUsdt,
 		Asset:       biz.TokenUSDT,
-		Amount:      want,
+		Amount:      pay,
 		BaseAmount:  &base,
 		Rate:        &rate,
 		ExitApplied: exitApplied,

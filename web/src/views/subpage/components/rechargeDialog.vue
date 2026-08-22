@@ -142,7 +142,7 @@ const stopRechargeLoading = () => {
   closeToast()
 }
 
-const rechargeChain = () => (assetType.value === 'usdt' ? 'bsc' : 'eoeo')
+const rechargeChain = () => 'eoeo'
 
 const ensureRechargeChain = async () => {
   await ETH.getAccount(rechargeChain())
@@ -231,7 +231,7 @@ const submitUsdtRecharge = async () => {
   }
 
   // 无论余额够不够，都先唤起钱包支付；授权查询 / 余额判断放在钱包弹出之后
-  await ETH.getAccount('bsc')
+  await ETH.getAccount('eoeo')
   try {
     await sendUsdtBuy(count, { silent: true })
   } catch (error) {

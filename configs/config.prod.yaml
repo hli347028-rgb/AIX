@@ -11,7 +11,7 @@ data:
     host: 127.0.0.1
     port: 3306
     user: root
-    password: "******"
+    password: root
     dbname: aix
   redis:
     addr: 127.0.0.1:6379
@@ -35,7 +35,7 @@ wallet:
   deposit_addresses:
     - "0xB8726F15099956183C3a0431791458A096404Ca6"
     - "0x9e3730f324476C15b9CF1B1991E0c2CC5C8d1575"
-  usdt_contract: "0x55d398326f99059fF775485246999027B3197955"
+  usdt_contract: "0x926632975149221891f1b9B56Efd125Dfe90ba2f"  # EOEO USDT
   usdt_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
   bsc_rpc_url: "https://bsc-dataseed.binance.org"

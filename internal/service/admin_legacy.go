@@ -158,6 +158,10 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 	if err != nil {
 		return err
 	}
+	allStake, err := s.sumAllPrincipalByUser(ctx)
+	if err != nil {
+		return err
+	}
 	totalIncome, releasedAmt, pendingRelease, err := s.sumOrderReleaseByUser(ctx)
 	if err != nil {
 		return err
@@ -193,8 +197,8 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"aix_balance":         u.AixBalance,        // AIX 代币数
 			"win_balance":          u.WinBalance,          // WIN 提现钱包
 			"win_recharge_balance": u.WinRechargeBalance,  // WIN 充值钱包
-			"pending_mgmt_reward": u.OverflowReward, // 兼容旧字段
-			"overflow_reward":     u.OverflowReward, // 溢出奖励
+			"pending_mgmt_reward": u.OverflowTotal(), // 兼容旧字段
+			"overflow_reward":     u.OverflowTotal(), // 溢出奖励合计（管理奖+直推）
 			"points":              u.Points,         // 当前积分
 			"points_all":          u.PointsAll,      // 累计总积分
 			"static_usdt_total":   u.StaticUsdtTotal,   // 静态总收益 USDT
@@ -206,7 +210,8 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"createdAt":           formatLegacyTime(u.CreatedAt),
 			"myRecommendAddress":  u.InviterAddress,
 			"bAmount":             u.UsdtRecharge,
-			"amountUsdtCurrent":   zeroIfEmpty(activeStake[u.ID]),
+			"amountUsdtCurrent":   zeroIfEmpty(allStake[u.ID]),       // 总订单 = 全部认购本金（与积分一致）
+			"amountUsdtActive":    zeroIfEmpty(activeStake[u.ID]),    // 进行中本金
 			"totalIncome":         zeroIfEmpty(totalIncome[u.ID]),     // 总收益（可释放总额）
 			"releasedAmount":      zeroIfEmpty(releasedAmt[u.ID]),    // 已释放
 			"pendingRelease":      zeroIfEmpty(pendingRelease[u.ID]),  // 待释放
@@ -499,7 +504,14 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 		db = db.Where("u.address LIKE ?", "%"+addressFilter+"%")
 	}
 	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
-		db = db.Where("rl.type = ?", typeFilter)
+		switch typeFilter {
+		case "mgmt", "mgmt_pool_release", "管理奖":
+			db = db.Where("rl.type IN ?", []string{biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease})
+		case "dynamic_usdt", "direct_pool_release", "直推奖":
+			db = db.Where("rl.type IN ?", []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease})
+		default:
+			db = db.Where("rl.type = ?", typeFilter)
+		}
 	}
 	if err := db.Scan(&rows).Error; err != nil {
 		return err
@@ -514,12 +526,13 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 		}
 		items = append(items, map[string]interface{}{
 			"id":             r.ID,
-			"type":           r.Type,
+			"type":           normalizeRewardType(r.Type),
+			"rawType":        r.Type,
 			"asset":          r.Asset,
 			"amount":         r.Amount.String(),
 			"address":        r.Address,
 			"addressTwo":     r.FromAddress,
-			"reason":         r.Type,
+			"reason":         normalizeRewardType(r.Type),
 			"settlementDate": settle,
 			"createdAt":      formatLegacyTime(r.CreatedTime),
 			"date":           formatLegacyTime(r.CreatedTime),
@@ -531,6 +544,17 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 		"count":   total,
 		"page":    page,
 	})
+}
+
+func normalizeRewardType(t string) string {
+	switch strings.TrimSpace(t) {
+	case biz.RewardTypeMgmtPoolRelease:
+		return biz.RewardTypeMgmt // 管理端统一展示为管理奖
+	case biz.RewardTypeDirectPoolRelease:
+		return biz.RewardTypeDynamicUsdt // 管理端统一展示为直推奖
+	default:
+		return t
+	}
 }
 
 func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
@@ -1191,7 +1215,7 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 	}
 	if err := s.data.DB().WithContext(ctx).Table("reward_logs").
 		Where("type IN ? AND DATE(created_time) = ?",
-			[]string{biz.RewardTypeDynamicUsdt, biz.RewardTypeMgmt}, todayDate).
+			[]string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease, biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease}, todayDate).
 		Select("COALESCE(SUM(amount),0)").Scan(&todayTwo).Error; err != nil {
 		return nil, err
 	}
@@ -1199,7 +1223,7 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 
 	var totalReward decimal.Decimal
 	if err := s.data.DB().WithContext(ctx).Table("reward_logs").
-		Where("type IN ?", []string{biz.RewardTypeStaticAix, biz.RewardTypeDynamicUsdt, biz.RewardTypeMgmt}).
+		Where("type IN ?", []string{biz.RewardTypeStaticAix, biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease, biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease}).
 		Select("COALESCE(SUM(amount),0)").Scan(&totalReward).Error; err != nil {
 		return nil, err
 	}
@@ -1227,16 +1251,25 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 }
 
 func (s *AdminLegacyService) sumActivePrincipalByUser(ctx context.Context) (map[int64]string, error) {
+	return s.sumPrincipalByUser(ctx, true)
+}
+
+func (s *AdminLegacyService) sumAllPrincipalByUser(ctx context.Context) (map[int64]string, error) {
+	return s.sumPrincipalByUser(ctx, false)
+}
+
+func (s *AdminLegacyService) sumPrincipalByUser(ctx context.Context, onlyActive bool) (map[int64]string, error) {
 	type row struct {
 		UserID int64
 		Total  decimal.Decimal
 	}
 	var rows []row
-	err := s.data.DB().WithContext(ctx).Table("orders").
-		Select("user_id, COALESCE(SUM(principal),0) as total").
-		Where("status = ?", biz.OrderStatusActive).
-		Group("user_id").Scan(&rows).Error
-	if err != nil {
+	db := s.data.DB().WithContext(ctx).Table("orders").
+		Select("user_id, COALESCE(SUM(principal),0) as total")
+	if onlyActive {
+		db = db.Where("status = ?", biz.OrderStatusActive)
+	}
+	if err := db.Group("user_id").Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := make(map[int64]string, len(rows))

@@ -132,8 +132,8 @@ const overflowReward = computed(() => {
 })
 const incomeTotal = computed(() => {
   const u = userinfo.value || {}
-  // 所有订单已释放金额合计（与已获收益同源）
-  return u.all ?? u.amountGet ?? 0
+  // 累计收益 = 静态收益 + 直推奖励 + 管理奖
+  return u.all ?? 0
 })
 
 // 使用 ?code= 便于本地登录弹窗预填（与 eth_authorize 邀请码一致）

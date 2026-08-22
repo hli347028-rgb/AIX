@@ -33,16 +33,22 @@ import listMixin from '../mixin/listMixin'
 const typeLabel = {
     static_aix: '静态奖(AIX)',
     dynamic_usdt: '直推奖(USDT)',
+    direct_pool_release: '直推奖(USDT)',
     mgmt: '管理奖(USDT)',
+    mgmt_pool_release: '管理奖(USDT)',
     exit_accel: '出局加速',
     transfer_in: '转入',
     transfer_out: '转出',
 }
 
-const typeOptions = Object.keys(typeLabel).map((value) => ({
-    value,
-    label: typeLabel[value],
-}))
+const typeOptions = [
+    { value: 'static_aix', label: '静态奖(AIX)' },
+    { value: 'dynamic_usdt', label: '直推奖(USDT)' },
+    { value: 'mgmt', label: '管理奖(USDT)' },
+    { value: 'exit_accel', label: '出局加速' },
+    { value: 'transfer_in', label: '转入' },
+    { value: 'transfer_out', label: '转出' },
+]
 
 export default {
     name: 'ordersList',

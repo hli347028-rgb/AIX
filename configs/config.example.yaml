@@ -42,6 +42,8 @@ wallet:
   win_contract: ""
   win_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
+  # BSC RPC（USDT BuySomething 充值扫描）
+  bsc_rpc_url: "https://bsc-dataseed.binance.org"
   # 进程内充值轮询。改用 crontab 时必须为 false，否则会与 cron 重复扫链。
   # false 时仍可通过 GET /api/admin_dhb/deposit_only 与 deposit_only_win 触发（幂等）。
   recharge_monitor_enabled: false

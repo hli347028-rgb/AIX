@@ -116,7 +116,7 @@ export default {
     teamTotalPerformance: '팀 총 실적',
     smallAreaPerformance: '소구 실적',
     generationRewardTotal: '대수 보상 누계',
-    staticIncomeTotal: '정적 수익 누계',
+    staticIncomeTotal: '정적 수익',
     communityBaseRewardTotal: '커뮤니티 기초 보상 누계',
     peerDividendTotal: '동급 배당 누계',
     incomeTotal: '수익 합계',

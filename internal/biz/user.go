@@ -2,7 +2,10 @@ package biz
 
 import (
 	"context"
+	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // User represents an AIX wallet user.
@@ -15,8 +18,9 @@ type User struct {
 	AixBalance        string // AIX 代币数
 	WinBalance         string // WIN 提现钱包（AIX 兑换，可提现）
 	WinRechargeBalance string // WIN 充值钱包（链上/后台充值，可认购）
-	PendingMgmtReward string // 兼容旧字段 = OverflowReward
-	OverflowReward    string // 溢出奖励（USDT）
+	PendingMgmtReward string // 兼容旧字段 = 管理奖溢出
+	OverflowReward    string // 管理奖溢出（USDT）
+	OverflowDirect    string // 直推奖溢出（USDT）
 	Points            string // 当前积分
 	PointsAll         string // 累计总积分
 	StaticUsdtTotal   string // 静态总收益（USDT）
@@ -64,6 +68,22 @@ func (u *User) SyncCompatFields() {
 	if u.EcoRewardTotal == "" {
 		u.EcoRewardTotal = "0"
 	}
+}
+
+// OverflowTotal 溢出奖励合计（管理奖溢出 + 直推奖溢出），用户端/管理端展示用。
+func (u *User) OverflowTotal() string {
+	if u == nil {
+		return "0"
+	}
+	a, err := decimal.NewFromString(strings.TrimSpace(u.OverflowReward))
+	if err != nil {
+		a = decimal.Zero
+	}
+	b, err := decimal.NewFromString(strings.TrimSpace(u.OverflowDirect))
+	if err != nil {
+		b = decimal.Zero
+	}
+	return a.Add(b).String()
 }
 
 func itoa(n int) string {

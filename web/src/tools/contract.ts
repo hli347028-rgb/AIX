@@ -50,7 +50,7 @@ export class ETH {
   public static provider: any = undefined // 提供者
   public static account: string = '' // 钱包地址
   public static signer: any = undefined // 用户签名者
-  // 链接钱包返回钱包地址；USDT 充值传 'bsc'，WIN 及其他默认 'eoeo'
+  // 链接钱包返回钱包地址；USDT / WIN 充值均在 EOEO
   public static async getAccount(chain: ChainKey = 'eoeo'): Promise<string> {
     const ethereum: any = await detectEthereumProvider()
     if (!ethereum) {

@@ -7,6 +7,15 @@
                     <a-input v-model="form.title" placeholder="请输入标题"/>
                     <a>内容:</a>
                     <tinymceForm v-model="form.content"></tinymceForm>
+                    <a style="padding-top: 8px; color: rgba(0,0,0,.45); font-size: 12px;">
+                        若富文本加载异常，可直接在下方文本框填写（支持纯文本或 HTML）
+                    </a>
+                    <a-textarea
+                        v-model="form.content"
+                        :rows="8"
+                        placeholder="公告正文"
+                        style="margin-top: 8px"
+                    />
                 </div>
                 <a-button type="primary" style="margin-top: 20px" @click="sub">
                     提交
@@ -39,16 +48,33 @@
             getOne(){
                 Art.getArticleDetails({id:this.form.id}).then(res => {
                     this.loading = false
-                    this.form.content = res.data.content;
-                    this.form.title = res.data.title;
+                    this.form.content = (res.data && res.data.content) || ''
+                    this.form.title = (res.data && res.data.title) || ''
+                }).catch(() => {
+                    this.loading = false
+                    this.$message.error('加载公告失败')
                 })
             },
             sub(){
+                const title = (this.form.title || '').trim()
+                const content = (this.form.content || '').trim()
+                if (!title) {
+                    this.$message.warning('请填写标题')
+                    return
+                }
+                if (!content) {
+                    this.$message.warning('请填写内容')
+                    return
+                }
                 this.loading = true
-                Art.addArticle(this.form).then(res => {
+                Art.addArticle({
+                    id: this.form.id,
+                    title,
+                    content,
+                }).then(() => {
                     this.loading = false
                     this.$router.back()
-                }).catch(res=>{
+                }).catch(() => {
                     this.loading = false
                 })
             }

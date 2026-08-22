@@ -5,7 +5,7 @@
                 type="info"
                 show-icon
                 style="margin-bottom: 16px"
-                message="每日结算会执行：静态奖（金本位发 AIX）+ 管理奖（A1–A10 级差，USDT 进奖励账本）。系统默认在中国时区 0 点自动跑「昨日」结算；管理端可手动触发。"
+                message="每日结算当前只发放静态奖（金本位发 AIX）。管理奖（A1–A10 级差）在下级认购时即时产生，可在「订单奖励」中按类型筛选查看。"
             />
             <a-row :gutter="10" class="inputGroup" style="margin-bottom: 16px">
                 <a-col :xs="24" :md="8" :lg="6" :xl="5">
@@ -79,6 +79,7 @@ export default {
                 {
                     title: '管理奖合计',
                     dataIndex: 'mgmtAmount',
+                    customRender: (v) => (v && Number(v) !== 0 ? v : '—（认购即时）'),
                 },
                 {
                     title: '本轮释放合计',
@@ -139,7 +140,7 @@ export default {
             }
             this.$confirm({
                 title: '执行每日结算',
-                content: `确定对 ${date} 执行每日结算吗？将发放静态 AIX 与管理奖。`,
+                content: `确定对 ${date} 执行每日结算吗？将发放静态 AIX（管理奖在认购时已即时产生，不在本结算中发放）。`,
                 centered: true,
                 onOk: () => {
                     this.triggering = true

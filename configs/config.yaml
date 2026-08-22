@@ -11,7 +11,7 @@ data:
     host: 127.0.0.1
     port: 3306
     user: root
-    password: "******"
+    password: root
     dbname: aix
   redis:
     addr: 127.0.0.1:6379
@@ -38,6 +38,7 @@ wallet:
   usdt_contract: "0x926632975149221891f1b9B56Efd125Dfe90ba2f"  # EOEO USDT
   usdt_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
+  bsc_rpc_url: "https://bsc-dataseed.binance.org"
   recharge_monitor_enabled: true
   recharge_scan_interval_seconds: 60
   recharge_scan_queries_per_cycle: 10
@@ -56,10 +57,10 @@ wallet:
   win_price_poll_seconds: 60
   win_price_queries_per_cycle: 10
   win_price_query_interval_seconds: 5
-  # WIN ERC20 合约（提现打款目标代币）
+  # WIN ERC20 鍚堢害锛堟彁鐜版墦娆剧洰鏍囦唬甯侊級
   win_contract: ""
   win_decimals: 18
-  # WIN 提现链上自动打款（私钥勿写入此文件，见下方 withdraw_private_key_file）
+  # WIN 鎻愮幇閾句笂鑷姩鎵撴锛堢閽ュ嬁鍐欏叆姝ゆ枃浠讹紝瑙佷笅鏂?withdraw_private_key_file锛?
   withdraw_payout_enabled: true
   withdraw_private_key_file: ""
   withdraw_payout_queries_per_cycle: 10
