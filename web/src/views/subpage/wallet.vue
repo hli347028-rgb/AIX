@@ -64,8 +64,8 @@
             <p>{{ userinfo.overflowReward || 0 }}</p>
           </div>
           <div class="pledge-item">
-            <p>AIX-USD</p>
-            <p>{{ profile.points_all || userinfo.points_all || 0 }}</p>
+            <p>AIX-SDT</p>
+            <p>{{ profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0 }}</p>
           </div>
         </div>
       </div>
@@ -96,7 +96,7 @@
         </div>
         <div v-else-if="isTableTab" class="subscribe-table" :class="{ 'is-two-col': isTwoColTab }">
           <div class="table-header">
-            <span class="col-amount">{{ active === 'points' ? 'AIX-USD' : $t('node.amount') }}</span>
+            <span class="col-amount">{{ active === 'points' ? 'AIX-SDT' : $t('node.amount') }}</span>
             <span v-if="!isTwoColTab" class="col-status">{{ tableMiddleTitle }}</span>
             <span class="col-time">{{ $t('node.time') }}</span>
           </div>
@@ -220,7 +220,7 @@ const menuType = computed(() => [
   ['2', $t('wallet.staticIncome')],
   ['3', $t('wallet.directReferralReward')],
   ['5', $t('wallet.managementReward')],
-  ['points', 'AIX-USD'],
+  ['points', 'AIX-SDT'],
 ])
 
 const isTableTab = computed(() => ['1', '2', '3', 'points'].includes(String(active)))

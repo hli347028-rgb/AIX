@@ -1189,6 +1189,52 @@ func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amou
 	return created, left, err
 }
 
+// CreateSdtWithdrawal AIX-SDT 提现：扣 points，创建 WithdrawalPO
+func (r *walletRepo) CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*biz.Withdrawal, string, error) {
+	amt, err := decimal.NewFromString(amount)
+	if err != nil || !amt.GreaterThan(decimal.Zero) {
+		return nil, "", fmt.Errorf("invalid amount")
+	}
+	var created *biz.Withdrawal
+	var left string
+	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
+			return err
+		}
+		if u.Points.LessThan(amt) {
+			return fmt.Errorf("insufficient points")
+		}
+		u.Points = u.Points.Sub(amt)
+		if err := tx.Model(&u).Update("points", u.Points).Error; err != nil {
+			return err
+		}
+		po := &WithdrawalPO{
+			UserID:    userID,
+			Asset:     biz.TokenSDT,
+			Amount:    amt,
+			Fee:       decimal.Zero,
+			PayAmount: amt,
+			ToAddress: toAddress,
+			Status:    biz.WithdrawStatusPending,
+			Remark:    "AIX-SDT withdraw; ERC20 payout pending",
+		}
+		if err := tx.Create(po).Error; err != nil {
+			return err
+		}
+		left = u.Points.String()
+		created = &biz.Withdrawal{
+			ID: po.ID, UserID: po.UserID, Address: u.Address,
+			ToAddress: po.ToAddress, Amount: po.Amount.String(),
+			Fee: po.Fee.String(), NetAmount: po.PayAmount.String(),
+			Status: po.Status, TxHash: po.TxHash, Asset: po.Asset,
+			CreatedAt: po.CreatedTime,
+		}
+		return nil
+	})
+	return created, left, err
+}
+
 func exchangeRecordToBiz(po *ExchangeRecordPO, userAddr string) *biz.ExchangeRecord {
 	return &biz.ExchangeRecord{
 		ID: po.ID, UserID: po.UserID, UserAddress: userAddr,
@@ -1485,7 +1531,10 @@ func (r *walletRepo) SumWithdrawnByUser(ctx context.Context, userID int64) (stri
 }
 func (r *walletRepo) ListAllWithdrawals(ctx context.Context) ([]*biz.Withdrawal, error) {
 	var list []WithdrawalPO
-	if err := r.data.db.WithContext(ctx).Where("asset = ?", biz.TokenWIN).Order("id desc").Find(&list).Error; err != nil {
+	if err := r.data.db.WithContext(ctx).
+		Where("asset IN ?", []string{biz.TokenWIN, biz.TokenSDT}).
+		Order("id desc").
+		Find(&list).Error; err != nil {
 		return nil, err
 	}
 	if len(list) == 0 {
@@ -1533,13 +1582,14 @@ func withdrawalPOToBiz(po *WithdrawalPO, userAddr string) *biz.Withdrawal {
 	}
 }
 
-// ClaimNextPendingWinWithdrawal 原子领取一条待打款 WIN 提现（pending → doing）。
+// ClaimNextPendingWinWithdrawal 原子领取一条待打款提现（pending → doing，WIN 或 SDT）。
 func (r *walletRepo) ClaimNextPendingWinWithdrawal(ctx context.Context) (*biz.Withdrawal, error) {
 	var claimed *biz.Withdrawal
 	err := r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var po WithdrawalPO
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("asset = ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')", biz.TokenWIN, biz.WithdrawStatusPending).
+			Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')",
+				[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusPending).
 			Order("id asc").
 			First(&po).Error
 		if err == gorm.ErrRecordNotFound {
@@ -1658,7 +1708,8 @@ func (r *walletRepo) ResetWithdrawalForRetry(ctx context.Context, id int64, rema
 func (r *walletRepo) ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*biz.Withdrawal, error) {
 	var list []WithdrawalPO
 	if err := r.data.db.WithContext(ctx).
-		Where("asset = ? AND status = ? AND tx_hash IS NOT NULL AND tx_hash != ''", biz.TokenWIN, biz.WithdrawStatusDoing).
+		Where("asset IN ? AND status = ? AND tx_hash IS NOT NULL AND tx_hash != ''",
+			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing).
 		Order("id asc").
 		Find(&list).Error; err != nil {
 		return nil, err
@@ -1668,8 +1719,8 @@ func (r *walletRepo) ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*biz
 
 func (r *walletRepo) ReleaseStaleDoingWithdrawals(ctx context.Context, staleBefore time.Time) (int64, error) {
 	res := r.data.db.WithContext(ctx).Model(&WithdrawalPO{}).
-		Where("asset = ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '') AND updated_time < ?",
-			biz.TokenWIN, biz.WithdrawStatusDoing, staleBefore).
+		Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '') AND updated_time < ?",
+			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing, staleBefore).
 		Updates(map[string]interface{}{
 			"status": biz.WithdrawStatusPending,
 			"remark": "payout timed out; retry pending",

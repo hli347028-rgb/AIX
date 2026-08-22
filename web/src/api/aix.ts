@@ -99,18 +99,20 @@ export interface AixWinExchangeRecord {
 
 export interface WinWithdrawResult {
   withdraw_id: number
-  asset: 'WIN'
+  asset: 'WIN' | 'SDT'
   amount: string
   to_address: string
   status: 'pending' | 'completed' | 'failed'
   tx_hash: string
-  win_balance: string
-  win_contract: string
+  win_balance?: string
+  win_contract?: string
+  points?: string
+  sdt_contract?: string
 }
 
 export interface WinWithdrawRecord {
   id: number
-  asset: 'WIN'
+  asset: 'WIN' | 'SDT'
   amount: string
   fee: string
   net_amount: string
@@ -134,6 +136,12 @@ export function withdrawWin(amount: string, toAddress?: string) {
   const payload: Record<string, string> = { amount }
   if (toAddress?.trim()) payload.to_address = toAddress.trim()
   return post<WinWithdrawResult>('/v1/wallet/withdraw-win', payload)
+}
+
+export function withdrawSdt(amount: string, toAddress?: string) {
+  const payload: Record<string, string> = { amount }
+  if (toAddress?.trim()) payload.to_address = toAddress.trim()
+  return post<WinWithdrawResult>('/v1/wallet/withdraw-sdt', payload)
 }
 
 export function getWinWithdrawRecords() {

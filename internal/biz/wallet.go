@@ -36,6 +36,7 @@ const (
 	TokenUSDT = "USDT"
 	TokenAIX  = "AIX"
 	TokenWIN  = "WIN"
+	TokenSDT  = "SDT"
 
 	RewardTypeStaticAix         = "static_aix"
 	RewardTypeDynamicUsdt       = "dynamic_usdt"
@@ -317,6 +318,8 @@ type WalletRepo interface {
 
 	// CreateWinWithdrawal WIN 代币提现
 	CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*Withdrawal, string, error)
+	// CreateSdtWithdrawal AIX-SDT 提现：扣 points，创建 WithdrawalPO
+	CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*Withdrawal, string, error)
 	ListWithdrawalsByUser(ctx context.Context, userID int64) ([]*Withdrawal, error)
 	// 提现相关（USDT 审批路径未完成，保留接口）
 	CreateWithdrawal(ctx context.Context, userID int64, amount, fee, netAmount, toAddress string) (*Withdrawal, string, error)

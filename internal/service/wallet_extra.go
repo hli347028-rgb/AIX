@@ -25,6 +25,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/withdraw-aix", wallet.HandleWithdrawAIX)
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
 	r.POST("/v1/wallet/withdraw-win", wallet.HandleWithdrawWIN)
+	r.POST("/v1/wallet/withdraw-sdt", wallet.HandleWithdrawSDT)
 	r.GET("/v1/wallet/withdraw-records", wallet.HandleWithdrawRecords)
 	r.GET("/v1/wallet/exchange-records", wallet.HandleExchangeRecords)
 	r.GET("/v1/wallet/aix-price", wallet.HandleAixPrice)
@@ -507,6 +508,33 @@ func (s *WalletService) HandleWithdrawWIN(ctx khttp.Context) error {
 		"tx_hash":      w.TxHash,
 		"win_balance":  left,
 		"win_contract": s.uc.WinContract(),
+	})
+}
+
+// HandleWithdrawSDT 用户端：AIX-SDT 提现
+func (s *WalletService) HandleWithdrawSDT(ctx khttp.Context) error {
+	var req struct {
+		Token     string `json:"token"`
+		Amount    string `json:"amount"`
+		ToAddress string `json:"to_address"`
+	}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
+	}
+	token := tokenFromRequest(ctx, req.Token)
+	w, left, err := s.uc.CreateSdtWithdraw(ctx, token, req.Amount, req.ToAddress)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"withdraw_id":  w.ID,
+		"asset":        w.Asset,
+		"amount":       w.Amount,
+		"to_address":   w.ToAddress,
+		"status":       w.Status,
+		"tx_hash":      w.TxHash,
+		"points":       left,
+		"sdt_contract": s.uc.SdtContract(),
 	})
 }
 

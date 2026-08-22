@@ -60,8 +60,10 @@ wallet:
   # WIN ERC20 鍚堢害锛堟彁鐜版墦娆剧洰鏍囦唬甯侊級
   win_contract: ""
   win_decimals: 18
-  # WIN 鎻愮幇閾句笂鑷姩鎵撴锛堢閽ュ嬁鍐欏叆姝ゆ枃浠讹紝瑙佷笅鏂?withdraw_private_key_file锛?
+  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"
+  sdt_decimals: 18
+  # WIN / AIX-SDT 提现打款共用 withdraw.key
   withdraw_payout_enabled: true
-  withdraw_private_key_file: ""
+  withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10
   withdraw_payout_query_interval_seconds: 5

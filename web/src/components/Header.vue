@@ -47,6 +47,7 @@ import { Teleport } from 'vue'
 import { useI18n } from 'vue-i18n'
 import userPerson from '@/pinia/person'
 import Sidebar from '@/components/Sidebar.vue'
+import { userLanguageOptions } from '@/i18n/languages'
 
 const person = userPerson()
 const { locale } = useI18n()
@@ -64,14 +65,7 @@ const formatAddress = (value: string) => {
   return frontSix + middle + backSix
 }
 
-const languages = [
-  { code: 'zh', name: '简体中文' },
-  { code: 'zh-tw', name: '繁體中文' },
-  { code: 'en', name: 'English' },
-  { code: 'ja', name: '日本語' },
-  { code: 'ko', name: '한국어' },
-  { code: 'vi', name: 'Tiếng Việt' }
-]
+const languages = userLanguageOptions
 
 watch(locale, (val) => {
   currentLanguage.value = val

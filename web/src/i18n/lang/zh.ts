@@ -239,6 +239,10 @@ export default {
     noRecords: '暂无提现记录',
     insufficientBalance: '可提余额不足',
     insufficientWin: 'WIN 余额不足',
+    insufficientSdt: 'AIX-SDT 余额不足',
+    sdtSubtitle: 'AIX-SDT 提现',
+    sdtAvailableBalance: 'AIX-SDT 余额',
+    sdtExchangeHint: 'AIX-SDT 将提现至绑定钱包地址，链上到账为 SDT 代币',
     insufficientHint: '可提余额不足（账户余额不可直接提现，须有静态/分红入账）',
     aixExchangeHint: 'AIX 不可直接提现，请先兑换为 WIN',
     toAddress: '提现地址',
@@ -362,7 +366,7 @@ export default {
     exitProgress: '出局进度', rechargeBalance: '充值余额', rewardBalance: '奖励余额',
     withdrawableAix: '可提 AIX', aixBalance: 'AIX 余额', winBalance: 'WIN 余额', rawNewBalance: '代币余额', exchange: '兑换', directReferralReward: '直推奖励',
     managementReward: '管理奖', releasedManagementReward: '已释放管理奖', pendingManagementReward: '待释放管理奖', overflowReward: '溢出奖励', totalIncome: '累计收益',
-    points: '当前积分', pointsAll: '总积分', pointsRecords: 'AIX-USD', noPointsRecords: '暂无 AIX-USD 记录'
+    points: '当前积分', pointsAll: '总积分', pointsRecords: 'AIX-SDT', noPointsRecords: '暂无 AIX-SDT 记录'
   },
   exchange: {
     title: 'AIX 兑换 WIN', availableAix: '可用 AIX', currentWin: 'WIN 余额', exchangeAmount: '兑换数量', all: '全部',

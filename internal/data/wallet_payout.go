@@ -101,7 +101,8 @@ func (r *walletRepo) SetWithdrawalPayoutNonce(ctx context.Context, id int64, non
 func (r *walletRepo) ListDoingWithdrawalsWithoutTxHash(ctx context.Context) ([]*biz.Withdrawal, error) {
 	var list []WithdrawalPO
 	if err := r.data.db.WithContext(ctx).
-		Where("asset = ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')", biz.TokenWIN, biz.WithdrawStatusDoing).
+		Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')",
+			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing).
 		Order("id asc").
 		Find(&list).Error; err != nil {
 		return nil, err
@@ -112,8 +113,8 @@ func (r *walletRepo) ListDoingWithdrawalsWithoutTxHash(ctx context.Context) ([]*
 func (r *walletRepo) ListStaleDoingWinWithdrawals(ctx context.Context, staleBefore time.Time) ([]*biz.Withdrawal, error) {
 	var list []WithdrawalPO
 	if err := r.data.db.WithContext(ctx).
-		Where("asset = ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '') AND updated_time < ?",
-			biz.TokenWIN, biz.WithdrawStatusDoing, staleBefore).
+		Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '') AND updated_time < ?",
+			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing, staleBefore).
 		Order("id asc").
 		Find(&list).Error; err != nil {
 		return nil, err

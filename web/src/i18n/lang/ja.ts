@@ -239,6 +239,10 @@ export default {
     noRecords: '出金記録なし',
     insufficientBalance: '出金可能残高が不足しています',
     insufficientWin: 'WIN残高が不足しています',
+    insufficientSdt: 'AIX-SDT残高が不足しています',
+    sdtSubtitle: 'AIX-SDT出金',
+    sdtAvailableBalance: 'AIX-SDT残高',
+    sdtExchangeHint: 'AIX-SDTは連携ウォレットへSDTトークンとして送金されます',
     insufficientHint: '出金可能残高が不足しています（口座残高は直接出金不可。静的/配当入金が必要）',
     aixExchangeHint: 'AIXは直接出金できません。先にWINへ交換してください',
     toAddress: '出金先アドレス',
@@ -359,7 +363,7 @@ export default {
     income: '収益',
     exitProgress: '出局進捗', rechargeBalance: 'チャージ残高', rewardBalance: '報酬残高',
     withdrawableAix: '出金可能 AIX', aixBalance: 'AIX残高', winBalance: 'WIN残高', rawNewBalance: 'トークン残高', exchange: '交換', directReferralReward: '直接紹介報酬', managementReward: '管理報酬', releasedManagementReward: '支払済み管理報酬', pendingManagementReward: '保留中の管理報酬', overflowReward: 'オーバーフロー報酬', totalIncome: '累計収益',
-    points: '現在のポイント', pointsAll: '累計ポイント', pointsRecords: 'AIX-USD', noPointsRecords: 'AIX-USD記録なし'
+    points: '現在のポイント', pointsAll: '累計ポイント', pointsRecords: 'AIX-SDT', noPointsRecords: 'AIX-SDT記録なし'
   },
   exchange: {
     title: 'AIXをWINに交換', availableAix: '利用可能なAIX', currentWin: 'WIN残高', exchangeAmount: '交換数量', all: 'すべて',

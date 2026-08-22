@@ -484,7 +484,7 @@ func (uc *AdminUsecase) ListExchangeRecords(ctx context.Context, tokenString str
 	return uc.walletRepo.ListAllExchangeRecords(ctx)
 }
 
-// ListAllWithdrawals 管理端：列出所有提现记录（仅 WIN）
+// ListAllWithdrawals 管理端：列出所有提现记录（WIN / AIX-SDT）
 func (uc *AdminUsecase) ListAllWithdrawals(ctx context.Context, tokenString string) ([]*Withdrawal, error) {
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return nil, err

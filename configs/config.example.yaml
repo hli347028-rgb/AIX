@@ -41,6 +41,8 @@ wallet:
   # WIN ERC20 合约（用于 WIN 充值链上校验）；留空时仅允许管理端人工入账 / 开发模式
   win_contract: ""
   win_decimals: 18
+  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"
+  sdt_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
   # BSC RPC（USDT BuySomething 充值扫描）
   bsc_rpc_url: "https://bsc-dataseed.binance.org"
@@ -68,7 +70,7 @@ wallet:
   win_price_poll_seconds: 60
   win_price_queries_per_cycle: 10
   win_price_query_interval_seconds: 5
-  # WIN 提现自动打款：私钥仅部署在服务器（环境变量或 key 文件），勿提交到 git
+  # WIN / AIX-SDT 提现自动打款共用 withdraw.key（勿提交到 git）
   withdraw_payout_enabled: true
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10

@@ -239,6 +239,10 @@ export default {
     noRecords: 'No withdraw records',
     insufficientBalance: 'Insufficient withdrawable balance',
     insufficientWin: 'Insufficient WIN balance',
+    insufficientSdt: 'Insufficient AIX-SDT balance',
+    sdtSubtitle: 'AIX-SDT Withdrawal',
+    sdtAvailableBalance: 'AIX-SDT Balance',
+    sdtExchangeHint: 'AIX-SDT will be sent to your linked wallet as SDT tokens on-chain',
     insufficientHint: 'Insufficient withdrawable balance (account balance cannot be withdrawn directly; static/dividend credits required)',
     aixExchangeHint: 'AIX cannot be withdrawn directly. Please exchange to WIN first.',
     toAddress: 'Withdraw Address',
@@ -363,7 +367,7 @@ export default {
     exitProgress: 'Exit Progress', rechargeBalance: 'Recharge Balance', rewardBalance: 'Reward Balance',
     withdrawableAix: 'Withdrawable AIX', aixBalance: 'AIX Balance', winBalance: 'WIN Balance', rawNewBalance: 'Token Balance', exchange: 'Exchange', directReferralReward: 'Direct Referral Reward',
     managementReward: 'Management Reward', releasedManagementReward: 'Released Management Reward', pendingManagementReward: 'Pending Management Reward', overflowReward: 'Overflow Reward', totalIncome: 'Total Income',
-    points: 'Points', pointsAll: 'Total Points', pointsRecords: 'AIX-USD', noPointsRecords: 'No AIX-USD records'
+    points: 'Points', pointsAll: 'Total Points', pointsRecords: 'AIX-SDT', noPointsRecords: 'No AIX-SDT records'
   },
   exchange: {
     title: 'Exchange AIX to WIN', availableAix: 'Available AIX', currentWin: 'WIN Balance', exchangeAmount: 'Exchange Amount', all: 'All',

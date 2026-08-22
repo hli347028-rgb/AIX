@@ -15,19 +15,13 @@
 <script setup lang="ts">
 import ChildrenHeader from '../../components/header/childrenHeader.vue'
 import { restartCurrentApp } from '@/tools/plaocRuntime'
+import { userLanguageOptions } from '@/i18n/languages'
 import { useI18n } from 'vue-i18n'
 import { ref } from 'vue'
 const { t: $t, locale } = useI18n()
 
 const selectedLanguage = ref(String(locale.value))
-const languageOptions = [
-  { code: 'zh', name: '简体中文' },
-  { code: 'zh-tw', name: '繁體中文' },
-  { code: 'en', name: 'English' },
-  { code: 'ja', name: '日本語' },
-  { code: 'ko', name: '한국어' },
-  { code: 'vi', name: 'Tiếng Việt' },
-]
+const languageOptions = userLanguageOptions
 
 const switchUser = async () => {
   localStorage.removeItem("token");

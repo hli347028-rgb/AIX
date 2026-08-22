@@ -1,9 +1,16 @@
 <template>
     <PageView>
-        <a-card title="WIN 提现记录">
+        <a-card title="提现记录">
             <a-row :gutter="10" class="inputGroup">
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-input v-model="searchData.address" placeholder="账户地址" @keyup.enter="getListTwo" />
+                </a-col>
+                <a-col :xs="12" :md="6" :lg="6" :xl="4">
+                    <a-select v-model="searchData.asset" placeholder="资产类型" allowClear style="width: 100%">
+                        <a-select-option value="">全部</a-select-option>
+                        <a-select-option value="WIN">WIN</a-select-option>
+                        <a-select-option value="SDT">AIX-SDT</a-select-option>
+                    </a-select>
                 </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-button-group>
@@ -31,6 +38,14 @@ export default {
                 {
                     title: '账户',
                     dataIndex: 'address',
+                },
+                {
+                    title: '资产',
+                    dataIndex: 'asset',
+                    customRender: (v) => ({
+                        WIN: 'WIN',
+                        SDT: 'AIX-SDT',
+                    }[String(v || 'WIN').toUpperCase()] || v || '-'),
                 },
                 {
                     title: '提现金额',
@@ -64,6 +79,7 @@ export default {
             ],
             searchData: {
                 address: '',
+                asset: '',
             },
         }
     },

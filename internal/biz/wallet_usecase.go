@@ -367,6 +367,39 @@ func (uc *WalletUsecase) CreateWinWithdraw(ctx context.Context, tokenString, amo
 	return w, left, nil
 }
 
+// CreateSdtWithdraw 提现 AIX-SDT（链上 SDT ERC20）
+func (uc *WalletUsecase) CreateSdtWithdraw(ctx context.Context, tokenString, amount, toAddress string) (*Withdrawal, string, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return nil, "", err
+	}
+	amt, err := ParseAmount(amount)
+	if err != nil || !amt.GreaterThan(decimal.Zero) {
+		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额必须大于0")
+	}
+	minWithdraw, err := decimal.NewFromString(uc.walletCfg.GetMinWithdraw())
+	if err == nil && minWithdraw.GreaterThan(decimal.Zero) && amt.LessThan(minWithdraw) {
+		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额低于最低限额")
+	}
+	toNorm := strings.TrimSpace(toAddress)
+	if toNorm == "" {
+		toNorm = user.Address
+	} else {
+		toNorm, err = eth.NormalizeAddress(toNorm)
+		if err != nil {
+			return nil, "", errors.BadRequest("INVALID_ADDRESS", "提现地址无效")
+		}
+	}
+	w, left, err := uc.walletRepo.CreateSdtWithdrawal(ctx, user.ID, amt.String(), toNorm)
+	if err != nil {
+		if strings.Contains(err.Error(), "insufficient") {
+			return nil, "", errors.BadRequest("INSUFFICIENT_SDT", "AIX-SDT 余额不足")
+		}
+		return nil, "", err
+	}
+	return w, left, nil
+}
+
 func (uc *WalletUsecase) ListExchangeRecords(ctx context.Context, tokenString string) ([]*ExchangeRecord, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
@@ -606,6 +639,14 @@ func (uc *WalletUsecase) WinContract() string {
 
 func (uc *WalletUsecase) WinDecimals() int32 {
 	return uc.walletCfg.GetWinDecimals()
+}
+
+func (uc *WalletUsecase) SdtContract() string {
+	return uc.walletCfg.GetSdtContract()
+}
+
+func (uc *WalletUsecase) SdtDecimals() int32 {
+	return uc.walletCfg.GetSdtDecimals()
 }
 
 func (uc *WalletUsecase) MinUsdtRecharge() string {

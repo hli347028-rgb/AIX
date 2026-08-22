@@ -3,13 +3,33 @@
     <Header />
 
     <div class="content">
+      <div class="asset-tabs">
+        <button
+          type="button"
+          class="asset-tab"
+          :class="{ active: assetType === 'WIN' }"
+          @click="switchAsset('WIN')"
+        >
+          WIN
+        </button>
+        <button
+          type="button"
+          class="asset-tab"
+          :class="{ active: assetType === 'SDT' }"
+          @click="switchAsset('SDT')"
+        >
+          AIX-SDT
+        </button>
+      </div>
+
       <div class="page-header">
-        <h1 class="page-title">{{ $t('withdraw.winSubtitle') }}</h1>
-        <p class="page-balance">{{ $t('withdraw.availableBalance') }}: {{ displayAmount(winBalance) }} WIN</p>
-        <p class="page-hint">
+        <h1 class="page-title">{{ pageSubtitle }}</h1>
+        <p class="page-balance">{{ balanceLabel }}: {{ displayAmount(currentBalance) }} {{ assetLabel }}</p>
+        <p v-if="assetType === 'WIN'" class="page-hint">
           {{ $t('withdraw.aixExchangeHint') }}
           <button type="button" class="link-btn" @click="router.push('/exchange')">{{ $t('wallet.exchange') }}</button>
         </p>
+        <p v-else class="page-hint">{{ $t('withdraw.sdtExchangeHint') }}</p>
       </div>
 
       <div class="withdraw-form">
@@ -22,13 +42,13 @@
         <div class="form-row">
           <input
             class="form-input"
-            v-model="amountWin"
-            @input="checkWinAmount"
+            v-model="amountInput"
+            @input="checkAmount"
             type="text"
             inputmode="decimal"
             :placeholder="$t('withdraw.enterAmount')"
           />
-          <span class="asset-tag">WIN</span>
+          <span class="asset-tag">{{ assetLabel }}</span>
         </div>
         <p v-if="amountError" class="error-text">{{ amountError }}</p>
 
@@ -41,7 +61,7 @@
         </button>
 
         <div class="form-info">
-          <p>{{ $t('withdraw.fee') }}: 0 WIN</p>
+          <p>{{ $t('withdraw.fee') }}: 0 {{ assetLabel }}</p>
         </div>
       </div>
 
@@ -58,10 +78,10 @@
             <span>{{ $t('withdraw.toAddressShort') }}</span>
             <span>{{ $t('withdraw.status') }}</span>
           </div>
-          <div class="order-list" v-for="item in amountList" :key="item.id">
+          <div class="order-list" v-for="item in filteredRecords" :key="item.id">
             <div class="table-row table-row-4">
-              <span>{{ displayAmount(item.amount) }} WIN</span>
-              <span>{{ displayAmount(item.net_amount) }} WIN</span>
+              <span>{{ displayAmount(item.amount) }} {{ recordAssetLabel(item.asset) }}</span>
+              <span>{{ displayAmount(item.net_amount) }} {{ recordAssetLabel(item.asset) }}</span>
               <span class="address-cell">{{ formatAddress(item.to_address) }}</span>
               <span class="status-cell">
                 {{ withdrawStatusText(item.status) }}
@@ -70,7 +90,7 @@
               </span>
             </div>
           </div>
-          <div class="empty-state" v-if="!recordLoading && amountList.length === 0">
+          <div class="empty-state" v-if="!recordLoading && filteredRecords.length === 0">
             <p>{{ $t('withdraw.noRecords') }}</p>
           </div>
           <div class="state-box" v-if="recordLoading">
@@ -85,7 +105,7 @@
 <script setup lang="ts">
 import Header from '@/components/Header.vue'
 import userPerson from '@/pinia/person'
-import { getWinWithdrawRecords, withdrawWin } from '@/api/aix'
+import { getWinWithdrawRecords, withdrawSdt, withdrawWin } from '@/api/aix'
 import type { WinWithdrawRecord } from '@/api/aix'
 import { compareDecimals, displayDecimal, isPositiveDecimal } from '@/tools/decimal'
 import { showToast } from 'vant'
@@ -93,28 +113,52 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+type AssetType = 'WIN' | 'SDT'
+
 const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson()
 
-const amountWin = ref('')
+const assetType = ref<AssetType>('WIN')
+const amountInput = ref('')
 const loading = ref(false)
 const recordLoading = ref(false)
 const amountList = ref<WinWithdrawRecord[]>([])
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
-const hasPendingRecords = computed(() => amountList.value.some((item) => item.status === 'pending'))
+const assetLabel = computed(() => (assetType.value === 'WIN' ? 'WIN' : 'AIX-SDT'))
+const pageSubtitle = computed(() =>
+  assetType.value === 'WIN' ? $t('withdraw.winSubtitle') : $t('withdraw.sdtSubtitle')
+)
+const balanceLabel = computed(() =>
+  assetType.value === 'WIN' ? $t('withdraw.availableBalance') : $t('withdraw.sdtAvailableBalance')
+)
 
 const winBalance = computed(() => String(person.profile?.win_balance || '0'))
+const sdtBalance = computed(() => String(person.profile?.points || person.userinfo?.points || '0'))
+const currentBalance = computed(() => (assetType.value === 'WIN' ? winBalance.value : sdtBalance.value))
+
+const filteredRecords = computed(() =>
+  amountList.value.filter((item) => {
+    const asset = String(item.asset || 'WIN').toUpperCase()
+    return assetType.value === 'SDT' ? asset === 'SDT' : asset === 'WIN'
+  })
+)
+
+const hasPendingRecords = computed(() => filteredRecords.value.some((item) => item.status === 'pending'))
 
 const amountError = computed(() => {
-  if (!amountWin.value) return ''
-  if (!isPositiveDecimal(amountWin.value)) return $t('withdraw.enterAmount')
-  if (compareDecimals(amountWin.value, winBalance.value) > 0) return $t('withdraw.insufficientWin')
+  if (!amountInput.value) return ''
+  if (!isPositiveDecimal(amountInput.value)) return $t('withdraw.enterAmount')
+  if (compareDecimals(amountInput.value, currentBalance.value) > 0) {
+    return assetType.value === 'WIN' ? $t('withdraw.insufficientWin') : $t('withdraw.insufficientSdt')
+  }
   return ''
 })
 
-const canSubmit = computed(() => Boolean(amountWin.value) && !amountError.value)
+const canSubmit = computed(() => Boolean(amountInput.value) && !amountError.value)
+
+const recordAssetLabel = (asset?: string) => (String(asset || 'WIN').toUpperCase() === 'SDT' ? 'AIX-SDT' : 'WIN')
 
 const withdrawStatusText = (status: string) => {
   switch (status) {
@@ -137,6 +181,13 @@ const formatTime = (value: number) => {
   if (Number.isNaN(date.getTime())) return ''
   const pad = (part: number) => String(part).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const switchAsset = (next: AssetType) => {
+  if (assetType.value === next) return
+  assetType.value = next
+  amountInput.value = ''
+  syncWithdrawPolling()
 }
 
 const getAmountList = async () => {
@@ -170,7 +221,7 @@ const syncWithdrawPolling = () => {
       const result = await getWinWithdrawRecords()
       amountList.value = result?.records || []
       await person.refreshProfile?.()
-      if (!amountList.value.some((item) => item.status === 'pending')) {
+      if (!hasPendingRecords.value) {
         stopWithdrawPolling()
       }
     } catch {
@@ -180,38 +231,45 @@ const syncWithdrawPolling = () => {
 }
 
 const handleAllAmount = () => {
-  if (!isPositiveDecimal(winBalance.value)) {
-    showToast({ message: $t('withdraw.insufficientWin'), position: 'middle' })
+  if (!isPositiveDecimal(currentBalance.value)) {
+    showToast({
+      message: assetType.value === 'WIN' ? $t('withdraw.insufficientWin') : $t('withdraw.insufficientSdt'),
+      position: 'middle',
+    })
     return
   }
-  amountWin.value = winBalance.value
+  amountInput.value = currentBalance.value
 }
 
-const checkWinAmount = (e: Event) => {
+const checkAmount = (e: Event) => {
   const target = e.target as HTMLInputElement
-  let raw = String(target?.value ?? amountWin.value ?? '')
+  let raw = String(target?.value ?? amountInput.value ?? '')
   raw = raw.replace(/[^\d.]/g, '')
   const parts = raw.split('.')
   if (parts.length > 2) raw = parts[0] + '.' + parts.slice(1).join('')
   if (parts[1] != null && parts[1].length > 18) raw = parts[0] + '.' + parts[1].slice(0, 18)
-  amountWin.value = raw
+  amountInput.value = raw
 }
 
 const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
   loading.value = true
   try {
-    const result = await withdrawWin(amountWin.value)
+    const result = assetType.value === 'WIN'
+      ? await withdrawWin(amountInput.value)
+      : await withdrawSdt(amountInput.value)
     person.profile = {
       ...person.profile,
-      win_balance: result.win_balance,
+      ...(assetType.value === 'WIN'
+        ? { win_balance: result.win_balance }
+        : { points: result.points }),
     }
     showToast({
       message: $t('withdraw.submittedProcessing'),
       position: 'middle',
       duration: 2000,
     })
-    amountWin.value = ''
+    amountInput.value = ''
     await Promise.allSettled([person.refreshProfile?.(), getAmountList()])
     syncWithdrawPolling()
   } catch (error: any) {
@@ -219,6 +277,7 @@ const handleWithdrawal = async () => {
     const messageKey: Record<string, string> = {
       INVALID_AMOUNT: 'withdraw.enterAmount',
       INSUFFICIENT_WIN: 'withdraw.insufficientWin',
+      INSUFFICIENT_SDT: 'withdraw.insufficientSdt',
       INVALID_ADDRESS: 'withdraw.invalidAddress',
       AIX_WITHDRAW_FORBIDDEN: 'withdraw.aixExchangeHint',
     }
@@ -261,6 +320,30 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+.asset-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.asset-tab {
+  flex: 1;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &.active {
+    border-color: $brand-primary;
+    background: rgba(21, 151, 229, 0.15);
+    color: #fff;
+  }
+}
+
 .page-header {
   text-align: center;
   margin-bottom: 20px;
@@ -270,11 +353,6 @@ onUnmounted(() => {
     font-weight: bold;
     color: #fff;
     margin-bottom: 8px;
-  }
-
-  .page-subtitle {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
   }
 
   .page-balance {

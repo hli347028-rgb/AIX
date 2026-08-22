@@ -282,6 +282,7 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
 	addressFilter := strings.TrimSpace(q.Get("address"))
+	assetFilter := strings.ToUpper(strings.TrimSpace(q.Get("asset")))
 
 	list, err := s.admin.ListAllWithdrawals(ctx, s.token(ctx))
 	if err != nil {
@@ -290,6 +291,9 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	filtered := make([]*biz.Withdrawal, 0, len(list))
 	for _, w := range list {
 		if addressFilter != "" && !strings.Contains(strings.ToLower(w.Address), strings.ToLower(addressFilter)) {
+			continue
+		}
+		if assetFilter != "" && strings.ToUpper(strings.TrimSpace(w.Asset)) != assetFilter {
 			continue
 		}
 		filtered = append(filtered, w)

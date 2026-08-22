@@ -10,6 +10,7 @@ import (
 const (
 	DefaultDepositContract    = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
 	DefaultWinDepositContract = "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
+	DefaultSdtContract        = "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"
 	DefaultRPCURL             = "https://rpc1.eoeo.info"
 	DefaultBscRPCURL          = "https://bsc-dataseed.binance.org"
 )
@@ -24,6 +25,8 @@ type WalletConfig struct {
 	UsdtDecimals                     int32    `json:"usdt_decimals" yaml:"usdt_decimals"`
 	WinContract                      string   `json:"win_contract" yaml:"win_contract"`
 	WinDecimals                      int32    `json:"win_decimals" yaml:"win_decimals"`
+	SdtContract                      string   `json:"sdt_contract" yaml:"sdt_contract"`
+	SdtDecimals                      int32    `json:"sdt_decimals" yaml:"sdt_decimals"`
 	RPCURL                           string   `json:"rpc_url" yaml:"rpc_url"`         // EOEO（WIN 充值 / 价格 / 提现）
 	BscRPCURL                        string   `json:"bsc_rpc_url" yaml:"bsc_rpc_url"` // BSC（USDT 充值）
 	RechargeMonitorEnabled           bool     `json:"recharge_monitor_enabled" yaml:"recharge_monitor_enabled"`
@@ -47,6 +50,8 @@ type WalletConfig struct {
 	WithdrawPayoutEnabled              bool   `json:"withdraw_payout_enabled" yaml:"withdraw_payout_enabled"`
 	WithdrawPrivateKey                 string `json:"withdraw_private_key" yaml:"withdraw_private_key"`
 	WithdrawPrivateKeyFile             string `json:"withdraw_private_key_file" yaml:"withdraw_private_key_file"`
+	SdtPrivateKey                      string `json:"sdt_private_key" yaml:"sdt_private_key"`
+	SdtPrivateKeyFile                  string `json:"sdt_private_key_file" yaml:"sdt_private_key_file"`
 	WithdrawPayoutQueriesPerCycle      int32  `json:"withdraw_payout_queries_per_cycle" yaml:"withdraw_payout_queries_per_cycle"`
 	WithdrawPayoutQueryIntervalSeconds int64  `json:"withdraw_payout_query_interval_seconds" yaml:"withdraw_payout_query_interval_seconds"`
 }
@@ -202,6 +207,20 @@ func (w *WalletConfig) GetWinDecimals() int32 {
 	return w.WinDecimals
 }
 
+func (w *WalletConfig) GetSdtContract() string {
+	if w == nil || strings.TrimSpace(w.SdtContract) == "" {
+		return DefaultSdtContract
+	}
+	return strings.TrimSpace(w.SdtContract)
+}
+
+func (w *WalletConfig) GetSdtDecimals() int32 {
+	if w == nil || w.SdtDecimals <= 0 {
+		return 18
+	}
+	return w.SdtDecimals
+}
+
 func (w *WalletConfig) GetRPCURL() string {
 	if w == nil || strings.TrimSpace(w.RPCURL) == "" {
 		return DefaultRPCURL
@@ -322,4 +341,25 @@ func (w *WalletConfig) GetWithdrawPrivateKey() string {
 		}
 	}
 	return ""
+}
+
+// GetSdtPrivateKey reads AIX-SDT payout key; falls back to WIN withdraw key when unset.
+func (w *WalletConfig) GetSdtPrivateKey() string {
+	if env := strings.TrimSpace(os.Getenv("AIX_SDT_WITHDRAW_PRIVATE_KEY")); env != "" {
+		return strings.TrimPrefix(env, "0x")
+	}
+	if w != nil {
+		if path := strings.TrimSpace(w.SdtPrivateKeyFile); path != "" {
+			if b, err := os.ReadFile(path); err == nil {
+				key := strings.TrimSpace(string(b))
+				if key != "" {
+					return strings.TrimPrefix(key, "0x")
+				}
+			}
+		}
+		if key := strings.TrimSpace(w.SdtPrivateKey); key != "" {
+			return strings.TrimPrefix(key, "0x")
+		}
+	}
+	return w.GetWithdrawPrivateKey()
 }

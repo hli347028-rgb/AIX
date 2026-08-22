@@ -57,7 +57,10 @@ wallet:
   win_price_query_interval_seconds: 5
   win_contract: "0x193013574dacbd38bf26ecb654b3fd787b94d216"
   win_decimals: 18
+  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"
+  sdt_decimals: 18
   withdraw_payout_enabled: true
+  # WIN 与 AIX-SDT 提现打款共用同一私钥；未配置 sdt_private_key_file 时 SDT 自动回退到此文件
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10
   withdraw_payout_query_interval_seconds: 5

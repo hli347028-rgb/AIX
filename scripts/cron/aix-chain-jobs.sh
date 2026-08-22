@@ -1,5 +1,6 @@
 #!/bin/bash
-# AIX chain jobs for crontab 鈥?trigger one cycle each (server does 10x every 5s).
+# AIX chain jobs for crontab — each HTTP call starts one server-side cycle (10 runs, 5s apart).
+# withdraw_payout covers WIN native payout + AIX-SDT ERC20 payout (same cycle params).
 # Prerequisite: recharge_monitor_enabled=false and win_price_oracle_enabled=false
 set -u
 BASE="${AIX_HTTP:-http://127.0.0.1:9000}"

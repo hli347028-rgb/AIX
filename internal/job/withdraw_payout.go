@@ -75,7 +75,7 @@ func (j *WithdrawPayoutJob) TriggerCycle() *WithdrawPayoutCycleResult {
 		res.Reason = "withdraw payout disabled"
 		return res
 	}
-	if j.cfg.GetWithdrawPrivateKey() == "" {
+	if j.cfg.GetWithdrawPrivateKey() == "" && j.cfg.GetSdtPrivateKey() == "" {
 		res.Accepted = false
 		res.Reason = "withdraw private key not configured"
 		return res
@@ -117,18 +117,14 @@ func (j *WithdrawPayoutJob) ProcessOnce(ctx context.Context) (*WithdrawPayoutRes
 	if !j.cfg.IsWithdrawPayoutEnabled() {
 		return &WithdrawPayoutResult{Skipped: true, Reason: "disabled"}, nil
 	}
-	privKey := j.cfg.GetWithdrawPrivateKey()
-	if privKey == "" {
-		return &WithdrawPayoutResult{Skipped: true, Reason: "no private key"}, nil
-	}
 
 	if err := j.recoverInProgress(ctx); err != nil {
 		j.log.Warnf("recover in-progress withdrawals: %v", err)
 	}
-	if err := j.reconcileDoingWithoutTxHash(ctx, privKey); err != nil {
+	if err := j.reconcileDoingWithoutTxHash(ctx); err != nil {
 		j.log.Warnf("reconcile doing withdrawals without tx_hash: %v", err)
 	}
-	if err := j.releaseStaleDoingWithdrawals(ctx, privKey); err != nil {
+	if err := j.releaseStaleDoingWithdrawals(ctx); err != nil {
 		j.log.Warnf("release stale doing withdrawals: %v", err)
 	}
 
@@ -138,6 +134,15 @@ func (j *WithdrawPayoutJob) ProcessOnce(ctx context.Context) (*WithdrawPayoutRes
 	}
 	if w == nil {
 		return &WithdrawPayoutResult{Processed: false}, nil
+	}
+
+	privKey := j.payoutPrivateKey(w)
+	if privKey == "" {
+		_ = j.walletRepo.ReleaseWithdrawalPayout(ctx, w.ID, "payout private key not configured")
+		return &WithdrawPayoutResult{
+			Processed: true, WithdrawID: w.ID,
+			Error: fmt.Sprintf("no private key for asset %s", w.Asset),
+		}, nil
 	}
 
 	if done, txHash, err := j.reconcileWithdrawal(ctx, w, privKey); err != nil {
@@ -173,9 +178,7 @@ func (j *WithdrawPayoutJob) ProcessOnce(ctx context.Context) (*WithdrawPayoutRes
 		j.log.Warnf("withdraw %d save payout nonce failed: %v", w.ID, err)
 	}
 
-	sendResult, err := eth.SendNativeTransferWithNonce(
-		ctx, j.cfg.GetRPCURL(), privKey, w.ToAddress, amount, j.cfg.GetWinDecimals(), &nonce,
-	)
+	sendResult, err := j.sendWithdrawTransfer(ctx, w, privKey, nonce)
 	if err != nil {
 		if recovered, txHash, recErr := j.recoverByStoredNonce(ctx, w, fromAddress, nonce); recErr == nil && recovered {
 			return &WithdrawPayoutResult{Processed: true, WithdrawID: w.ID, TxHash: txHash}, nil
@@ -204,16 +207,64 @@ func (j *WithdrawPayoutJob) ProcessOnce(ctx context.Context) (*WithdrawPayoutRes
 	return j.finalizeSubmittedTx(ctx, w.ID, sendResult.TxHash)
 }
 
+func (j *WithdrawPayoutJob) payoutPrivateKey(w *biz.Withdrawal) string {
+	if w == nil {
+		return j.cfg.GetWithdrawPrivateKey()
+	}
+	if strings.EqualFold(strings.TrimSpace(w.Asset), biz.TokenSDT) {
+		return j.cfg.GetSdtPrivateKey()
+	}
+	return j.cfg.GetWithdrawPrivateKey()
+}
+
+func (j *WithdrawPayoutJob) sendWithdrawTransfer(
+	ctx context.Context,
+	w *biz.Withdrawal,
+	privKey string,
+	nonce uint64,
+) (*eth.NativeTransferSendResult, error) {
+	amount, err := decimal.NewFromString(w.NetAmount)
+	if err != nil || !amount.GreaterThan(decimal.Zero) {
+		return nil, fmt.Errorf("invalid payout amount")
+	}
+	asset := strings.ToUpper(strings.TrimSpace(w.Asset))
+	switch asset {
+	case biz.TokenWIN:
+		// EOEO 链上 WIN 即主币，提现直接 native 转账到用户地址，无需 ERC20 合约。
+		return eth.SendNativeTransferWithNonce(
+			ctx, j.cfg.GetRPCURL(), privKey, w.ToAddress, amount, j.cfg.GetWinDecimals(), &nonce,
+		)
+	case biz.TokenSDT:
+		contract := j.cfg.GetSdtContract()
+		if contract == "" {
+			return nil, fmt.Errorf("sdt contract not configured")
+		}
+		result, err := eth.SendERC20TransferWithNonce(
+			ctx, j.cfg.GetRPCURL(), privKey, contract, w.ToAddress, amount, j.cfg.GetSdtDecimals(), &nonce,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &eth.NativeTransferSendResult{
+			TxHash:      result.TxHash,
+			Nonce:       result.Nonce,
+			FromAddress: result.FromAddress,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported withdraw asset %s", w.Asset)
+	}
+}
+
 func (j *WithdrawPayoutJob) recoverInProgress(ctx context.Context) error {
 	list, err := j.walletRepo.ListDoingWithdrawalsWithTxHash(ctx)
 	if err != nil {
 		return err
 	}
-	privKey := j.cfg.GetWithdrawPrivateKey()
 	for _, w := range list {
 		if strings.TrimSpace(w.TxHash) == "" {
 			continue
 		}
+		privKey := j.payoutPrivateKey(w)
 		done, _, err := j.reconcileByTxHash(ctx, w, w.TxHash)
 		if err != nil {
 			j.log.Warnf("reconcile withdraw %d tx %s: %v", w.ID, w.TxHash, err)
@@ -222,17 +273,18 @@ func (j *WithdrawPayoutJob) recoverInProgress(ctx context.Context) error {
 		if !done {
 			j.log.Infof("withdraw %d tx %s still pending", w.ID, w.TxHash)
 		}
+		_ = privKey
 	}
-	_ = privKey
 	return nil
 }
 
-func (j *WithdrawPayoutJob) reconcileDoingWithoutTxHash(ctx context.Context, privKey string) error {
+func (j *WithdrawPayoutJob) reconcileDoingWithoutTxHash(ctx context.Context) error {
 	list, err := j.walletRepo.ListDoingWithdrawalsWithoutTxHash(ctx)
 	if err != nil {
 		return err
 	}
 	for _, w := range list {
+		privKey := j.payoutPrivateKey(w)
 		if _, _, err := j.reconcileWithdrawal(ctx, w, privKey); err != nil {
 			j.log.Warnf("reconcile withdraw %d without tx_hash: %v", w.ID, err)
 		}
@@ -240,13 +292,14 @@ func (j *WithdrawPayoutJob) reconcileDoingWithoutTxHash(ctx context.Context, pri
 	return nil
 }
 
-func (j *WithdrawPayoutJob) releaseStaleDoingWithdrawals(ctx context.Context, privKey string) error {
+func (j *WithdrawPayoutJob) releaseStaleDoingWithdrawals(ctx context.Context) error {
 	staleBefore := time.Now().Add(-10 * time.Minute)
 	list, err := j.walletRepo.ListStaleDoingWinWithdrawals(ctx, staleBefore)
 	if err != nil {
 		return err
 	}
 	for _, w := range list {
+		privKey := j.payoutPrivateKey(w)
 		if done, _, err := j.reconcileWithdrawal(ctx, w, privKey); err != nil {
 			j.log.Warnf("stale withdraw %d reconcile failed: %v", w.ID, err)
 			continue
@@ -341,7 +394,7 @@ func (j *WithdrawPayoutJob) reconcileByTxHash(ctx context.Context, w *biz.Withdr
 	}
 
 	_ = j.walletRepo.MarkWithdrawalPayoutFailed(ctx, w.ID, txHash)
-	if err := j.safeResetForRetry(ctx, w, j.cfg.GetWithdrawPrivateKey(), "chain tx failed; retry pending"); err != nil {
+	if err := j.safeResetForRetry(ctx, w, j.payoutPrivateKey(w), "chain tx failed; retry pending"); err != nil {
 		j.log.Warnf("reset failed withdraw %d: %v", w.ID, err)
 	} else {
 		j.log.Infof("reset failed withdraw %d tx=%s for retry", w.ID, txHash)
@@ -372,7 +425,7 @@ func (j *WithdrawPayoutJob) recoverByStoredNonce(ctx context.Context, w *biz.Wit
 		}
 		if !outcome.Success {
 			_ = j.walletRepo.MarkWithdrawalPayoutFailed(ctx, w.ID, txHash)
-			if err := j.safeResetForRetry(ctx, w, j.cfg.GetWithdrawPrivateKey(), "chain tx failed; retry pending"); err != nil {
+			if err := j.safeResetForRetry(ctx, w, j.payoutPrivateKey(w), "chain tx failed; retry pending"); err != nil {
 				return false, txHash, err
 			}
 			return false, txHash, nil
