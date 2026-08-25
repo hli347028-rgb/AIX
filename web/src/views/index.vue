@@ -6,8 +6,7 @@
       <div class="welcome-card">
         <AixWaveBackground />
         <div class="welcome-content">
-          <img src="/assets/logo.png" alt="Logo" class="logo active-logo" />
-          <div class="welcome-home">{{ $t('tab.home') }}</div>
+          <img src="/assets/aix-logo.png" alt="Logo" class="logo active-logo" />
           <div class="welcome-subtitle">Aix Protocol</div>
           <!-- <div class="welcome-description">{{ $t('index.welcomeDescription2') }}</div> -->
         </div>
@@ -224,7 +223,7 @@ const handleExternalLink = () => {
 
     .logo {
       margin-top: 10px;
-      width: 220px;
+      width: 200px;
       height: auto;
     }
 

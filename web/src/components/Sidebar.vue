@@ -9,8 +9,7 @@
         <div class="sidebar-logo">
           <img src="/assets/logo.png" alt="Logo" class="logo-img" />
           <div class="brand-copy">
-            <strong>AIX</strong>
-            <span>{{ $t('common.protocol') }}</span>
+            <!-- <strong>AIX</strong> -->
           </div>
         </div>
 
@@ -245,7 +244,7 @@ const handleCopyAddress = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all $transition-fast;
+  // transition: all $transition-fast;
 
   &:hover {
     color: $text-primary;
@@ -266,9 +265,6 @@ const handleCopyAddress = async () => {
     width: 108px;
     height: 108px;
     object-fit: cover;
-    border-radius: 28px;
-    border: 1px solid rgba(143, 223, 255, 0.22);
-    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.42), 0 0 30px rgba(21, 151, 229, 0.12);
   }
 
   .brand-copy {

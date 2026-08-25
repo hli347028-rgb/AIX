@@ -2,7 +2,7 @@
   <header class="app-header">
     <div class="header-container">
       <div class="header-left" @click="handleSidebarClick">
-        <img src="/assets/logo.jpg" alt="Logo" class="logo" />
+        <img src="/assets/logo.png" alt="Logo" class="logo" />
         <span class="home-label">{{ $t('tab.home') }}</span>
       </div>
       <div class="header-right">
@@ -125,7 +125,7 @@ const handleWalletClick = () => {
       gap: $spacing-sm;
 
       .logo {
-        height: 44px;
+        height: 40px;
         width: auto;
         object-fit: contain;
       }

@@ -480,7 +480,7 @@ const handleBack = () => {
       background-image: url(@/assets/images/a1.png);
       background-repeat: no-repeat;
       background-size: 100% 111px;
-      padding: 24px 20px 6px 20px;
+      padding: 28px 20px 10px 20px;
       display: flex;
       box-sizing: border-box;
       font-size: 12px;
