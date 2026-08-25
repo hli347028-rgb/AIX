@@ -8,7 +8,7 @@
         <span class="level-value">{{ levelLabel }}</span>
       </div>
       <div class="info-card">
-        <div class="info-box">
+        <div class="info-box info-box--row">
           <div class="info-title">{{ $t('community.superiorAddress') }}</div>
           <div class="info-address">{{ formatAddress(userinfo.inviteUserAddress) || '-' }}</div>
         </div>
@@ -23,8 +23,8 @@
 
       <div class="performance-list">
         <div class="performance-info">
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.recommendNum) }}</p>
+          <div class="performance-info-item performance-info-item--first">
+            <p>{{ formatNum(userinfo.recommendNum) }}</p> 
             <p>{{ $t('community.directReferralCount') }}</p>
           </div>
           <div class="performance-info-item">
@@ -72,33 +72,36 @@
             <p>{{ $t('community.communitySubsidy') }}</p>
           </div>
         </div>
-        <div class="performance-share-title">{{ $t('community.directInviteData') }}</div>
-        <div class="downline-recharge-card">
-          <div class="table-header downline-recharge-header">
-            <span>{{ $t('community.walletAddress') }}</span>
-            <span>{{ $t('community.usdtAmount') }}</span>
-            <span>{{ $t('community.time') }}</span>
+      </div>
+
+      <h3 class="list-title">{{ $t('community.directInviteData') }}</h3>
+      <div class="table-card downline-table" :class="{ 'is-empty': downlineRechargeList.length === 0 }">
+        <div class="table-header downline-recharge-header">
+          <span>{{ $t('community.walletAddress') }}</span>
+          <span>{{ $t('community.usdtAmount') }}</span>
+          <span>{{ $t('community.time') }}</span>
+        </div>
+        <div v-if="downlineRechargeList.length > 0" class="downline-recharge-list">
+          <div class="downline-recharge-item" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
+            <span class="col-address">{{ formatAddr(item.address) }}</span>
+            <span class="col-amount">{{ formatNum(item.amount) }}</span>
+            <span class="col-time">{{ item.createdAt }}</span>
           </div>
-          <div v-if="downlineRechargeList.length > 0" class="downline-recharge-list">
-            <div class="downline-recharge-item" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
-              <span class="col-address">{{ formatAddr(item.address) }}</span>
-              <span class="col-amount">{{ formatNum(item.amount) }}</span>
-              <span class="col-time">{{ item.createdAt }}</span>
-            </div>
-            <Pagination
-              v-model="downlinePage"
-              :page-count="downlinePageCount"
-              mode="simple"
-              @change="getDownlineRecharges"
-            />
-          </div>
-          <div v-else class="empty-state"><p>{{ $t('common.noData') }}</p></div>
+          <Pagination
+            v-model="downlinePage"
+            :page-count="downlinePageCount"
+            mode="simple"
+            @change="getDownlineRecharges"
+          />
+        </div>
+        <div v-else class="empty-state">
+          <p>{{ $t('common.noData') }}</p>
         </div>
       </div>
 
       <h3 class="list-title">{{ $t('community.generationRewardRecord') }}</h3>
 
-      <div class="table-card">
+      <div class="table-card" :class="{ 'is-empty': rewardList.length === 0 }">
         <div class="table-header">
           <span>{{ $t('community.amount') }}</span>
           <span>{{ $t('community.source') }}</span>
@@ -304,6 +307,25 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
 
+  &--row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 15px;
+
+    .info-title {
+      flex-shrink: 0;
+    }
+
+    .info-address {
+      flex: 1;
+      text-align: right;
+      word-break: break-all;
+    }
+  }
+
   .info-title {
     color: $brand-primary;
     font-size: 16px;
@@ -396,6 +418,14 @@ onMounted(() => {
   backdrop-filter: blur(10px);
   padding: 11px 0;
 
+  &.is-empty {
+    min-height: 0;
+
+    .empty-state {
+      height: 80px;
+    }
+  }
+
   .table-header {
     display: flex;
     align-items: center;
@@ -476,23 +506,23 @@ onMounted(() => {
     border-radius: 18px;
     padding: 16px;
     box-sizing: border-box;
-    margin-bottom: 25px;
+    margin-bottom: 0;
     border: 1px solid rgba(21, 151, 229, 0.2);
 
     .performance-info {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 0;
 
       .performance-info-item {
-        min-height: 66px;
+        min-height: 60px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        padding: 12px 8px;
+        gap: 6px;
+        padding: 10px 4px;
         background: rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
@@ -504,7 +534,7 @@ onMounted(() => {
           text-align: center;
 
           &:first-child {
-            font-size: 18px;
+            font-size: 12px;
             font-weight: 600;
             color: $brand-primary;
             word-break: break-all;
@@ -512,52 +542,57 @@ onMounted(() => {
 
           &:last-child {
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
           }
         }
-      }
-    }
 
-    .performance-share-title {
-      margin-bottom: 15px;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .downline-recharge-card {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 12px;
-      padding: 10px;
-
-      .downline-recharge-header,
-      .downline-recharge-item {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr 1fr;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .downline-recharge-header {
-        padding: 8px 6px;
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      .downline-recharge-item {
-        padding: 10px 6px;
-        color: #fff;
-        font-size: 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-
-        .col-amount {
-          color: $brand-primary;
-          font-weight: 600;
+        &--first p:first-child {
+          font-size: 14px;
         }
       }
     }
   }
+
+.downline-table {
+  .downline-recharge-header,
+  .downline-recharge-item {
+    display: grid;
+    grid-template-columns: 1.15fr 1.1fr 0.85fr;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .downline-recharge-header span {
+    flex: none;
+  }
+
+  .downline-recharge-list {
+    padding: 10px;
+  }
+
+  .downline-recharge-item {
+    padding: 10px;
+    font-size: 12px;
+    color: $text-muted;
+    border-bottom: 1px solid $border-light;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .col-amount {
+      color: $brand-primary;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .col-address,
+    .col-time {
+      text-align: center;
+    }
+  }
+}
 
 .safe-bottom {
   height: 50px;
