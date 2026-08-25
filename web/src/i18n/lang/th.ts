@@ -112,6 +112,7 @@ export default {
     teamPerformance: 'ผลงานทีม',
     directReferralIncome: 'รายได้แนะนำตรง',
     directReferralCount: 'จำนวนแนะนำตรง',
+    teamTotalCount: 'จำนวนสมาชิกทีมทั้งหมด',
     activeSubscription: 'การสมัครที่ใช้งานอยู่',
     teamTotalPerformance: 'ผลงานทีมรวม',
     smallAreaPerformance: 'ผลงานพื้นที่ย่อย',
@@ -130,7 +131,10 @@ export default {
     generation: 'รุ่น',
     reward: 'รางวัล',
     time: 'เวลา', directReferralReward: 'รางวัลแนะนำตรง', managementReward: 'รางวัลการจัดการ',
-    usdtAmount: 'จำนวน USDT', brc20Amount: 'จำนวน BRC20'
+    usdtAmount: 'จำนวน USDT',
+    rechargeType: 'ประเภทการเติม',
+    rechargeAmount: 'จำนวนเงินที่เติม',
+    brc20Amount: 'จำนวน BRC20'
   },
   count: {
     myNodes: 'โหนดของฉัน', myIncome: 'รายได้ของฉัน', matrix: 'เมทริกซ์', level: 'ระดับ', sharedNodes: 'โหนดที่แชร์',

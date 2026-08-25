@@ -28,6 +28,10 @@
             <p>{{ $t('community.directReferralCount') }}</p>
           </div>
           <div class="performance-info-item">
+            <p>{{ formatNum(userinfo.recommendTeamNum) }}</p>
+            <p>{{ $t('community.teamTotalCount') }}</p>
+          </div>
+          <div class="performance-info-item">
             <p>{{ formatNum(userinfo.buy) }}</p>
             <p>{{ $t('community.activeSubscription') }}</p>
           </div>
@@ -78,12 +82,14 @@
       <div class="table-card downline-table" :class="{ 'is-empty': downlineRechargeList.length === 0 }">
         <div class="table-header downline-recharge-header">
           <span>{{ $t('community.walletAddress') }}</span>
-          <span>{{ $t('community.usdtAmount') }}</span>
+          <span>{{ $t('community.rechargeType') }}</span>
+          <span>{{ $t('community.rechargeAmount') }}</span>
           <span>{{ $t('community.time') }}</span>
         </div>
         <div v-if="downlineRechargeList.length > 0" class="downline-recharge-list">
           <div class="downline-recharge-item" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
             <span class="col-address">{{ formatAddr(item.address) }}</span>
+            <span class="col-type">{{ item.type || item.asset || 'USDT' }}</span>
             <span class="col-amount">{{ formatNum(item.amount) }}</span>
             <span class="col-time">{{ item.createdAt }}</span>
           </div>
@@ -558,8 +564,8 @@ onMounted(() => {
   .downline-recharge-header,
   .downline-recharge-item {
     display: grid;
-    grid-template-columns: 1.15fr 1.1fr 0.85fr;
-    gap: 8px;
+    grid-template-columns: 1.2fr 0.7fr 1fr 0.95fr;
+    gap: 6px;
     align-items: center;
   }
 
@@ -588,6 +594,7 @@ onMounted(() => {
     }
 
     .col-address,
+    .col-type,
     .col-time {
       text-align: center;
     }

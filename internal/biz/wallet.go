@@ -64,9 +64,10 @@ func GetWinPrice() float64 {
 	return WinPrice
 }
 
-// GetWinAPrice 返回 WIN-A 代币价格（USDT/枚），由管理后台手动配置。
+// GetWinAPrice 返回 WIN-A 代币价格（USDT/枚）。
+// 业务要求：WIN-A 价格始终与 WIN 价格相等。
 func GetWinAPrice() float64 {
-	return WinAPrice
+	return WinPrice
 }
 
 // GetExchangeFeeRate 返回兑换手续费率（如 0.05 = 5%）。

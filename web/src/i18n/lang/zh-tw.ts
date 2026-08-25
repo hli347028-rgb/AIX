@@ -112,6 +112,7 @@ export default {
     teamPerformance: '團隊業績',
     directReferralIncome: '直推收益',
     directReferralCount: '直推人數',
+    teamTotalCount: '團隊總人數',
     activeSubscription: '進行中認購',
     teamTotalPerformance: '團隊總業績',
     smallAreaPerformance: '小區業績',
@@ -130,7 +131,10 @@ export default {
     generation: '代數',
     reward: '獎勵',
     time: '時間', directReferralReward: '直推獎勵', managementReward: '管理獎',
-    usdtAmount: 'USDT 數量', brc20Amount: 'BRC20 數量'
+    usdtAmount: 'USDT 數量',
+    rechargeType: '充值類型',
+    rechargeAmount: '充值金額',
+    brc20Amount: 'BRC20 數量'
   },
   count: {
     myNodes: '我的節點', myIncome: '我的收益', matrix: '矩陣圖', level: '級別', sharedNodes: '分享節點',

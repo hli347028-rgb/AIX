@@ -448,7 +448,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 	})
 }
 
-// HandleDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录。
+// HandleDownlineUSDTRecharges 当前用户所有下级 USDT/WIN 充值记录。
 func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	page, pageSize, err := transferRecordPagination(ctx)

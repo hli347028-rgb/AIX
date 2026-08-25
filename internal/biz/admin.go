@@ -261,8 +261,10 @@ func (uc *AdminUsecase) UpdateSystemConfig(ctx context.Context, tokenString stri
 	if err := uc.settingsRepo.Set(ctx, conf.SettingsKeySystemConfig, string(data)); err != nil {
 		return nil, err
 	}
-	// 后台改 WIN 价时，同步覆盖 win_prices 唯一一行
+	// 后台改 WIN 价时，同步覆盖 win_prices 唯一一行；WIN-A 始终跟 WIN
 	if snapshot != nil && snapshot.WinPrice > 0 {
+		snapshot.WinAPrice = snapshot.WinPrice
+		WinAPrice = snapshot.WinPrice
 		_ = uc.walletRepo.UpsertCurrentWinPrice(ctx, strconv.FormatFloat(snapshot.WinPrice, 'f', -1, 64), "admin")
 	}
 	return uc.buildConfigSnapshot(), nil
@@ -291,7 +293,7 @@ func (uc *AdminUsecase) buildConfigSnapshot() *conf.SystemConfigSnapshot {
 		MgmtRates:            append([]float64(nil), MgmtRates...),
 		AixPriceInitial:      AixPriceInitial,
 		WinPrice:             WinPrice,
-		WinAPrice:            WinAPrice,
+		WinAPrice:            WinPrice, // WIN-A 与 WIN 同价
 		ExchangeFeeRate:      ExchangeFeeRate,
 		MinUsdtRecharge:            MinUsdtRecharge,
 		MinWinRecharge:             MinWinRecharge,
@@ -355,6 +357,7 @@ func (uc *AdminUsecase) LoadPersistedConfig(ctx context.Context) error {
 		if p, err := decimal.NewFromString(strings.TrimSpace(priceStr)); err == nil && p.IsPositive() {
 			f, _ := p.Float64()
 			WinPrice = f
+			WinAPrice = f // WIN-A 与 WIN 同价
 		}
 	}
 	return nil
@@ -370,6 +373,7 @@ func (uc *AdminUsecase) SetWinPriceFromOracle(ctx context.Context, price float64
 		return err
 	}
 	WinPrice = price
+	WinAPrice = price // WIN-A 与 WIN 同价
 	return nil
 }
 

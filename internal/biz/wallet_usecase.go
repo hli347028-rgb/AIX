@@ -309,7 +309,7 @@ func (uc *WalletUsecase) ListRecharges(ctx context.Context, tokenString string) 
 	return uc.walletRepo.ListRechargesByUserAsset(ctx, user.ID, TokenUSDT)
 }
 
-// ListDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录（已确认）。
+// ListDownlineUSDTRecharges 当前用户所有下级 USDT/WIN 充值记录（已确认）。
 func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 	ctx context.Context, tokenString string, page, pageSize int,
 ) ([]*Recharge, int64, error) {

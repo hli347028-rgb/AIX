@@ -112,6 +112,7 @@ export default {
     teamPerformance: 'チーム業績',
     directReferralIncome: '直紹介収益',
     directReferralCount: '直紹介人数',
+    teamTotalCount: 'チーム総人数',
     activeSubscription: '進行中の認購',
     teamTotalPerformance: 'チーム総業績',
     smallAreaPerformance: '小区業績',
@@ -130,7 +131,10 @@ export default {
     generation: '世代',
     reward: '報酬',
     time: '時間', directReferralReward: '直接紹介報酬', managementReward: '管理報酬',
-    usdtAmount: 'USDT 数量', brc20Amount: 'BRC20 数量'
+    usdtAmount: 'USDT 数量',
+    rechargeType: 'チャージ種別',
+    rechargeAmount: 'チャージ金額',
+    brc20Amount: 'BRC20 数量'
   },
   count: {
     myNodes: 'マイノード', myIncome: 'マイ収益', matrix: 'マトリックス', level: 'レベル', sharedNodes: '共有ノード',

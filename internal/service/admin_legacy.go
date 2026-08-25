@@ -1699,9 +1699,9 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 		return strconv.FormatFloat(conf.DefaultWinPrice, 'f', -1, 64)
 	case 36:
 		if cfg != nil {
-			return strconv.FormatFloat(cfg.WinAPrice, 'f', -1, 64)
+			return strconv.FormatFloat(cfg.WinPrice, 'f', -1, 64) // WIN-A = WIN
 		}
-		return strconv.FormatFloat(conf.DefaultWinAPrice, 'f', -1, 64)
+		return strconv.FormatFloat(conf.DefaultWinPrice, 'f', -1, 64)
 	case 9:
 		if cfg != nil {
 			return strconv.FormatFloat(cfg.ExchangeFeeRate*100, 'f', -1, 64)
@@ -1807,12 +1807,13 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 			return errors.BadRequest("INVALID_VALUE", "WIN价格格式错误")
 		}
 		snapshot.WinPrice = price
+		snapshot.WinAPrice = price // WIN-A 与 WIN 同价
 	case 36:
-		price, err := strconv.ParseFloat(value, 64)
-		if err != nil || price <= 0 {
-			return errors.BadRequest("INVALID_VALUE", "WIN-A价格格式错误")
+		// WIN-A 价格不允许单独配置，始终跟随 WIN
+		snapshot.WinAPrice = snapshot.WinPrice
+		if snapshot.WinAPrice <= 0 {
+			snapshot.WinAPrice = conf.DefaultWinPrice
 		}
-		snapshot.WinAPrice = price
 	case 9:
 		feePercent, err := strconv.ParseFloat(value, 64)
 		if err != nil || feePercent < 0 || feePercent >= 100 {

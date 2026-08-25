@@ -112,6 +112,7 @@ export default {
     teamPerformance: '팀 실적',
     directReferralIncome: '직추 수익',
     directReferralCount: '직추 인원',
+    teamTotalCount: '팀 총 인원',
     activeSubscription: '진행 중 인수',
     teamTotalPerformance: '팀 총 실적',
     smallAreaPerformance: '소구 실적',
@@ -130,7 +131,10 @@ export default {
     generation: '세대',
     reward: '보상',
     time: '시간', directReferralReward: '직접 추천 보상', managementReward: '관리 보상',
-    usdtAmount: 'USDT 수량', brc20Amount: 'BRC20 수량'
+    usdtAmount: 'USDT 수량',
+    rechargeType: '충전 유형',
+    rechargeAmount: '충전 금액',
+    brc20Amount: 'BRC20 수량'
   },
   count: {
     myNodes: '내 노드', myIncome: '내 수익', matrix: '매트릭스', level: '등급', sharedNodes: '공유 노드',

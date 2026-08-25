@@ -112,6 +112,7 @@ export default {
     teamPerformance: 'Team Performance',
     directReferralIncome: 'Direct Referral Income',
     directReferralCount: 'Direct Referrals',
+    teamTotalCount: 'Team Total Members',
     activeSubscription: 'Active Subscription',
     teamTotalPerformance: 'Team Total Performance',
     smallAreaPerformance: 'Small Area Performance',
@@ -133,7 +134,10 @@ export default {
     generation: 'Generation',
     reward: 'Reward',
     time: 'Time', directReferralReward: 'Direct Referral Reward', managementReward: 'Management Reward',
-    usdtAmount: 'USDT Amount', brc20Amount: 'BRC20 Amount'
+    usdtAmount: 'USDT Amount',
+    rechargeType: 'Recharge Type',
+    rechargeAmount: 'Recharge Amount',
+    brc20Amount: 'BRC20 Amount'
   },
   count: {
     myNodes: 'My Nodes', myIncome: 'My Income', matrix: 'Matrix', level: 'Level', sharedNodes: 'Shared Nodes',

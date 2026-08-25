@@ -75,9 +75,9 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	if snap.WinPrice > 0 {
 		WinPrice = snap.WinPrice
 	}
-	if snap.WinAPrice > 0 {
-		WinAPrice = snap.WinAPrice
-	}
+	// WIN-A 价格始终等于 WIN 价格
+	WinAPrice = WinPrice
+	snap.WinAPrice = WinPrice
 	if snap.ExchangeFeeRate > 0 {
 		ExchangeFeeRate = snap.ExchangeFeeRate
 	}

@@ -959,10 +959,13 @@ export async function adaptRequest(
       const body = apiBody(res)
       const records = (body.records || []).map((item: any) => {
         const createdAt = formatUnixTime(item.created_at ?? item.createdAt)
+        const asset = String(item.asset || 'USDT').toUpperCase()
         return {
           id: item.id,
           address: item.address || '',
           amount: trimAmountText(item.amount),
+          asset,
+          type: asset === 'WIN' ? 'WIN' : 'USDT',
           createdAt,
         }
       })

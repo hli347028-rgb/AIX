@@ -94,9 +94,8 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	if s.WinPrice <= 0 {
 		s.WinPrice = DefaultWinPrice
 	}
-	if s.WinAPrice <= 0 {
-		s.WinAPrice = DefaultWinAPrice
-	}
+	// WIN-A 价格始终等于 WIN 价格
+	s.WinAPrice = s.WinPrice
 	if s.ExchangeFeeRate <= 0 {
 		s.ExchangeFeeRate = DefaultExchangeFeeRate
 	}

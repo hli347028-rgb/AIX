@@ -390,10 +390,14 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	if limit <= 0 {
 		limit = 10
 	}
+	// 下级认购/充值展示：USDT + WIN（不含 WIN-A；空 asset 视为 USDT）
+	assets := []string{biz.TokenUSDT, biz.TokenWIN}
+	assetCond := "(UPPER(asset) IN ? OR asset = '' OR asset IS NULL)"
 	base := r.data.db.WithContext(ctx).
 		Model(&RechargePO{}).
 		Where("user_id IN ?", userIDs).
-		Where("asset = ? AND status = ?", biz.TokenUSDT, biz.RechargeStatusConfirmed)
+		Where("status = ?", biz.RechargeStatusConfirmed).
+		Where(assetCond, assets)
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
@@ -409,7 +413,8 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 		Select("r.*, u.address AS user_address").
 		Joins("JOIN users u ON u.id = r.user_id").
 		Where("r.user_id IN ?", userIDs).
-		Where("r.asset = ? AND r.status = ?", biz.TokenUSDT, biz.RechargeStatusConfirmed).
+		Where("r.status = ?", biz.RechargeStatusConfirmed).
+		Where("(UPPER(r.asset) IN ? OR r.asset = '' OR r.asset IS NULL)", assets).
 		Order("r.id DESC").
 		Offset(offset).
 		Limit(limit).
@@ -421,6 +426,9 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 		rec := r.rechargeToBiz(&rows[i].RechargePO)
 		if addr := strings.TrimSpace(rows[i].UserAddress); addr != "" {
 			rec.Address = addr
+		}
+		if strings.TrimSpace(rec.Asset) == "" {
+			rec.Asset = biz.TokenUSDT
 		}
 		out = append(out, rec)
 	}

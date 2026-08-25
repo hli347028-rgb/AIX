@@ -112,6 +112,7 @@ export default {
     teamPerformance: 'Kinerja Tim',
     directReferralIncome: 'Pendapatan Rujukan Langsung',
     directReferralCount: 'Jumlah Rujukan Langsung',
+    teamTotalCount: 'Total Anggota Tim',
     activeSubscription: 'Langganan Aktif',
     teamTotalPerformance: 'Total Kinerja Tim',
     smallAreaPerformance: 'Kinerja Area Kecil',
@@ -130,7 +131,10 @@ export default {
     generation: 'Generasi',
     reward: 'Hadiah',
     time: 'Waktu', directReferralReward: 'Hadiah Rujukan Langsung', managementReward: 'Hadiah Manajemen',
-    usdtAmount: 'Jumlah USDT', brc20Amount: 'Jumlah BRC20'
+    usdtAmount: 'Jumlah USDT',
+    rechargeType: 'Jenis Isi Ulang',
+    rechargeAmount: 'Jumlah Isi Ulang',
+    brc20Amount: 'Jumlah BRC20'
   },
   count: {
     myNodes: 'Node Saya', myIncome: 'Pendapatan Saya', matrix: 'Matriks', level: 'Level', sharedNodes: 'Node Bersama',

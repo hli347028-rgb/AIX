@@ -31,6 +31,7 @@ export default defineStore('person', {
       location: '0.00',
       recommend: '0.00',
       recommendNum: 0,
+      recommendTeamNum: 0,
       recommendTwo: '0.00',
       team: '0.00',
       overflowReward: '0.00',

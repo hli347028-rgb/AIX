@@ -89,8 +89,22 @@ func (j *WithdrawPayoutJob) TriggerCycle() *WithdrawPayoutCycleResult {
 	go func() {
 		defer j.cycling.Store(false)
 		j.log.Infof("withdraw payout cycle started: queries=%d interval=%s", queries, gap)
+
+		// 先轻量对账少量卡住的旧单（独立短超时），避免阻塞后面最多 queries 笔新待打款
+		recoverCtx, recoverCancel := context.WithTimeout(context.Background(), 25*time.Second)
+		if err := j.recoverInProgress(recoverCtx, 3); err != nil {
+			j.log.Warnf("pre-cycle recover in-progress: %v", err)
+		}
+		if err := j.reconcileDoingWithoutTxHash(recoverCtx); err != nil {
+			j.log.Warnf("pre-cycle reconcile without tx_hash: %v", err)
+		}
+		if err := j.releaseStaleDoingWithdrawals(recoverCtx); err != nil {
+			j.log.Warnf("pre-cycle release stale: %v", err)
+		}
+		recoverCancel()
+
 		for i := 0; i < queries; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			if result, err := j.ProcessOnce(ctx); err != nil {
 				j.log.Errorf("withdraw payout cycle #%d/%d error: %v", i+1, queries, err)
 			} else if result != nil {
@@ -112,21 +126,24 @@ func (j *WithdrawPayoutJob) TriggerCycle() *WithdrawPayoutCycleResult {
 	return res
 }
 
-// ProcessOnce recovers stuck rows and pays at most one pending withdrawal.
+// ProcessOnce pays at most one pending withdrawal.
+// 旧单对账使用独立短超时，失败不影响本轮领取新的待打款订单。
 func (j *WithdrawPayoutJob) ProcessOnce(ctx context.Context) (*WithdrawPayoutResult, error) {
 	if !j.cfg.IsWithdrawPayoutEnabled() {
 		return &WithdrawPayoutResult{Skipped: true, Reason: "disabled"}, nil
 	}
 
-	if err := j.recoverInProgress(ctx); err != nil {
+	recoverCtx, recoverCancel := context.WithTimeout(context.Background(), 12*time.Second)
+	if err := j.recoverInProgress(recoverCtx, 1); err != nil {
 		j.log.Warnf("recover in-progress withdrawals: %v", err)
 	}
-	if err := j.reconcileDoingWithoutTxHash(ctx); err != nil {
+	if err := j.reconcileDoingWithoutTxHash(recoverCtx); err != nil {
 		j.log.Warnf("reconcile doing withdrawals without tx_hash: %v", err)
 	}
-	if err := j.releaseStaleDoingWithdrawals(ctx); err != nil {
+	if err := j.releaseStaleDoingWithdrawals(recoverCtx); err != nil {
 		j.log.Warnf("release stale doing withdrawals: %v", err)
 	}
+	recoverCancel()
 
 	w, err := j.walletRepo.ClaimNextPendingWinWithdrawal(ctx)
 	if err != nil {
@@ -271,17 +288,26 @@ func (j *WithdrawPayoutJob) sendWithdrawTransfer(
 	}
 }
 
-func (j *WithdrawPayoutJob) recoverInProgress(ctx context.Context) error {
+func (j *WithdrawPayoutJob) recoverInProgress(ctx context.Context, limit int) error {
 	list, err := j.walletRepo.ListDoingWithdrawalsWithTxHash(ctx)
 	if err != nil {
 		return err
 	}
+	if limit <= 0 {
+		limit = len(list)
+	}
+	n := 0
 	for _, w := range list {
+		if n >= limit {
+			break
+		}
 		if strings.TrimSpace(w.TxHash) == "" {
 			continue
 		}
-		privKey := j.payoutPrivateKey(w)
-		done, _, err := j.reconcileByTxHash(ctx, w, w.TxHash)
+		n++
+		itemCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		done, _, err := j.reconcileByTxHash(itemCtx, w, w.TxHash)
+		cancel()
 		if err != nil {
 			j.log.Warnf("reconcile withdraw %d tx %s: %v", w.ID, w.TxHash, err)
 			continue
@@ -289,7 +315,6 @@ func (j *WithdrawPayoutJob) recoverInProgress(ctx context.Context) error {
 		if !done {
 			j.log.Infof("withdraw %d tx %s still pending", w.ID, w.TxHash)
 		}
-		_ = privKey
 	}
 	return nil
 }

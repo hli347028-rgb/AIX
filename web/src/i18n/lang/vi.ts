@@ -112,6 +112,7 @@ export default {
     teamPerformance: 'Thành tích nhóm',
     directReferralIncome: 'Thu nhập trực tiếp',
     directReferralCount: 'Số người giới thiệu trực tiếp',
+    teamTotalCount: 'Tổng số thành viên nhóm',
     activeSubscription: 'Đăng ký đang diễn ra',
     teamTotalPerformance: 'Tổng thành tích nhóm',
     smallAreaPerformance: 'Thành tích khu nhỏ',
@@ -130,7 +131,10 @@ export default {
     generation: 'Thế hệ',
     reward: 'Thưởng',
     time: 'Thời gian', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý',
-    usdtAmount: 'Số lượng USDT', brc20Amount: 'Số lượng BRC20'
+    usdtAmount: 'Số lượng USDT',
+    rechargeType: 'Loại nạp',
+    rechargeAmount: 'Số tiền nạp',
+    brc20Amount: 'Số lượng BRC20'
   },
   count: {
     myNodes: 'Node của tôi', myIncome: 'Thu nhập của tôi', matrix: 'Ma trận', level: 'Cấp độ', sharedNodes: 'Node chia sẻ',
