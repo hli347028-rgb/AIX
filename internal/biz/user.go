@@ -18,6 +18,8 @@ type User struct {
 	AixBalance        string // AIX 代币数
 	WinBalance         string // WIN 提现钱包（AIX 兑换，可提现）
 	WinRechargeBalance string // WIN 充值钱包（链上/后台充值，可认购）
+	WinARechargeBalance string // WIN-A 充值钱包（链上充值，可认购）
+	UsdtWithdrawable   string // 可提 U 余额（0号账户/社区补贴奖励）
 	PendingMgmtReward string // 兼容旧字段 = 管理奖溢出
 	OverflowReward    string // 管理奖溢出（USDT）
 	OverflowDirect    string // 直推奖溢出（USDT）
@@ -28,6 +30,12 @@ type User struct {
 	LargeAreaPerf   string
 	SmallAreaPerf   string
 	TeamPerf        string
+	IsZeroAccount          bool
+	IsCommunitySubsidy     bool
+	ZeroAccountSetAt       *time.Time
+	CommunitySubsidySetAt  *time.Time
+	ZeroAccountRewardTotal string
+	CommunitySubsidyTotal  string
 	Status          int32
 	InviterID       *int64
 	InviterAddress  string
@@ -147,11 +155,14 @@ type UserRepo interface {
 	ListAllUsers(ctx context.Context) ([]*User, error)
 	ListDirectInvitees(ctx context.Context, userID int64) ([]*User, error)
 	ListUsersUnder(ctx context.Context, rootID int64) ([]*User, error)
+	CountUsersUnder(ctx context.Context, rootID int64) (int32, error)
+	ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error)
 	SumPrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
 	// SumExitAmountByUserIDs 兼容旧接口：活跃订单本金合计（业绩）
 	SumExitAmountByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
 	UpdateMgmtStats(ctx context.Context, userID int64, level int32, smallArea, teamPerf string) error
 	RefreshPerformance(ctx context.Context) error
+	RefreshPerformanceFromUsers(ctx context.Context, userIDs ...int64) error
 	AdminUpdateUser(ctx context.Context, update *AdminUserUpdate) error
 	SetRole(ctx context.Context, userID int64, role string) error
 	GetBalances(ctx context.Context, userID int64) (recharge, reward, aix string, err error)

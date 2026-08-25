@@ -63,16 +63,35 @@
             <p>{{ formatNum(incomeTotal) }}</p>
             <p>{{ $t('community.incomeTotal') }}</p>
           </div>
+          <div v-if="showZeroAccount" class="performance-info-item">
+            <p>{{ formatNum(zeroAccountReward) }}</p>
+            <p>{{ $t('community.zeroAccount') }}</p>
+          </div>
+          <div v-if="showCommunitySubsidy" class="performance-info-item">
+            <p>{{ formatNum(communitySubsidyReward) }}</p>
+            <p>{{ $t('community.communitySubsidy') }}</p>
+          </div>
         </div>
         <div class="performance-share-title">{{ $t('community.directInviteData') }}</div>
-        <div class="performance-share-list">
-          <Tree
-            v-if="treeData.length > 0"
-            v-model:expandedKeys="expandedKeys"
-            v-model:selectedKeys="selectedKeys"
-            :load-data="onLoadData"
-            :tree-data="treeData"
-          />
+        <div class="downline-recharge-card">
+          <div class="table-header downline-recharge-header">
+            <span>{{ $t('community.walletAddress') }}</span>
+            <span>{{ $t('community.usdtAmount') }}</span>
+            <span>{{ $t('community.time') }}</span>
+          </div>
+          <div v-if="downlineRechargeList.length > 0" class="downline-recharge-list">
+            <div class="downline-recharge-item" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
+              <span class="col-address">{{ formatAddr(item.address) }}</span>
+              <span class="col-amount">{{ formatNum(item.amount) }}</span>
+              <span class="col-time">{{ item.createdAt }}</span>
+            </div>
+            <Pagination
+              v-model="downlinePage"
+              :page-count="downlinePageCount"
+              mode="simple"
+              @change="getDownlineRecharges"
+            />
+          </div>
           <div v-else class="empty-state"><p>{{ $t('common.noData') }}</p></div>
         </div>
       </div>
@@ -118,7 +137,6 @@ import { showToast } from 'vant'
 import copy from 'copy-to-clipboard'
 import request from '@/tools/request'
 import { Pagination } from 'vant'
-import { Tree } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 
 const person = userPerson()
@@ -134,6 +152,30 @@ const incomeTotal = computed(() => {
   const u = userinfo.value || {}
   // 累计收益 = 静态收益 + 直推奖励 + 管理奖
   return u.all ?? 0
+})
+
+const showZeroAccount = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return !!(u.is_zero_account ?? u.isZeroAccount ?? p.is_zero_account ?? p.isZeroAccount)
+})
+
+const showCommunitySubsidy = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return !!(u.is_community_subsidy ?? u.isCommunitySubsidy ?? p.is_community_subsidy ?? p.isCommunitySubsidy)
+})
+
+const zeroAccountReward = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return u.zero_account_reward_total ?? u.zeroAccountRewardTotal ?? p.zero_account_reward_total ?? p.zeroAccountRewardTotal ?? 0
+})
+
+const communitySubsidyReward = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return u.community_subsidy_total ?? u.communitySubsidyTotal ?? p.community_subsidy_total ?? p.communitySubsidyTotal ?? 0
 })
 
 // 使用 ?code= 便于本地登录弹窗预填（与 eth_authorize 邀请码一致）
@@ -162,10 +204,9 @@ let page = $ref(1)
 let allPageCount = $ref(1)
 let active = $ref('3') // reqType=3 代数奖励
 
-// performance-list 相关变量
-const expandedKeys = $ref([])
-const selectedKeys = $ref([])
-let treeData = $ref([])
+let downlineRechargeList = $ref<any[]>([])
+let downlinePage = $ref(1)
+let downlinePageCount = $ref(1)
 
 const formatAddress = (value: string) => {
   if (!value) return ''
@@ -184,44 +225,12 @@ const copyToClipboard = (text: string) => {
   showToast($t('common.copiedToClipboard'))
 }
 
-const onLoadData = (treeNode: any) => {
-  return new Promise<void>(async (resolve) => {
-    if (treeNode.dataRef.children) {
-      resolve()
-      return
-    }
-
-    const res: any = await request.get(`app_server/recommend_list?address=${treeNode.dataRef.address}`)
-
-    treeNode.dataRef.children = (res.recommends || []).map((item: any, index: number) => {
-      const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
-      const tag = item.activated === false ? $t('community.inactive') : `${$t('community.subscribe')}: ${item.amount}`
-      return {
-        title: `${formatAddress(item.address)}（${tag}）`,
-        key: `${treeNode.eventKey}-${index}`,
-        amount: item.amount,
-        address: item.address,
-        isLeaf: !hasChildren
-      }
-    })
-    treeData = [...treeData]
-    resolve()
+const getDownlineRecharges = async (pageNum: number = 1) => {
+  const res: any = await request.get('app_server/downline_recharges', {
+    params: { page: pageNum },
   })
-}
-
-const getUserArea = async () => {
-  if (!address.value) return
-  const res: any = await request.get(`app_server/recommend_list?address=${address.value}`)
-  treeData = (res.recommends || []).map((item: any, index: number) => {
-    const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
-    const tag = item.activated === false ? $t('community.inactive') : `${$t('community.subscribe')}: ${item.amount}`
-    return {
-      title: `${formatAddress(item.address)}（${tag}）`,
-      key: index,
-      address: item.address,
-      isLeaf: !hasChildren
-    }
-  })
+  downlinePageCount = Math.ceil((res.count || 0) / 10) || 1
+  downlineRechargeList = res.list || []
 }
 
 const getRewardList = async (pageNum: number = 1) => {
@@ -238,8 +247,9 @@ const getRewardList = async (pageNum: number = 1) => {
 
 onMounted(() => {
   person.getUser?.()
+  person.refreshProfile?.()
   getRewardList()
-  getUserArea()
+  getDownlineRecharges()
 })
 </script>
 
@@ -515,42 +525,35 @@ onMounted(() => {
       font-weight: 500;
     }
 
-    .performance-share-list {
-      // width: 100%;
-      display: flex;
-      min-height: 100px;
+    .downline-recharge-card {
       background: rgba(0, 0, 0, 0.2);
       border-radius: 12px;
       padding: 10px;
-      overflow-x: auto;
 
-      :deep(.ant-tree) {
-        background: transparent;
+      .downline-recharge-header,
+      .downline-recharge-item {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr 1fr;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .downline-recharge-header {
+        padding: 8px 6px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .downline-recharge-item {
+        padding: 10px 6px;
         color: #fff;
-        width: 100%;
+        font-size: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 
-        .ant-tree-treenode {
-          padding: 4px 0;
-
-          .ant-tree-node-content-wrapper {
-            color: #fff;
-            &:hover {
-              background: rgba(21, 151, 229, 0.1);
-            }
-          }
-
-          .ant-tree-switcher {
-            color: #fff;
-          }
-
-          .ant-tree-node-title {
-            color: #fff;
-          }
-        }
-
-        .ant-tree-switcher_open,
-        .ant-tree-switcher_close {
+        .col-amount {
           color: $brand-primary;
+          font-weight: 600;
         }
       }
     }

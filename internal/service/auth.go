@@ -46,25 +46,17 @@ func (s *AuthService) Login(ctx context.Context, req *v1.LoginRequest) (*v1.Logi
 }
 
 func (s *AuthService) GetProfile(ctx context.Context, req *v1.GetProfileRequest) (*v1.GetProfileReply, error) {
-	user, inviteeCount, downline, err := s.uc.GetProfile(ctx, resolveToken(ctx, req.Token))
+	user, inviteeCount, totalDownline, err := s.uc.GetProfile(ctx, resolveToken(ctx, req.Token))
 	if err != nil {
 		return nil, err
-	}
-	items := make([]*v1.DownlineInvitee, 0, len(downline))
-	for _, item := range downline {
-		items = append(items, &v1.DownlineInvitee{
-			Address:    item.Address,
-			Generation: item.Generation,
-			CreatedAt:  item.CreatedAt.Unix(),
-		})
 	}
 	return &v1.GetProfileReply{
 		Address:            user.Address,
 		InviterAddress:     user.InviterAddress,
 		InviteeCount:       inviteeCount,
 		CreatedAt:          user.CreatedAt.Unix(),
-		DownlineInvitees:   items,
-		TotalDownlineCount: int32(len(items)),
+		DownlineInvitees:   nil,
+		TotalDownlineCount: totalDownline,
 		CommunityLevel:     user.CommunityLevel,
 		CommunityStake:     user.CommunityStake,
 		TeamStake:          user.TeamStake,

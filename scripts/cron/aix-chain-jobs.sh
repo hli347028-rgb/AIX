@@ -1,6 +1,6 @@
 #!/bin/bash
 # AIX chain jobs for crontab — each HTTP call starts one server-side cycle (10 runs, 5s apart).
-# withdraw_payout covers WIN native payout + AIX-SDT ERC20 payout (same cycle params).
+# withdraw_payout covers WIN native + AIX-USDT ERC20 + USDT ERC20 payout (10 runs, 5s apart).
 # Prerequisite: recharge_monitor_enabled=false and win_price_oracle_enabled=false
 set -u
 BASE="${AIX_HTTP:-http://127.0.0.1:9000}"
@@ -10,6 +10,8 @@ echo "[$TS] start BASE=$BASE"
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only" || echo "[$TS] deposit_only FAILED"
 echo
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only_win" || echo "[$TS] deposit_only_win FAILED"
+echo
+curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only_win_a" || echo "[$TS] deposit_only_win_a FAILED"
 echo
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/win_price_oracle" || echo "[$TS] win_price_oracle FAILED"
 echo

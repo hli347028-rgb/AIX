@@ -50,6 +50,9 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	if err := migrateWinRechargeBalance(db); err != nil {
 		return nil, nil, err
 	}
+	if err := ensureUserAdminColumns(db); err != nil {
+		return nil, nil, err
+	}
 	if err := seedDefaults(db); err != nil {
 		return nil, nil, err
 	}
@@ -178,6 +181,81 @@ func migrateWinRechargeBalance(db *gorm.DB) error {
 	`).Error
 }
 
+func ensureUserAdminColumns(db *gorm.DB) error {
+	columns := []struct {
+		name string
+		ddl  string
+	}{
+		{
+			name: "overflow_direct",
+			ddl:  "ALTER TABLE users ADD COLUMN overflow_direct decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "is_zero_account",
+			ddl:  "ALTER TABLE users ADD COLUMN is_zero_account tinyint(1) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "is_community_subsidy",
+			ddl:  "ALTER TABLE users ADD COLUMN is_community_subsidy tinyint(1) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "zero_account_reward_total",
+			ddl:  "ALTER TABLE users ADD COLUMN zero_account_reward_total decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "community_subsidy_total",
+			ddl:  "ALTER TABLE users ADD COLUMN community_subsidy_total decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "zero_account_set_at",
+			ddl:  "ALTER TABLE users ADD COLUMN zero_account_set_at datetime(3) DEFAULT NULL",
+		},
+		{
+			name: "community_subsidy_set_at",
+			ddl:  "ALTER TABLE users ADD COLUMN community_subsidy_set_at datetime(3) DEFAULT NULL",
+		},
+		{
+			name: "usdt_withdrawable",
+			ddl:  "ALTER TABLE users ADD COLUMN usdt_withdrawable decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "win_a_recharge_balance",
+			ddl:  "ALTER TABLE users ADD COLUMN win_a_recharge_balance decimal(36,18) NOT NULL DEFAULT 0",
+		},
+	}
+	for _, col := range columns {
+		var cnt int64
+		if err := db.Raw(`
+			SELECT COUNT(1)
+			FROM information_schema.columns
+			WHERE table_schema = DATABASE()
+			  AND table_name = 'users'
+			  AND column_name = ?
+		`, col.name).Scan(&cnt).Error; err != nil {
+			return err
+		}
+		if cnt == 0 {
+			if err := db.Exec(col.ddl).Error; err != nil {
+				return err
+			}
+		}
+	}
+	// 历史已开启角色但无设置时间：用 updated_time 近似回填（仅补空值）
+	if err := db.Exec(`
+		UPDATE users SET zero_account_set_at = updated_time
+		WHERE is_zero_account = 1 AND zero_account_set_at IS NULL
+	`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`
+		UPDATE users SET community_subsidy_set_at = updated_time
+		WHERE is_community_subsidy = 1 AND community_subsidy_set_at IS NULL
+	`).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 // DB exposes the underlying gorm handle for admin legacy queries.
 func (d *Data) DB() *gorm.DB {
 	return d.db
@@ -196,10 +274,12 @@ func seedDefaults(db *gorm.DB) error {
 		MgmtRates:            conf.DefaultMgmtRates(),
 		AixPriceInitial:      conf.DefaultAixPrice,
 		WinPrice:             conf.DefaultWinPrice,
+		WinAPrice:            conf.DefaultWinAPrice,
 		MgmtCountsTowardExit: true,
 		MinSubscribe:         conf.DefaultMinSubscribe,
 		MinUsdtRecharge:      conf.DefaultMinUsdtRecharge,
 		MinWinRecharge:       conf.DefaultMinWinRecharge,
+		MinWinARecharge:      conf.DefaultMinWinARecharge,
 	}
 	if cnt == 0 {
 		conf.NormalizeBusinessDefaults(&snap)
@@ -214,18 +294,18 @@ func seedDefaults(db *gorm.DB) error {
 			conf.NormalizeBusinessDefaults(&snap)
 		}
 	}
-	today := time.Now().Format("2006-01-02")
-	aixSeed := decimal.NewFromFloat(snap.AixPriceInitial)
-	if !aixSeed.IsPositive() {
-		aixSeed = decimal.NewFromFloat(conf.DefaultAixPrice)
-	}
-	var priceCnt int64
-	if err := db.Model(&AixPricePO{}).Where("effective_date = ?", today).Count(&priceCnt).Error; err != nil {
+	var totalPriceCnt int64
+	if err := db.Model(&AixPricePO{}).Count(&totalPriceCnt).Error; err != nil {
 		return err
 	}
-	if priceCnt == 0 {
+	if totalPriceCnt == 0 {
+		today := time.Now().Format("2006-01-02")
+		aixSeed := decimal.NewFromFloat(snap.AixPriceInitial)
+		if !aixSeed.IsPositive() {
+			aixSeed = decimal.NewFromFloat(conf.DefaultAixPrice)
+		}
 		if err := db.Create(&AixPricePO{
-			Price:         aixSeed,
+			Price:         aixSeed.Round(biz.AixPriceDecimals),
 			EffectiveDate: today,
 			Remark:        "initial",
 		}).Error; err != nil {

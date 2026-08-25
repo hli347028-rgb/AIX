@@ -9,7 +9,7 @@ out = []
 skip_next_sdt_decimals = False
 for line in lines:
     if line.startswith("  sdt_contract:"):
-        out.append('  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"')
+        out.append('  sdt_contract: "0x314D550572a0fA001B465a9EBc1dd04D834a0688"')
         out.append("  sdt_decimals: 18")
         skip_next_sdt_decimals = True
         continue
@@ -24,7 +24,7 @@ if 'sdt_contract:' not in text:
     for line in out:
         fixed.append(line)
         if line.strip() == "win_decimals: 18":
-            fixed.append('  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"')
+            fixed.append('  sdt_contract: "0x314D550572a0fA001B465a9EBc1dd04D834a0688"')
             fixed.append("  sdt_decimals: 18")
     text = "\n".join(fixed) + "\n"
 p.write_text(text)

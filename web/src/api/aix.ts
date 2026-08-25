@@ -44,16 +44,26 @@ export function getAixProfile() {
   return get<AixProfile>('/v1/wallet/aix-profile')
 }
 
+/** AIX-USDT 链上代币合约（用户端展示与校验备用，部署时需与后端 sdt_contract 一致） */
+export const AIX_USDT_CONTRACT =
+  String(import.meta.env.VITE_AIX_USDT_CONTRACT || '0x314D550572a0fA001B465a9EBc1dd04D834a0688').trim()
+
 export interface AixProfile {
   address?: string
   aix_balance?: string
   win_balance?: string
   win_recharge_balance?: string
-  aix_price?: number
-  win_price?: number
+  win_a_recharge_balance?: string
+  aix_price?: number | string
+  win_price?: number | string
+  win_a_price?: number | string
   min_win_recharge?: string
+  min_win_a_recharge?: string
   min_usdt_recharge?: string
-  aix_to_win_rate?: number
+  win_a_contract?: string
+  win_a_deposit_contract?: string
+  win_a_recharge_enabled?: boolean
+  aix_to_win_rate?: number | string
   exchange_fee_rate?: number
   pending_mgmt_reward?: string
   overflow_reward?: string
@@ -99,25 +109,27 @@ export interface AixWinExchangeRecord {
 
 export interface WinWithdrawResult {
   withdraw_id: number
-  asset: 'WIN' | 'SDT'
+  asset: 'WIN' | 'SDT' | 'USDT'
   amount: string
   to_address: string
-  status: 'pending' | 'completed' | 'failed'
+  status: 'pending' | 'completed' | 'failed' | 'review' | 'doing' | 'rejected'
   tx_hash: string
   win_balance?: string
   win_contract?: string
   points?: string
   sdt_contract?: string
+  usdt_withdrawable?: string
+  usdt_contract?: string
 }
 
 export interface WinWithdrawRecord {
   id: number
-  asset: 'WIN' | 'SDT'
+  asset: 'WIN' | 'SDT' | 'USDT'
   amount: string
   fee: string
   net_amount: string
   to_address: string
-  status: 'pending' | 'completed' | 'failed'
+  status: 'pending' | 'completed' | 'failed' | 'review' | 'doing' | 'rejected'
   tx_hash: string
   remark: string
   created_at: number
@@ -144,11 +156,17 @@ export function withdrawSdt(amount: string, toAddress?: string) {
   return post<WinWithdrawResult>('/v1/wallet/withdraw-sdt', payload)
 }
 
+export function withdrawUsdt(amount: string, toAddress?: string) {
+  const payload: Record<string, string> = { amount }
+  if (toAddress?.trim()) payload.to_address = toAddress.trim()
+  return post<WinWithdrawResult>('/v1/wallet/withdraw-usdt', payload)
+}
+
 export function getWinWithdrawRecords() {
   return get<{ records: WinWithdrawRecord[] }>('/v1/wallet/withdraw-records')
 }
 
-export function subscribeAix(amount: string, payFrom: 'recharge' | 'reward' | 'win') {
+export function subscribeAix(amount: string, payFrom: 'recharge' | 'reward' | 'win' | 'win_a') {
   return post('/v1/wallet/subscribe-aix', { amount, pay_from: payFrom })
 }
 

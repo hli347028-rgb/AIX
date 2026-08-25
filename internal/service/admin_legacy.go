@@ -69,9 +69,14 @@ var legacyConfigDefs = []struct {
 	{6, "USDT合约"},
 	{7, "AIX价格(USDT/枚)"},
 	{8, "WIN价格(USDT/枚)"},
+	{36, "WIN-A价格(USDT/枚)"},
 	{9, "兑换手续费率(%)"},
 	{31, "USDT充值最小值"},
 	{32, "WIN充值最小值"},
+	{37, "WIN-A充值最小值"},
+	{33, "WIN提现审核阈值(超过需审核)"},
+	{34, "AIX-USDT提现审核阈值(超过需审核)"},
+	{35, "USDT提现审核阈值(超过需审核)"},
 	{11, "W1 收益系数"},
 	{12, "W2 收益系数"},
 	{13, "W3 收益系数"},
@@ -147,9 +152,6 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 	page, pageSize, offset := parsePage(q)
 	addressFilter := strings.TrimSpace(q.Get("address"))
 
-	if err := s.userRepo.RefreshPerformance(ctx); err != nil {
-		return err
-	}
 	users, err := s.userRepo.ListAllUsers(ctx)
 	if err != nil {
 		return err
@@ -188,6 +190,9 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 		u.SyncCompatFields()
 		inviteeCount := directCount[u.ID]
 		vip := formatMgmtVIP(u.MgmtLevel)
+		za, _ := decimal.NewFromString(strings.TrimSpace(u.ZeroAccountRewardTotal))
+		cs, _ := decimal.NewFromString(strings.TrimSpace(u.CommunitySubsidyTotal))
+		usdtWithdrawableDisplay := za.Add(cs).String() // 可提 U = 零号账户累计 + 社区补贴累计
 		items = append(items, map[string]interface{}{
 			"userId":              u.ID,
 			"id":                  u.ID,
@@ -195,8 +200,10 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"usdt_recharge":       u.UsdtRecharge,
 			"usdt_reward":         u.UsdtReward,
 			"aix_balance":         u.AixBalance,        // AIX 代币数
-			"win_balance":          u.WinBalance,          // WIN 提现钱包
-			"win_recharge_balance": u.WinRechargeBalance,  // WIN 充值钱包
+			"win_balance":            u.WinBalance,            // WIN 提现钱包
+			"win_recharge_balance":   u.WinRechargeBalance,    // WIN 充值钱包
+			"win_a_recharge_balance": u.WinARechargeBalance,   // WIN-A 充值钱包
+			"usdt_withdrawable":      usdtWithdrawableDisplay,
 			"pending_mgmt_reward": u.OverflowTotal(), // 兼容旧字段
 			"overflow_reward":     u.OverflowTotal(), // 溢出奖励合计（管理奖+直推）
 			"points":              u.Points,         // 当前积分
@@ -217,6 +224,12 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"pendingRelease":      zeroIfEmpty(pendingRelease[u.ID]),  // 待释放
 			"vip":                 vip,
 			"historyRecommend":    strconv.Itoa(inviteeCount),
+			"is_zero_account":     u.IsZeroAccount,
+			"is_community_subsidy": u.IsCommunitySubsidy,
+			"zero_account_set_at": formatLegacyTimePtr(u.ZeroAccountSetAt),
+			"community_subsidy_set_at": formatLegacyTimePtr(u.CommunitySubsidySetAt),
+			"zero_account_reward_total": u.ZeroAccountRewardTotal,
+			"community_subsidy_total":   u.CommunitySubsidyTotal,
 		})
 	}
 	return ctx.Result(200, map[string]interface{}{
@@ -231,10 +244,21 @@ func (s *AdminLegacyService) HandleConfig(ctx khttp.Context) error {
 		return err
 	}
 	cfg := s.admin.GetPersistedConfigSnapshot()
+	liveAixPrice := ""
+	today := jwtpkg.NowChina().Format("2006-01-02")
+	if price, err := s.walletRepo.GetAixPrice(ctx, today); err == nil && strings.TrimSpace(price) != "" {
+		liveAixPrice = biz.FormatAixPrice(price)
+	} else if latest, err := s.walletRepo.GetLatestAixPriceBefore(ctx, today); err == nil && strings.TrimSpace(latest) != "" && latest != "0" {
+		liveAixPrice = biz.FormatAixPrice(latest)
+	}
 	items := make([]legacyConfigItem, 0, len(legacyConfigDefs))
 	for _, def := range legacyConfigDefs {
+		value := legacyConfigValue(cfg, s.walletCfg, def.ID)
+		if def.ID == 7 && liveAixPrice != "" {
+			value = liveAixPrice
+		}
 		items = append(items, legacyConfigItem{
-			ID: def.ID, Name: def.Name, Value: legacyConfigValue(cfg, s.walletCfg, def.ID),
+			ID: def.ID, Name: def.Name, Value: value,
 		})
 	}
 	return ctx.Result(200, map[string]interface{}{"config": items})
@@ -261,10 +285,6 @@ func (s *AdminLegacyService) HandleConfigUpdate(ctx khttp.Context) error {
 			return err
 		}
 	}
-	if id == 7 && strings.TrimSpace(value) != "" {
-		date := jwtpkg.NowChina().Format("2006-01-02")
-		_ = s.walletRepo.UpsertAixPrice(ctx, date, strings.TrimSpace(value), "admin config")
-	}
 	if id == 8 && strings.TrimSpace(value) != "" {
 		_ = s.walletRepo.UpsertCurrentWinPrice(ctx, strings.TrimSpace(value), "admin")
 	}
@@ -283,6 +303,8 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	page, pageSize, offset := parsePage(q)
 	addressFilter := strings.TrimSpace(q.Get("address"))
 	assetFilter := strings.ToUpper(strings.TrimSpace(q.Get("asset")))
+	statusFilter := strings.TrimSpace(q.Get("status"))
+	start, end := parseLegacyTimeRange(q)
 
 	list, err := s.admin.ListAllWithdrawals(ctx, s.token(ctx))
 	if err != nil {
@@ -296,8 +318,15 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 		if assetFilter != "" && strings.ToUpper(strings.TrimSpace(w.Asset)) != assetFilter {
 			continue
 		}
+		if statusFilter != "" && strings.TrimSpace(w.Status) != statusFilter {
+			continue
+		}
+		if !withdrawalWithinTime(w, start, end) {
+			continue
+		}
 		filtered = append(filtered, w)
 	}
+	stats := sumWithdrawalStats(filtered)
 	total := len(filtered)
 	pageItems := paginateSlice(filtered, offset, pageSize)
 	items := make([]map[string]interface{}, 0, len(pageItems))
@@ -312,6 +341,7 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 			"asset":     w.Asset,
 			"status":    w.Status,
 			"txHash":    w.TxHash,
+			"remark":    w.Remark,
 			"createdAt": formatLegacyTime(w.CreatedAt),
 		})
 	}
@@ -320,6 +350,7 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 		"list":     items,
 		"count":    total,
 		"page":     page,
+		"stats":    stats,
 	})
 }
 
@@ -474,7 +505,29 @@ func (s *AdminLegacyService) HandleWithdrawPass(ctx khttp.Context) error {
 	if _, err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
-	return ctx.Result(200, map[string]string{"status": "ok", "message": "not supported in AIX"})
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, _ := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	if err := s.admin.ApproveWithdrawalReview(ctx, s.token(ctx), id); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok", "message": "审核通过，已进入打款队列"})
+}
+
+func (s *AdminLegacyService) HandleWithdrawReject(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, _ := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	remark := strings.TrimSpace(ctx.Request().Form.Get("remark"))
+	if err := s.admin.RejectWithdrawalReview(ctx, s.token(ctx), id, remark); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok", "message": "已拒绝并退回余额"})
 }
 
 func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
@@ -567,55 +620,23 @@ func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
 	}
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
-	addressFilter := strings.TrimSpace(q.Get("address"))
-	typeFilter := strings.ToLower(strings.TrimSpace(q.Get("type"))) // admin | usdt | win
 
-	type row struct {
-		ID          int64
-		Address     string
-		Asset       string
-		Amount      decimal.Decimal
-		TxHash      string
-		Message     string
-		CreatedTime time.Time
-	}
-	var rows []row
-	db := s.data.DB().WithContext(ctx).
-		Table("recharges r").
-		Select(`r.id, COALESCE(NULLIF(r.from_address,''), u.address) as address,
-			r.asset, r.amount, r.tx_hash, COALESCE(r.message,'') as message, r.created_time`).
-		Joins("JOIN users u ON u.id = r.user_id").
-		Where("r.status = ?", biz.RechargeStatusConfirmed).
-		Order("r.id desc")
-	if addressFilter != "" {
-		db = db.Where("(r.from_address LIKE ? OR u.address LIKE ?)", "%"+addressFilter+"%", "%"+addressFilter+"%")
-	}
-	switch typeFilter {
-	case "admin", "后台充值":
-		db = db.Where("r.tx_hash LIKE ?", "admin-%")
-	case "win", "win充值", "win_recharge":
-		db = db.Where("UPPER(r.asset) = ? AND r.tx_hash NOT LIKE ?", biz.TokenWIN, "admin-%")
-	case "usdt", "usdt充值", "usdt_recharge":
-		db = db.Where("(UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL) AND r.tx_hash NOT LIKE ?", biz.TokenUSDT, "admin-%")
-	}
-	if err := db.Scan(&rows).Error; err != nil {
+	var total int64
+	if err := s.rechargeListDB(ctx, q).Count(&total).Error; err != nil {
 		return err
 	}
-	total := len(rows)
-	pageRows := paginateSlice(rows, offset, pageSize)
-	items := make([]map[string]interface{}, 0, len(pageRows))
-	for _, r := range pageRows {
-		remark, typeCode := classifyRechargeType(r.Asset, r.TxHash, r.Message)
-		items = append(items, map[string]interface{}{
-			"id":        r.ID,
-			"address":   r.Address,
-			"asset":     strings.ToUpper(strings.TrimSpace(r.Asset)),
-			"amount":    r.Amount.String(),
-			"txHash":    r.TxHash,
-			"remark":    remark,
-			"type":      typeCode,
-			"createdAt": formatLegacyTime(r.CreatedTime),
-		})
+	stats, err := s.rechargeStats(ctx, q)
+	if err != nil {
+		return err
+	}
+
+	var rows []rechargeListRow
+	if err := s.rechargeListDB(ctx, q).Order("r.id desc").Offset(offset).Limit(pageSize).Scan(&rows).Error; err != nil {
+		return err
+	}
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, rechargeRowToItem(r))
 	}
 	return ctx.Result(200, map[string]interface{}{
 		"rewards":   items,
@@ -623,7 +644,21 @@ func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
 		"locations": items,
 		"count":     total,
 		"page":      page,
+		"stats":     stats,
 	})
+}
+
+func (s *AdminLegacyService) HandleRecordListExport(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	q := ctx.Request().URL.Query()
+	var rows []rechargeListRow
+	if err := s.rechargeListDB(ctx, q).Order("r.id desc").Scan(&rows).Error; err != nil {
+		return err
+	}
+	w := ctx.Response()
+	return writeRechargeCSV(w, rows)
 }
 
 func classifyRechargeType(asset, txHash, message string) (remark, typeCode string) {
@@ -632,6 +667,9 @@ func classifyRechargeType(asset, txHash, message string) (remark, typeCode strin
 	message = strings.ToLower(strings.TrimSpace(message))
 	if strings.HasPrefix(txHash, "admin-") {
 		return "后台充值", "admin"
+	}
+	if asset == biz.TokenWINA || strings.Contains(message, "win_a_deposit") || strings.Contains(message, "win_a_recharge") {
+		return "WIN-A充值", "win_a"
 	}
 	if asset == biz.TokenWIN || strings.Contains(message, "win_deposit") || strings.Contains(message, "win_recharge") {
 		return "WIN充值", "win"
@@ -758,7 +796,7 @@ func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
 			"settlementDate": b.SettlementDate,
 			"status":         status,
 			"releaseTotal":   b.ReleaseTotal,
-			"aixPrice":       b.AixPrice,
+			"aixPrice":       biz.FormatAixPrice(b.AixPrice),
 			"staticAmount":   b.StaticAmount,
 			"mgmtAmount":     b.MgmtAmount,
 			"startedAt":      "",
@@ -824,6 +862,76 @@ func (s *AdminLegacyService) HandleVipUpdate(ctx khttp.Context) error {
 	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
 		UserID: userID, CommunityLevel: formatMgmtVIP(level), SetCommunityLevel: true,
 	}); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandleSetZeroAccount(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	enabled := strings.TrimSpace(ctx.Request().Form.Get("enabled")) == "1" ||
+		strings.EqualFold(strings.TrimSpace(ctx.Request().Form.Get("enabled")), "true")
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
+		UserID: userID, SetIsZeroAccount: true, IsZeroAccount: enabled,
+	}); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	enabled := strings.TrimSpace(ctx.Request().Form.Get("enabled")) == "1" ||
+		strings.EqualFold(strings.TrimSpace(ctx.Request().Form.Get("enabled")), "true")
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
+		UserID: userID, SetIsCommunitySubsidy: true, IsCommunitySubsidy: enabled,
+	}); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandleSetInviter(ctx khttp.Context) error {
+	if _, err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	inviterAddress := firstNonEmpty(
+		ctx.Request().Form.Get("inviter_address"),
+		ctx.Request().Form.Get("address"),
+		ctx.Request().Form.Get("recommend_address"),
+	)
+	if err := s.admin.SetUserInviter(ctx, s.token(ctx), userID, inviterAddress); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]string{"status": "ok"})
@@ -1147,7 +1255,7 @@ func (s *AdminLegacyService) token(ctx khttp.Context) string {
 func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[string]interface{}, error) {
 	now := time.Now().In(jwtpkg.ChinaLocation())
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, jwtpkg.ChinaLocation())
-	todayDate := todayStart.Format("2006-01-02")
+	yesterdayDate := todayStart.Add(-24 * time.Hour).Format("2006-01-02")
 
 	var totalUserR int64
 	var todayUserR int64
@@ -1171,86 +1279,169 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 		return nil, err
 	}
 
-	var buyTotal decimal.Decimal
-	var todayBuy decimal.Decimal
-	if err := s.data.DB().WithContext(ctx).Table("orders").
-		Select("COALESCE(SUM(principal),0)").Scan(&buyTotal).Error; err != nil {
+	buyTotal, err := s.sumOrderPrincipal(ctx, "", nil)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.data.DB().WithContext(ctx).Table("orders").
-		Where("created_time >= ?", todayStart).
-		Select("COALESCE(SUM(principal),0)").Scan(&todayBuy).Error; err != nil {
+	todayBuy, err := s.sumOrderPrincipal(ctx, "", &todayStart)
+	if err != nil {
 		return nil, err
 	}
 
-	var balanceUsdt decimal.Decimal
-	var usdtRechargeTotal decimal.Decimal
-	var aixTotal decimal.Decimal
-	if err := s.data.DB().WithContext(ctx).Model(&data.UserPO{}).
-		Select("COALESCE(SUM(usdt_reward),0)").Scan(&balanceUsdt).Error; err != nil {
+	totalUsdtChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenUSDT, nil)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.data.DB().WithContext(ctx).Model(&data.UserPO{}).
-		Select("COALESCE(SUM(usdt_recharge),0)").Scan(&usdtRechargeTotal).Error; err != nil {
+	todayUsdtChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenUSDT, &todayStart)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.data.DB().WithContext(ctx).Model(&data.UserPO{}).
-		Select("COALESCE(SUM(aix_balance),0)").Scan(&aixTotal).Error; err != nil {
+	totalWinChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenWIN, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayWinChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenWIN, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+	totalWinAChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenWINA, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayWinAChainRecharge, err := s.sumChainRecharge(ctx, biz.TokenWINA, &todayStart)
+	if err != nil {
 		return nil, err
 	}
 
-	var orderActive int64
-	var orderExited int64
-	if err := s.data.DB().WithContext(ctx).Table("orders").
-		Where("status = ?", biz.OrderStatusActive).Count(&orderActive).Error; err != nil {
+	totalRewardReinvest, err := s.sumOrderPrincipal(ctx, biz.PayFromReward, nil)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.data.DB().WithContext(ctx).Table("orders").
-		Where("status = ?", biz.OrderStatusExited).Count(&orderExited).Error; err != nil {
+	todayRewardReinvest, err := s.sumOrderPrincipal(ctx, biz.PayFromReward, &todayStart)
+	if err != nil {
 		return nil, err
 	}
 
-	var todayOne decimal.Decimal
-	var todayTwo decimal.Decimal
-	if err := s.data.DB().WithContext(ctx).Table("reward_logs").
-		Where("type = ? AND settlement_date = ?", biz.RewardTypeStaticAix, todayDate).
-		Select("COALESCE(SUM(amount),0)").Scan(&todayOne).Error; err != nil {
+	totalDynamic, err := s.sumDynamicReward(ctx, nil)
+	if err != nil {
 		return nil, err
 	}
-	if err := s.data.DB().WithContext(ctx).Table("reward_logs").
-		Where("type IN ? AND DATE(created_time) = ?",
-			[]string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease, biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease}, todayDate).
-		Select("COALESCE(SUM(amount),0)").Scan(&todayTwo).Error; err != nil {
+	todayDynamic, err := s.sumDynamicReward(ctx, &todayStart)
+	if err != nil {
 		return nil, err
 	}
-	todayThree := todayOne.Add(todayTwo)
 
-	var totalReward decimal.Decimal
-	if err := s.data.DB().WithContext(ctx).Table("reward_logs").
-		Where("type IN ?", []string{biz.RewardTypeStaticAix, biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease, biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease}).
-		Select("COALESCE(SUM(amount),0)").Scan(&totalReward).Error; err != nil {
+	totalStaticRelease, err := s.sumStaticRelease(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	yesterdayStaticRelease, err := s.sumStaticRelease(ctx, yesterdayDate)
+	if err != nil {
+		return nil, err
+	}
+
+	totalWinWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenWIN, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayWinWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenWIN, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+	totalSdtWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenSDT, nil)
+	if err != nil {
+		return nil, err
+	}
+	todaySdtWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenSDT, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+
+	totalSdtAsset, err := s.sumUserAsset(ctx, "points")
+	if err != nil {
+		return nil, err
+	}
+	winBalance, err := s.sumUserAsset(ctx, "win_balance")
+	if err != nil {
+		return nil, err
+	}
+	winRechargeBalance, err := s.sumUserAsset(ctx, "win_recharge_balance")
+	if err != nil {
+		return nil, err
+	}
+	totalWinAsset := winBalance.Add(winRechargeBalance)
+
+	totalAdminRecharge, err := s.sumAdminManualRecharge(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayAdminRecharge, err := s.sumAdminManualRecharge(ctx, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+
+	totalZeroAccountReward, err := s.sumUserAsset(ctx, "zero_account_reward_total")
+	if err != nil {
+		return nil, err
+	}
+	todayZeroAccountReward, err := s.sumRewardByType(ctx, biz.RewardTypeZeroAccount, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+	totalCommunitySubsidyReward, err := s.sumUserAsset(ctx, "community_subsidy_total")
+	if err != nil {
+		return nil, err
+	}
+	todayCommunitySubsidyReward, err := s.sumRewardByType(ctx, biz.RewardTypeCommunitySubsidy, &todayStart)
+	if err != nil {
+		return nil, err
+	}
+
+	// 全网可提U / 总提现U / 今日提现U 中的「U」均指：零号账户 + 社区补贴
+	totalUsdtWithdrawable := totalZeroAccountReward.Add(totalCommunitySubsidyReward)
+	totalUsdtWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenUSDT, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayUsdtWithdraw, err := s.sumWithdrawalAmount(ctx, biz.TokenUSDT, &todayStart)
+	if err != nil {
 		return nil, err
 	}
 
 	return map[string]interface{}{
-		"totalUserR":        totalUserR,
-		"totalUser":         totalUser,
-		"todayUserR":        todayUserR,
-		"todayUser":         todayUser,
-		"buyTotal":          buyTotal.String(),
-		"todayBuy":          todayBuy.String(),
-		"balanceUsdt":       balanceUsdt.String(),
-		"usdtRechargeTotal": usdtRechargeTotal.String(),
-		"aixTotal":          aixTotal.String(),
-		"orderActive":       orderActive,
-		"orderExited":       orderExited,
-		"todayOne":          todayOne.String(),
-		"todayTwo":          todayTwo.String(),
-		"todayThree":        todayThree.String(),
-		"totalReward":       totalReward.String(),
-		"todayWithdraw":     "0",
-		"totalWithdraw":     "0",
-		"totalIspay":        "0",
+		"totalUserR":             totalUserR,
+		"totalUser":              totalUser,
+		"todayUserR":             todayUserR,
+		"todayUser":              todayUser,
+		"buyTotal":               buyTotal.String(),
+		"todayBuy":               todayBuy.String(),
+		"totalUsdtChainRecharge": totalUsdtChainRecharge.String(),
+		"todayUsdtChainRecharge": todayUsdtChainRecharge.String(),
+		"totalWinChainRecharge":  totalWinChainRecharge.String(),
+		"todayWinChainRecharge":  todayWinChainRecharge.String(),
+		"totalWinAChainRecharge": totalWinAChainRecharge.String(),
+		"todayWinAChainRecharge": todayWinAChainRecharge.String(),
+		"totalRewardReinvest":    totalRewardReinvest.String(),
+		"todayRewardReinvest":    todayRewardReinvest.String(),
+		"totalDynamic":           totalDynamic.String(),
+		"todayDynamic":           todayDynamic.String(),
+		"totalStaticRelease":     totalStaticRelease.String(),
+		"yesterdayStaticRelease": yesterdayStaticRelease.String(),
+		"totalWinWithdraw":       totalWinWithdraw.String(),
+		"todayWinWithdraw":       todayWinWithdraw.String(),
+		"totalSdtWithdraw":       totalSdtWithdraw.String(),
+		"todaySdtWithdraw":       todaySdtWithdraw.String(),
+		"totalSdtAsset":          totalSdtAsset.String(),
+		"totalWinAsset":          totalWinAsset.String(),
+		"totalAdminRecharge":     totalAdminRecharge.String(),
+		"todayAdminRecharge":     todayAdminRecharge.String(),
+		"totalZeroAccountReward": totalZeroAccountReward.String(),
+		"todayZeroAccountReward": todayZeroAccountReward.String(),
+		"totalCommunitySubsidyReward": totalCommunitySubsidyReward.String(),
+		"todayCommunitySubsidyReward": todayCommunitySubsidyReward.String(),
+		"totalUsdtWithdrawable":  totalUsdtWithdrawable.String(),
+		"totalUsdtWithdraw":      totalUsdtWithdraw.String(),
+		"todayUsdtWithdraw":      todayUsdtWithdraw.String(),
 	}, nil
 }
 
@@ -1405,6 +1596,13 @@ func formatLegacyTime(t time.Time) string {
 	return t.In(jwtpkg.ChinaLocation()).Format("2006-01-02 15:04:05")
 }
 
+func formatLegacyTimePtr(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return formatLegacyTime(*t)
+}
+
 func parsePage(q url.Values) (page, pageSize, offset int) {
 	page = 1
 	pageSize = 20
@@ -1491,14 +1689,19 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 		return ""
 	case 7:
 		if cfg != nil {
-			return strconv.FormatFloat(cfg.AixPriceInitial, 'f', -1, 64)
+			return biz.FormatAixPriceDecimal(decimal.NewFromFloat(cfg.AixPriceInitial))
 		}
-		return strconv.FormatFloat(conf.DefaultAixPrice, 'f', -1, 64)
+		return biz.FormatAixPriceDecimal(decimal.NewFromFloat(conf.DefaultAixPrice))
 	case 8:
 		if cfg != nil {
 			return strconv.FormatFloat(cfg.WinPrice, 'f', -1, 64)
 		}
 		return strconv.FormatFloat(conf.DefaultWinPrice, 'f', -1, 64)
+	case 36:
+		if cfg != nil {
+			return strconv.FormatFloat(cfg.WinAPrice, 'f', -1, 64)
+		}
+		return strconv.FormatFloat(conf.DefaultWinAPrice, 'f', -1, 64)
 	case 9:
 		if cfg != nil {
 			return strconv.FormatFloat(cfg.ExchangeFeeRate*100, 'f', -1, 64)
@@ -1514,6 +1717,26 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 			return cfg.MinWinRecharge
 		}
 		return conf.DefaultMinWinRecharge
+	case 37:
+		if cfg != nil && strings.TrimSpace(cfg.MinWinARecharge) != "" {
+			return cfg.MinWinARecharge
+		}
+		return conf.DefaultMinWinARecharge
+	case 33:
+		if cfg != nil && strings.TrimSpace(cfg.WinWithdrawReviewThreshold) != "" {
+			return cfg.WinWithdrawReviewThreshold
+		}
+		return "0"
+	case 34:
+		if cfg != nil && strings.TrimSpace(cfg.SdtWithdrawReviewThreshold) != "" {
+			return cfg.SdtWithdrawReviewThreshold
+		}
+		return "0"
+	case 35:
+		if cfg != nil && strings.TrimSpace(cfg.UsdtWithdrawReviewThreshold) != "" {
+			return cfg.UsdtWithdrawReviewThreshold
+		}
+		return "0"
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		idx := id - 11
 		rates := conf.DefaultMgmtRates()
@@ -1584,6 +1807,12 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 			return errors.BadRequest("INVALID_VALUE", "WIN价格格式错误")
 		}
 		snapshot.WinPrice = price
+	case 36:
+		price, err := strconv.ParseFloat(value, 64)
+		if err != nil || price <= 0 {
+			return errors.BadRequest("INVALID_VALUE", "WIN-A价格格式错误")
+		}
+		snapshot.WinAPrice = price
 	case 9:
 		feePercent, err := strconv.ParseFloat(value, 64)
 		if err != nil || feePercent < 0 || feePercent >= 100 {
@@ -1602,6 +1831,26 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 			return errors.BadRequest("INVALID_VALUE", fmt.Sprintf("WIN充值最小值必须 ≥ %g", conf.FloorMinRechargeAmount))
 		}
 		snapshot.MinWinRecharge = strconv.FormatFloat(minAmt, 'f', -1, 64)
+	case 37:
+		minAmt, err := strconv.ParseFloat(value, 64)
+		if err != nil || minAmt < conf.FloorMinRechargeAmount {
+			return errors.BadRequest("INVALID_VALUE", fmt.Sprintf("WIN-A充值最小值必须 ≥ %g", conf.FloorMinRechargeAmount))
+		}
+		snapshot.MinWinARecharge = strconv.FormatFloat(minAmt, 'f', -1, 64)
+	case 33, 34, 35:
+		threshold, err := strconv.ParseFloat(value, 64)
+		if err != nil || threshold < 0 {
+			return errors.BadRequest("INVALID_VALUE", "提现审核阈值须为 ≥0 的数字（0 表示不审核；超过该金额需人工审核）")
+		}
+		v := strconv.FormatFloat(threshold, 'f', -1, 64)
+		switch id {
+		case 33:
+			snapshot.WinWithdrawReviewThreshold = v
+		case 34:
+			snapshot.SdtWithdrawReviewThreshold = v
+		case 35:
+			snapshot.UsdtWithdrawReviewThreshold = v
+		}
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil || rate < 0 {

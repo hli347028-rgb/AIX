@@ -189,27 +189,27 @@ func (uc *AuthUsecase) registerNewUser(ctx context.Context, address, inviteCode 
 	return uc.userRepo.Create(ctx, user)
 }
 
-func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*User, int32, []*DownlineInvitee, error) {
+func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*User, int32, int32, error) {
 	address, err := token.Parse(tokenString, uc.jwtSecret())
 	if err != nil {
-		return nil, 0, nil, errors.Unauthorized(v1.ErrorReason_AUTH_UNSPECIFIED.String(), "token 无效或已过期")
+		return nil, 0, 0, errors.Unauthorized(v1.ErrorReason_AUTH_UNSPECIFIED.String(), "token 无效或已过期")
 	}
 	user, err := uc.userRepo.FindByAddress(ctx, address)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, 0, err
 	}
 	if user == nil {
-		return nil, 0, nil, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
+		return nil, 0, 0, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
 	}
 	count, err := uc.userRepo.CountInvitees(ctx, user.ID)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, 0, err
 	}
-	downline, err := uc.userRepo.ListDownlineInvitees(ctx, user.ID, MaxDownlineGenerations)
+	totalDownline, err := uc.userRepo.CountUsersUnder(ctx, user.ID)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, 0, err
 	}
-	return user, count, downline, nil
+	return user, count, totalDownline, nil
 }
 
 func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address string) ([]*DirectInvitee, error) {

@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"backend/internal/conf"
@@ -17,12 +18,44 @@ var (
 	MgmtThresholds       = conf.DefaultMgmtThresholds()
 	MgmtRates            = conf.DefaultMgmtRates()
 	MgmtCountsTowardExit = true
-	AixPriceInitial      = float64(conf.DefaultAixPrice)
+	AixPriceInitial           = float64(conf.DefaultAixPrice)
+	AixPriceDailyGrowthRate   = conf.DefaultAixPriceDailyGrowth
 	WinPrice             = float64(conf.DefaultWinPrice)
+	WinAPrice            = float64(conf.DefaultWinAPrice)
 	ExchangeFeeRate      = float64(conf.DefaultExchangeFeeRate)
-	MinUsdtRecharge      = conf.DefaultMinUsdtRecharge
+	MinUsdtRecharge              = conf.DefaultMinUsdtRecharge
+	WinWithdrawReviewThreshold   = "0"
+	SdtWithdrawReviewThreshold   = "0"
+	UsdtWithdrawReviewThreshold   = "0"
 	MinWinRecharge       = conf.DefaultMinWinRecharge
+	MinWinARecharge      = conf.DefaultMinWinARecharge
 )
+
+// AixPriceDecimals AIX 价格对外展示与落库统一保留的小数位数。
+const AixPriceDecimals int32 = 15
+
+// FormatAixPrice 将价格格式化为固定 15 位小数；无效时回退为当前初始价。
+func FormatAixPrice(price string) string {
+	p, err := decimal.NewFromString(strings.TrimSpace(price))
+	if err != nil || !p.IsPositive() {
+		p = decimal.NewFromFloat(AixPriceInitial)
+	}
+	if !p.IsPositive() {
+		p = decimal.NewFromInt(1)
+	}
+	return p.StringFixed(AixPriceDecimals)
+}
+
+// FormatAixPriceDecimal 将 decimal 价格格式化为固定 15 位小数。
+func FormatAixPriceDecimal(p decimal.Decimal) string {
+	if !p.IsPositive() {
+		p = decimal.NewFromFloat(AixPriceInitial)
+	}
+	if !p.IsPositive() {
+		p = decimal.NewFromInt(1)
+	}
+	return p.StringFixed(AixPriceDecimals)
+}
 
 // ApplyAixConfig hot-updates AIX business parameters.
 func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
@@ -42,6 +75,9 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	if snap.WinPrice > 0 {
 		WinPrice = snap.WinPrice
 	}
+	if snap.WinAPrice > 0 {
+		WinAPrice = snap.WinAPrice
+	}
 	if snap.ExchangeFeeRate > 0 {
 		ExchangeFeeRate = snap.ExchangeFeeRate
 	}
@@ -50,6 +86,18 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	}
 	if snap.MinWinRecharge != "" {
 		MinWinRecharge = snap.MinWinRecharge
+	}
+	if snap.MinWinARecharge != "" {
+		MinWinARecharge = snap.MinWinARecharge
+	}
+	if snap.WinWithdrawReviewThreshold != "" {
+		WinWithdrawReviewThreshold = snap.WinWithdrawReviewThreshold
+	}
+	if snap.SdtWithdrawReviewThreshold != "" {
+		SdtWithdrawReviewThreshold = snap.SdtWithdrawReviewThreshold
+	}
+	if snap.UsdtWithdrawReviewThreshold != "" {
+		UsdtWithdrawReviewThreshold = snap.UsdtWithdrawReviewThreshold
 	}
 }
 
@@ -164,6 +212,7 @@ type StakingRepo interface {
 	HasStaticReward(ctx context.Context, orderID int64, date string) (bool, error)
 
 	GetAixPrice(ctx context.Context, date string) (string, error)
+	GetLatestAixPriceBefore(ctx context.Context, date string) (string, error)
 	UpsertAixPrice(ctx context.Context, date, price, remark string) error
 
 	HasCompletedSettlement(ctx context.Context, date string) (bool, error)

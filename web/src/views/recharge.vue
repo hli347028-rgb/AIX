@@ -5,6 +5,7 @@
     <div class="withdraw-info">
       <p class="withdraw-balance">{{ $t('recharge.balance') }}: {{ displayAmount(rechargeBalance) }}</p>
       <p class="withdraw-balance">{{ $t('recharge.winBalance') }}: {{ displayAmount(winBalance) }}</p>
+      <p class="withdraw-balance">{{ $t('recharge.winABalance') }}: {{ displayAmount(winABalance) }}</p>
       <!-- <p v-if="winPrice > 0" class="withdraw-balance withdraw-price">{{ $t('recharge.winPrice') }}: {{ winPrice }} USDT</p> -->
       <div class="withdraw-actions">
         <button class="withdraw-btn" @click="showRecharge"><van-icon name="balance-pay" />{{ $t('recharge.recharge') }}</button>
@@ -18,6 +19,7 @@
       <ul class="withdraw-tab-title">
         <li :class="{ active: recordTab === 'usdt' }" @click="switchRecordTab('usdt')">USDT</li>
         <li :class="{ active: recordTab === 'win' }" @click="switchRecordTab('win')">WIN</li>
+        <li :class="{ active: recordTab === 'win_a' }" @click="switchRecordTab('win_a')">WIN-A</li>
       </ul>
       <div class="withdrawal-list">
         <div class="withdrawal-list-content">
@@ -37,7 +39,7 @@
                 </div>
                 <div class="table-cell col-amount">
                   <span class="amount-value">{{ displayAmount(item.amount) }}</span>
-                  <span class="amount-unit">{{ recordTab === 'win' ? 'WIN' : 'USDT' }}</span>
+                  <span class="amount-unit">{{ recordAssetUnit }}</span>
                 </div>
                 <div class="table-cell col-status" :class="statusClass(item.status)">
                   {{ rechargeStatusText(item.status) }}
@@ -86,18 +88,29 @@ const userinfo = $computed(() => person.userinfo);
 const profile = $computed(() => person.profile);
 const rechargeBalance = $computed(() => String(profile.usdt_recharge || userinfo.usdt || '0'))
 const winBalance = $computed(() => String(profile.win_recharge_balance || '0'))
+const winABalance = $computed(() => String(profile.win_a_recharge_balance || '0'))
 const winPrice = $computed(() => Number(profile.win_price || 0))
 const displayAmount = (value) => displayDecimal(value)
 const rechargeDialogRef = ref(null)
 const recordTab = ref('usdt')
 let usdtRecords = $ref([])
 let winRecords = $ref([])
+let winARecords = $ref([])
 let page = $ref(1)
 let allPageCount = $ref(1)
 let usdtBalance = $ref("0");
 let usdtApproved = $ref(false);
 
-const currentRecords = computed(() => recordTab.value === 'win' ? winRecords : usdtRecords)
+const currentRecords = computed(() => {
+  if (recordTab.value === 'win') return winRecords
+  if (recordTab.value === 'win_a') return winARecords
+  return usdtRecords
+})
+const recordAssetUnit = computed(() => {
+  if (recordTab.value === 'win') return 'WIN'
+  if (recordTab.value === 'win_a') return 'WIN-A'
+  return 'USDT'
+})
 
 const rechargeStatusText = (status) => {
   switch (String(status || '').toLowerCase()) {
@@ -129,6 +142,7 @@ const switchRecordTab = async (tab) => {
   recordTab.value = tab
   page = 1
   if (tab === 'win') await getWinRecords(1)
+  else if (tab === 'win_a') await getWinARecords(1)
   else await getUsdtRecords(1)
 }
 
@@ -198,16 +212,41 @@ const getWinRecords = async (pageNum = 1) => {
   }
 }
 
+const getWinARecords = async (pageNum = 1) => {
+  try {
+    const res = await request.get('app_server/deposit_win_a_list', {
+      params: { page: pageNum },
+    })
+    allPageCount = Math.max(1, Math.ceil(Number(res.count || 0) / 10))
+    winARecords = (res.list || res.recharges || []).map((item, index) => ({
+      ...item,
+      id: item.id ?? index,
+      createdAt: item.createdAt || item.created_at || '-',
+      status: item.status || 'pending',
+    }))
+    page = pageNum
+  } catch {
+    winARecords = []
+    allPageCount = 1
+  }
+}
+
 const onPageChange = async (pageNum = 1) => {
   if (recordTab.value === 'win') await getWinRecords(pageNum)
+  else if (recordTab.value === 'win_a') await getWinARecords(pageNum)
   else await getUsdtRecords(pageNum)
 }
 
 const handleRechargeChange = async (pageNum = 1) => {
+  const loadRecords = recordTab.value === 'win'
+    ? getWinRecords(pageNum)
+    : recordTab.value === 'win_a'
+      ? getWinARecords(pageNum)
+      : getUsdtRecords(pageNum)
   await Promise.allSettled([
     person.refreshProfile?.(),
     getBalance(),
-    recordTab.value === 'win' ? getWinRecords(pageNum) : getUsdtRecords(pageNum),
+    loadRecords,
   ])
 }
 

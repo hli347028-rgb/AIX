@@ -4,9 +4,9 @@ const UNIT = 18
 const ONE = ethers.utils.parseUnits('1', UNIT)
 
 export interface ExchangeRateInput {
-  aix_to_win_rate?: number
-  aix_price?: number
-  win_price?: number
+  aix_to_win_rate?: number | string
+  aix_price?: number | string
+  win_price?: number | string
 }
 
 function sanitize(value: string | number): string {
@@ -33,6 +33,14 @@ export function displayDecimal(value: unknown, maxFraction = 8) {
   const [integer, fraction = ''] = text.split('.')
   const trimmedFraction = fraction.replace(/0+$/, '').slice(0, maxFraction)
   return trimmedFraction ? `${integer}.${trimmedFraction}` : integer
+}
+
+/** AIX 价格固定展示小数点后 15 位 */
+export function displayAixPrice(value: unknown) {
+  const text = fromUnits(toUnits(String(value ?? '0')))
+  if (!text.includes('.')) return `${text}.000000000000000`
+  const [integer, fraction = ''] = text.split('.')
+  return `${integer}.${fraction.padEnd(15, '0').slice(0, 15)}`
 }
 
 export function isPositiveDecimal(value: string) {
@@ -77,12 +85,12 @@ export function formatFeeRate(value: unknown) {
 
 /** 优先用 aix_to_win_rate，否则用 aix_price / win_price 推算 */
 export function resolveAixToWinRate(input: ExchangeRateInput): string | null {
-  const direct = Number(input.aix_to_win_rate)
-  if (Number.isFinite(direct) && direct > 0) return sanitize(String(direct))
-  const aixPrice = Number(input.aix_price)
-  const winPrice = Number(input.win_price)
-  if (Number.isFinite(aixPrice) && aixPrice > 0 && Number.isFinite(winPrice) && winPrice > 0) {
-    return divDecimal(String(aixPrice), String(winPrice))
+  const directText = String(input.aix_to_win_rate ?? '').trim()
+  if (directText && isPositiveDecimal(directText)) return sanitize(directText)
+  const aixText = String(input.aix_price ?? '').trim()
+  const winText = String(input.win_price ?? '').trim()
+  if (isPositiveDecimal(aixText) && isPositiveDecimal(winText)) {
+    return divDecimal(aixText, winText)
   }
   return null
 }

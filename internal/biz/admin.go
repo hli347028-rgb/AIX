@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/conf"
+	"backend/internal/pkg/eth"
 	"backend/internal/pkg/token"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -107,9 +108,6 @@ func (uc *AdminUsecase) ListUsers(ctx context.Context, tokenString string) ([]*A
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return nil, err
 	}
-	if err := uc.userRepo.RefreshPerformance(ctx); err != nil {
-		return nil, err
-	}
 	users, err := uc.userRepo.ListAllUsers(ctx)
 	if err != nil {
 		return nil, err
@@ -131,6 +129,7 @@ type AdminUserUpdate struct {
 	AixBalance        string
 	WinBalance         string
 	WinRechargeBalance string
+	WinARechargeBalance string
 	PendingMgmtReward string
 	OverflowReward    string
 	StaticUsdtTotal   string
@@ -141,6 +140,10 @@ type AdminUserUpdate struct {
 	TeamStake         string
 	InviterID         *int64
 	WithdrawReset     *bool
+	SetIsZeroAccount         bool
+	IsZeroAccount            bool
+	SetIsCommunitySubsidy    bool
+	IsCommunitySubsidy       bool
 }
 
 func (uc *AdminUsecase) UpdateUser(ctx context.Context, tokenString string, update *AdminUserUpdate) (*AdminUserDetail, error) {
@@ -156,6 +159,87 @@ func (uc *AdminUsecase) UpdateUser(ctx context.Context, tokenString string, upda
 	}
 	count, _ := uc.userRepo.CountInvitees(ctx, user.ID)
 	return &AdminUserDetail{User: user, InviteeCount: count}, nil
+}
+
+// SetUserInviter 后台修改用户上级（按钱包地址），并刷新团队业绩。
+func (uc *AdminUsecase) SetUserInviter(ctx context.Context, tokenString string, userID int64, inviterAddress string) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	user, err := uc.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.NotFound("USER_NOT_FOUND", "用户不存在")
+	}
+
+	inviterAddress = strings.TrimSpace(inviterAddress)
+	if inviterAddress == "" {
+		return errors.BadRequest("INVALID_INVITER", "上级地址不能为空")
+	}
+	normalized, err := eth.NormalizeAddress(inviterAddress)
+	if err != nil {
+		return errors.BadRequest("INVALID_INVITER", "上级地址格式无效")
+	}
+	if strings.EqualFold(normalized, user.Address) {
+		return errors.BadRequest("INVALID_INVITER", "不能将自己设为上级")
+	}
+
+	inviter, err := uc.userRepo.FindByAddress(ctx, normalized)
+	if err != nil {
+		return err
+	}
+	if inviter == nil {
+		return errors.BadRequest("INVALID_INVITER", "上级地址对应用户不存在")
+	}
+	if inviter.ID == userID {
+		return errors.BadRequest("INVALID_INVITER", "不能将自己设为上级")
+	}
+
+	// 防止成环：新上级及其祖先链中不能包含当前用户
+	curID := inviter.ID
+	seen := map[int64]struct{}{curID: {}}
+	for {
+		cur, err := uc.userRepo.FindByID(ctx, curID)
+		if err != nil {
+			return err
+		}
+		if cur == nil || cur.InviterID == nil {
+			break
+		}
+		parentID := *cur.InviterID
+		if parentID == userID {
+			return errors.BadRequest("INVALID_INVITER", "不能形成邀请环路（该地址属于当前用户下级）")
+		}
+		if _, ok := seen[parentID]; ok {
+			break
+		}
+		seen[parentID] = struct{}{}
+		curID = parentID
+	}
+
+	oldInviterID := user.InviterID
+	if oldInviterID != nil && *oldInviterID == inviter.ID {
+		return nil
+	}
+
+	if err := uc.userRepo.AdminUpdateUser(ctx, &AdminUserUpdate{
+		UserID:    userID,
+		InviterID: &inviter.ID,
+	}); err != nil {
+		return err
+	}
+
+	// HTTP 超时通常只有 5s，不能全量重算。只刷新旧/新上级及其祖先链。
+	seeds := []int64{inviter.ID}
+	if oldInviterID != nil && *oldInviterID > 0 {
+		seeds = append(seeds, *oldInviterID)
+	}
+	return uc.userRepo.RefreshPerformanceFromUsers(ctx, seeds...)
 }
 
 func (uc *AdminUsecase) GetSystemConfig(ctx context.Context, tokenString string) (*conf.SystemConfigSnapshot, error) {
@@ -207,10 +291,15 @@ func (uc *AdminUsecase) buildConfigSnapshot() *conf.SystemConfigSnapshot {
 		MgmtRates:            append([]float64(nil), MgmtRates...),
 		AixPriceInitial:      AixPriceInitial,
 		WinPrice:             WinPrice,
+		WinAPrice:            WinAPrice,
 		ExchangeFeeRate:      ExchangeFeeRate,
-		MinUsdtRecharge:      MinUsdtRecharge,
-		MinWinRecharge:       MinWinRecharge,
-		MgmtCountsTowardExit: MgmtCountsTowardExit,
+		MinUsdtRecharge:            MinUsdtRecharge,
+		MinWinRecharge:             MinWinRecharge,
+		MinWinARecharge:            MinWinARecharge,
+		WinWithdrawReviewThreshold: WinWithdrawReviewThreshold,
+		SdtWithdrawReviewThreshold: SdtWithdrawReviewThreshold,
+		UsdtWithdrawReviewThreshold: UsdtWithdrawReviewThreshold,
+		MgmtCountsTowardExit:       MgmtCountsTowardExit,
 	}
 	conf.NormalizeBusinessDefaults(snap)
 	return snap
@@ -267,11 +356,6 @@ func (uc *AdminUsecase) LoadPersistedConfig(ctx context.Context) error {
 			f, _ := p.Float64()
 			WinPrice = f
 		}
-	}
-	// 将配置中的 AIX 现价同步到当日 aix_prices，避免种子价 1 覆盖后台配置
-	if AixPriceInitial > 0 {
-		date := token.NowChina().Format("2006-01-02")
-		_ = uc.walletRepo.UpsertAixPrice(ctx, date, strconv.FormatFloat(AixPriceInitial, 'f', -1, 64), "sync from config")
 	}
 	return nil
 }
@@ -484,12 +568,38 @@ func (uc *AdminUsecase) ListExchangeRecords(ctx context.Context, tokenString str
 	return uc.walletRepo.ListAllExchangeRecords(ctx)
 }
 
-// ListAllWithdrawals 管理端：列出所有提现记录（WIN / AIX-SDT）
+// ListAllWithdrawals 管理端：列出所有提现记录（WIN / AIX-USDT / USDT 可提U）
 func (uc *AdminUsecase) ListAllWithdrawals(ctx context.Context, tokenString string) ([]*Withdrawal, error) {
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return nil, err
 	}
 	return uc.walletRepo.ListAllWithdrawals(ctx)
+}
+
+func (uc *AdminUsecase) ApproveWithdrawalReview(ctx context.Context, tokenString string, id int64) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if id <= 0 {
+		return errors.BadRequest("INVALID_ID", "提现 ID 无效")
+	}
+	if err := uc.walletRepo.ApproveWithdrawalReview(ctx, id); err != nil {
+		return errors.BadRequest("APPROVE_FAILED", err.Error())
+	}
+	return nil
+}
+
+func (uc *AdminUsecase) RejectWithdrawalReview(ctx context.Context, tokenString string, id int64, remark string) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if id <= 0 {
+		return errors.BadRequest("INVALID_ID", "提现 ID 无效")
+	}
+	if err := uc.walletRepo.RejectWithdrawalReview(ctx, id, remark); err != nil {
+		return errors.BadRequest("REJECT_FAILED", err.Error())
+	}
+	return nil
 }
 
 func (uc *AdminUsecase) UpdateOrder(ctx context.Context, tokenString string, update *AdminOrderUpdate) (*AdminOrderDetail, error) {

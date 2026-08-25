@@ -10,8 +10,10 @@ import (
 
 	"backend/internal/biz"
 	authmw "backend/internal/middleware"
+	"backend/internal/pkg/token"
 
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/shopspring/decimal"
 )
 
 // RegisterWalletExtraRoutes mounts AIX-specific routes without regenerating protos.
@@ -26,16 +28,19 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
 	r.POST("/v1/wallet/withdraw-win", wallet.HandleWithdrawWIN)
 	r.POST("/v1/wallet/withdraw-sdt", wallet.HandleWithdrawSDT)
+	r.POST("/v1/wallet/withdraw-usdt", wallet.HandleWithdrawUSDT)
 	r.GET("/v1/wallet/withdraw-records", wallet.HandleWithdrawRecords)
 	r.GET("/v1/wallet/exchange-records", wallet.HandleExchangeRecords)
 	r.GET("/v1/wallet/aix-price", wallet.HandleAixPrice)
 	r.GET("/v1/wallet/rewards", wallet.HandleRewards)
 	r.GET("/v1/wallet/management-rewards", wallet.HandleManagementRewards)
 	r.GET("/v1/wallet/aix-profile", wallet.HandleAixProfile)
+	r.GET("/v1/wallet/downline-usdt-recharges", wallet.HandleDownlineUSDTRecharges)
 	r.GET("/v1/wallet/points-records", wallet.HandlePointsRecords)
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
 	r.POST("/v1/wallet/recharge-win/confirm", wallet.HandleConfirmWinRecharge)
 	r.GET("/v1/wallet/recharges-win", wallet.HandleListWinRecharges)
+	r.GET("/v1/wallet/recharges-win-a", wallet.HandleListWinARecharges)
 }
 
 func transferRecordPagination(ctx khttp.Context) (page, pageSize int, err error) {
@@ -133,6 +138,14 @@ func (s *WalletService) HandleSubscribeAIX(ctx khttp.Context) error {
 		resp["win_recharge_balance"] = bal
 		if order.WinPrice == "" {
 			resp["win_price"] = fmt.Sprintf("%v", biz.GetWinPrice())
+		}
+	}
+	if order.FundSource == biz.PayFromWinA {
+		resp["from_win_a"] = order.FromWinA
+		resp["win_a_price"] = order.WinAPrice
+		resp["win_a_recharge_balance"] = bal
+		if order.WinAPrice == "" {
+			resp["win_a_price"] = fmt.Sprintf("%v", biz.GetWinAPrice())
 		}
 	}
 	return ctx.JSON(http.StatusOK, resp)
@@ -263,13 +276,16 @@ func (s *WalletService) HandleWithdrawAIX(ctx khttp.Context) error {
 }
 
 func (s *WalletService) HandleAixPrice(ctx khttp.Context) error {
-	date := ctx.Request().URL.Query().Get("date")
+	date := strings.TrimSpace(ctx.Request().URL.Query().Get("date"))
 	price, err := s.uc.GetAixPrice(ctx, date)
 	if err != nil {
 		return err
 	}
+	if date == "" {
+		date = token.NowChina().Format("2006-01-02")
+	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"price": price, "date": date,
+		"price": biz.FormatAixPrice(price), "date": date,
 		"aix_contract": "", // TODO: 待配置 AIX 代币合约
 	})
 }
@@ -350,27 +366,39 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		return err
 	}
 
-	// AIX 现价以管理配置 AixPriceInitial 为准（当日 aix_prices 供日结历史用）
-	aixPrice := biz.AixPriceInitial
-	if aixPrice <= 0 {
-		if priceStr, priceErr := s.uc.GetAixPrice(ctx, ""); priceErr == nil {
-			if parsed, parseErr := strconv.ParseFloat(strings.TrimSpace(priceStr), 64); parseErr == nil && parsed > 0 {
-				aixPrice = parsed
-			}
-		}
+	// AIX 现价优先取当日 aix_prices，统一格式化为 15 位小数
+	aixPriceStr := ""
+	if priceStr, priceErr := s.uc.GetAixPrice(ctx, ""); priceErr == nil && strings.TrimSpace(priceStr) != "" {
+		aixPriceStr = priceStr
+	} else {
+		aixPriceStr = biz.FormatAixPriceDecimal(decimal.NewFromFloat(biz.AixPriceInitial))
 	}
+	aixPriceDec, _ := decimal.NewFromString(aixPriceStr)
 	winPrice := biz.GetWinPrice()
-	aixToWinRate := 0.0
-	if winPrice > 0 {
+	winAPrice := biz.GetWinAPrice()
+	aixToWinRate := "0"
+	if winPrice > 0 && aixPriceDec.IsPositive() {
 		// 1 AIX 可兑多少 WIN（毛量，未扣手续费）= aix_price / win_price
-		aixToWinRate = aixPrice / winPrice
+		aixToWinRate = aixPriceDec.Div(decimal.NewFromFloat(winPrice)).StringFixed(biz.AixPriceDecimals)
 	}
 
 	overflow := "0"
+	isZeroAccount := false
+	isCommunitySubsidy := false
+	zeroAccountReward := "0"
+	communitySubsidyReward := "0"
 	if user != nil {
 		overflow = user.OverflowTotal()
 		if overflow == "" {
 			overflow = "0"
+		}
+		isZeroAccount = user.IsZeroAccount
+		isCommunitySubsidy = user.IsCommunitySubsidy
+		if user.ZeroAccountRewardTotal != "" {
+			zeroAccountReward = user.ZeroAccountRewardTotal
+		}
+		if user.CommunitySubsidyTotal != "" {
+			communitySubsidyReward = user.CommunitySubsidyTotal
 		}
 	}
 
@@ -379,10 +407,16 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"usdt_recharge":        recharge,
 		"usdt_reward":          reward,
 		"aix_balance":          aix,
-		"win_balance":          user.WinBalance,
-		"win_recharge_balance": user.WinRechargeBalance,
+		"win_balance":            user.WinBalance,
+		"win_recharge_balance":   user.WinRechargeBalance,
+		"win_a_recharge_balance": user.WinARechargeBalance,
+		"usdt_withdrawable":      zeroIfEmpty(user.UsdtWithdrawable),
 		"pending_mgmt_reward":  overflow, // 兼容旧字段，值为溢出奖励
 		"overflow_reward":      overflow,
+		"is_zero_account":          isZeroAccount,
+		"is_community_subsidy":     isCommunitySubsidy,
+		"zero_account_reward_total": zeroAccountReward,
+		"community_subsidy_total":   communitySubsidyReward,
 		"points":               zeroIfEmpty(user.Points),
 		"points_all":           zeroIfEmpty(user.PointsAll),
 		"static_usdt_total":    staticTotal,
@@ -398,14 +432,56 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"team_perf":            teamPerf,
 		"server_time":          serverTime,
 		"next_release_at":      nextReleaseAt,
-		"aix_price":            aixPrice,
+		"aix_price":            aixPriceStr,
 		"win_price":            winPrice,
+		"win_a_price":          winAPrice,
 		"aix_to_win_rate":      aixToWinRate,
 		"exchange_fee_rate":    biz.GetExchangeFeeRate(),
 		"aix_contract":         "", // TODO
-		"win_contract":         s.uc.WinContract(),
+		"win_contract":           s.uc.WinContract(),
+		"win_a_contract":         s.uc.WinAContract(),
+		"win_a_deposit_contract":   s.uc.WinADepositContract(),
+		"win_a_recharge_enabled":   s.uc.WinARechargeEnabled(),
 		"min_usdt_recharge":    s.uc.MinUsdtRecharge(),
 		"min_win_recharge":     s.uc.MinWinRecharge(),
+		"min_win_a_recharge":   s.uc.MinWinARecharge(),
+	})
+}
+
+// HandleDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录。
+func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	page, pageSize, err := transferRecordPagination(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
+	}
+	records, total, err := s.uc.ListDownlineUSDTRecharges(ctx, token, page, pageSize)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		if rec == nil {
+			continue
+		}
+		createdAt := rec.CreatedTime.Unix()
+		if rec.ConfirmedTime != nil {
+			createdAt = rec.ConfirmedTime.Unix()
+		}
+		items = append(items, map[string]any{
+			"id":         rec.ID,
+			"address":    rec.Address,
+			"amount":     rec.Amount,
+			"asset":      rec.Asset,
+			"status":     rec.Status,
+			"created_at": createdAt,
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"records": items,
+		"count":   total,
+		"page":    page,
+		"page_size": pageSize,
 	})
 }
 
@@ -422,8 +498,11 @@ func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	}
 	items := make([]map[string]any, 0, len(orders))
 	for _, o := range orders {
+		if o.FundSource == biz.PayFromWinA {
+			continue
+		}
 		pts := o.Points
-		if pts == "" {
+		if pts == "" || pts == "0" {
 			pts = o.Principal
 		}
 		items = append(items, map[string]any{
@@ -431,6 +510,10 @@ func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 			"order_id":     o.ID,
 			"points":       pts,
 			"principal":    o.Principal,
+			"total_amount": o.Principal,
+			"amount":       o.Principal,
+			"from_win":     o.FromWin,
+			"from_win_a":   o.FromWinA,
 			"fund_source":  o.FundSource,
 			"status":       o.Status,
 			"created_at":   o.CreatedTime.Unix(),
@@ -511,7 +594,7 @@ func (s *WalletService) HandleWithdrawWIN(ctx khttp.Context) error {
 	})
 }
 
-// HandleWithdrawSDT 用户端：AIX-SDT 提现
+// HandleWithdrawSDT 用户端：AIX-USDT 提现
 func (s *WalletService) HandleWithdrawSDT(ctx khttp.Context) error {
 	var req struct {
 		Token     string `json:"token"`
@@ -535,6 +618,33 @@ func (s *WalletService) HandleWithdrawSDT(ctx khttp.Context) error {
 		"tx_hash":      w.TxHash,
 		"points":       left,
 		"sdt_contract": s.uc.SdtContract(),
+	})
+}
+
+// HandleWithdrawUSDT 用户端：可提 U 余额提现
+func (s *WalletService) HandleWithdrawUSDT(ctx khttp.Context) error {
+	var req struct {
+		Token     string `json:"token"`
+		Amount    string `json:"amount"`
+		ToAddress string `json:"to_address"`
+	}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
+	}
+	token := tokenFromRequest(ctx, req.Token)
+	w, left, err := s.uc.CreateUsdtWithdraw(ctx, token, req.Amount, req.ToAddress)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"withdraw_id":     w.ID,
+		"asset":           w.Asset,
+		"amount":          w.Amount,
+		"to_address":      w.ToAddress,
+		"status":          w.Status,
+		"tx_hash":         w.TxHash,
+		"usdt_withdrawable": left,
+		"usdt_contract":   s.uc.UsdtContract(),
 	})
 }
 
@@ -596,6 +706,28 @@ func (s *WalletService) HandleConfirmWinRecharge(ctx khttp.Context) error {
 func (s *WalletService) HandleListWinRecharges(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	records, err := s.uc.ListWinRecharges(ctx, token)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, r := range records {
+		item := map[string]any{
+			"id": r.ID, "asset": r.Asset, "amount": r.Amount,
+			"tx_hash": r.TxHash, "status": r.Status,
+			"created_at": r.CreatedAt.Unix(),
+		}
+		if r.ConfirmedAt != nil {
+			item["confirmed_at"] = r.ConfirmedAt.Unix()
+		}
+		items = append(items, item)
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{"recharges": items})
+}
+
+// HandleListWinARecharges 查询本人 WIN-A 充值记录
+func (s *WalletService) HandleListWinARecharges(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	records, err := s.uc.ListWinARecharges(ctx, token)
 	if err != nil {
 		return err
 	}

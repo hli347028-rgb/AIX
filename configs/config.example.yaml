@@ -33,6 +33,9 @@ wallet:
   deposit_contract: "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
   # 原生 WIN 充值合约（BuySomething payable）
   win_deposit_contract: "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
+  win_a_deposit_contract: "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
+  # WIN-A 链上充值开关；false 时用户端显示暂未开放且不入账
+  win_a_recharge_enabled: true
   deposit_address: "replace-with-your-deposit-address"
   deposit_addresses:
     - "replace-with-your-deposit-address"
@@ -41,7 +44,10 @@ wallet:
   # WIN ERC20 合约（用于 WIN 充值链上校验）；留空时仅允许管理端人工入账 / 开发模式
   win_contract: ""
   win_decimals: 18
-  sdt_contract: "0x4277289b67cc85C98067b653B91A071D0f4CB3b2"
+  # WIN-A ERC20 代币合约
+  win_a_contract: "0x3dce8Ef2646e3082f1e4afbC26Cf747e4e238A8D"
+  win_a_decimals: 18
+  sdt_contract: "0x314D550572a0fA001B465a9EBc1dd04D834a0688"
   sdt_decimals: 18
   rpc_url: "https://rpc1.eoeo.info"
   # BSC RPC（USDT BuySomething 充值扫描）
@@ -70,7 +76,7 @@ wallet:
   win_price_poll_seconds: 60
   win_price_queries_per_cycle: 10
   win_price_query_interval_seconds: 5
-  # WIN / AIX-SDT 提现自动打款共用 withdraw.key（勿提交到 git）
+  # WIN / AIX-USDT 提现自动打款共用 withdraw.key（勿提交到 git）
   withdraw_payout_enabled: true
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10

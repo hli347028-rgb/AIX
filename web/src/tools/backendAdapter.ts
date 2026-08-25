@@ -329,6 +329,18 @@ async function fetchUserInfo() {
       // 溢出奖励 = 直推溢出 + 管理奖溢出（均因出局帽发不下而暂存，下次认购再释放）
       overflowReward: String(overflowRewardAmt),
       overflow_reward: String(overflowRewardAmt),
+      is_zero_account: !!(aixProfile.is_zero_account ?? aixProfile.isZeroAccount),
+      is_community_subsidy: !!(aixProfile.is_community_subsidy ?? aixProfile.isCommunitySubsidy),
+      zero_account_reward_total: firstText(
+        aixProfile.zero_account_reward_total,
+        aixProfile.zeroAccountRewardTotal,
+        '0',
+      ),
+      community_subsidy_total: firstText(
+        aixProfile.community_subsidy_total,
+        aixProfile.communitySubsidyTotal,
+        '0',
+      ),
       points: String(aixProfile.points || pickField(aixProfile, 'points') || '0'),
       points_all: String(aixProfile.points_all || pickField(aixProfile, 'points_all', 'pointsAll') || '0'),
       // 代数奖励合计（1代+≥2代，累计）
@@ -347,6 +359,7 @@ async function fetchUserInfo() {
       reward: firstText(aixProfile.usdt_reward, aixProfile.usdtReward, b.released_balance, '0'),
       aix: firstText(aixProfile.aix_balance, aixProfile.aixBalance, b.claimed_amount, '0'),
       win: firstText(aixProfile.win_balance, aixProfile.winBalance, '0'),
+      usdtWithdrawable: firstText(aixProfile.usdt_withdrawable, aixProfile.usdtWithdrawable, '0'),
       amountUsdt: firstText(aixProfile.usdt_recharge, aixProfile.usdtRecharge, b.balance, '0'),
       balanceUsdt: firstText(aixProfile.usdt_recharge, aixProfile.usdtRecharge, b.balance, '0'),
       balanceBiw: '0',
@@ -813,7 +826,7 @@ export async function adaptRequest(
     case 'app_server/withdraw': {
       const profile = await authGet('/v1/auth/profile')
       const toAddress = data?.to_address || data?.address || profile.data?.address || ''
-      const res = await authPost('/v1/wallet/withdraw-aix', {
+      const res = await authPost('/v1/wallet/withdraw-win', {
         amount: String(data?.amount || ''),
         to_address: toAddress,
       })
@@ -940,6 +953,25 @@ export async function adaptRequest(
       const res = await authGet('/v1/auth/invitees', targetAddress ? { address: targetAddress } : {})
       return { recommends: mapInvitees(res.data?.invitees || []) }
     }
+    case 'app_server/downline_recharges': {
+      const page = Math.max(1, Number(mergedParams.page) || 1)
+      const res = await authGet('/v1/wallet/downline-usdt-recharges', { page, page_size: 10 })
+      const body = apiBody(res)
+      const records = (body.records || []).map((item: any) => {
+        const createdAt = formatUnixTime(item.created_at ?? item.createdAt)
+        return {
+          id: item.id,
+          address: item.address || '',
+          amount: trimAmountText(item.amount),
+          createdAt,
+        }
+      })
+      return {
+        count: Number(body.count || 0),
+        list: records,
+        page: Number(body.page || page),
+      }
+    }
     case 'app_server/amount_to': {
       const res = await authPost('/v1/wallet/claim', {
         amount: String(data?.amount || ''),
@@ -954,7 +986,9 @@ export async function adaptRequest(
       if (!amount) return { status: 'fail', message: '请输入认购金额' }
       const payFrom = data?.pay_from === 'reward' || data?.payFrom === 'reward'
         ? 'reward'
-        : (data?.pay_from === 'win' || data?.payFrom === 'win' ? 'win' : 'recharge')
+        : (data?.pay_from === 'win_a' || data?.payFrom === 'win_a'
+          ? 'win_a'
+          : (data?.pay_from === 'win' || data?.payFrom === 'win' ? 'win' : 'recharge'))
       const res = await authPost('/v1/wallet/subscribe-aix', {
         amount,
         pay_from: payFrom,
@@ -977,6 +1011,12 @@ export async function adaptRequest(
     }
     case 'app_server/deposit_win_list': {
       const res = await authGet('/v1/wallet/recharges-win')
+      const list = mapRecharges(res.data?.recharges || [])
+      const pageData = paginateList(list, mergedParams.page)
+      return { status: 'ok', ...pageData }
+    }
+    case 'app_server/deposit_win_a_list': {
+      const res = await authGet('/v1/wallet/recharges-win-a')
       const list = mapRecharges(res.data?.recharges || [])
       const pageData = paginateList(list, mergedParams.page)
       return { status: 'ok', ...pageData }

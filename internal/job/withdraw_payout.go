@@ -250,6 +250,22 @@ func (j *WithdrawPayoutJob) sendWithdrawTransfer(
 			Nonce:       result.Nonce,
 			FromAddress: result.FromAddress,
 		}, nil
+	case biz.TokenUSDT:
+		contract := j.cfg.GetUsdtContract()
+		if contract == "" {
+			return nil, fmt.Errorf("usdt contract not configured")
+		}
+		result, err := eth.SendERC20TransferWithNonce(
+			ctx, j.cfg.GetRPCURL(), privKey, contract, w.ToAddress, amount, j.cfg.GetUsdtDecimals(), &nonce,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &eth.NativeTransferSendResult{
+			TxHash:      result.TxHash,
+			Nonce:       result.Nonce,
+			FromAddress: result.FromAddress,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported withdraw asset %s", w.Asset)
 	}

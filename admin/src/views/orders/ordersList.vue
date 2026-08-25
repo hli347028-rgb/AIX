@@ -39,12 +39,16 @@ const typeLabel = {
     exit_accel: '出局加速',
     transfer_in: '转入',
     transfer_out: '转出',
+    zero_account: '零号账户(USDT)',
+    community_subsidy: '社区补贴(USDT)',
 }
 
 const typeOptions = [
     { value: 'static_aix', label: '静态奖(AIX)' },
     { value: 'dynamic_usdt', label: '直推奖(USDT)' },
     { value: 'mgmt', label: '管理奖(USDT)' },
+    { value: 'zero_account', label: '零号账户(USDT)' },
+    { value: 'community_subsidy', label: '社区补贴(USDT)' },
     { value: 'exit_accel', label: '出局加速' },
     { value: 'transfer_in', label: '转入' },
     { value: 'transfer_out', label: '转出' },

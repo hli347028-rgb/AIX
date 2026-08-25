@@ -3,6 +3,7 @@
     <div class="header-container">
       <div class="header-left" @click="handleSidebarClick">
         <img src="/assets/logo.jpg" alt="Logo" class="logo" />
+        <span class="home-label">{{ $t('tab.home') }}</span>
       </div>
       <div class="header-right">
         <button class="connect-btn" @click="handleWalletClick">
@@ -127,6 +128,12 @@ const handleWalletClick = () => {
         height: 44px;
         width: auto;
         object-fit: contain;
+      }
+
+      .home-label {
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
       }
 
       span {

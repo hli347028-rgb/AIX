@@ -179,6 +179,10 @@ func (r *stakingRepo) GetAixPrice(ctx context.Context, date string) (string, err
 	return NewWalletRepo(r.data).GetAixPrice(ctx, date)
 }
 
+func (r *stakingRepo) GetLatestAixPriceBefore(ctx context.Context, date string) (string, error) {
+	return NewWalletRepo(r.data).GetLatestAixPriceBefore(ctx, date)
+}
+
 func (r *stakingRepo) UpsertAixPrice(ctx context.Context, date, price, remark string) error {
 	return NewWalletRepo(r.data).UpsertAixPrice(ctx, date, price, remark)
 }
@@ -239,7 +243,7 @@ func (r *stakingRepo) ListSettlementBatches(ctx context.Context, offset, limit i
 		b := &biz.SettlementBatch{
 			ID:             po.ID,
 			SettlementDate: po.SettlementDate,
-			AixPrice:       po.AixPrice.String(),
+			AixPrice:       biz.FormatAixPriceDecimal(po.AixPrice),
 			Status:         po.Status,
 			StaticCount:    po.StaticCount,
 			StaticAmount:   po.StaticAmount.String(),
@@ -332,7 +336,7 @@ func (r *stakingRepo) GetLatestSettlementBatch(ctx context.Context, date string)
 		return nil, err
 	}
 	b := &biz.SettlementBatch{
-		ID: po.ID, SettlementDate: po.SettlementDate, AixPrice: po.AixPrice.String(),
+		ID: po.ID, SettlementDate: po.SettlementDate, AixPrice: biz.FormatAixPriceDecimal(po.AixPrice),
 		Status: po.Status, StaticCount: po.StaticCount, StaticAmount: po.StaticAmount.String(),
 		MgmtCount: po.MgmtCount, MgmtAmount: po.MgmtAmount.String(), ErrorMsg: po.ErrorMsg,
 		CreatedTime: po.CreatedTime,

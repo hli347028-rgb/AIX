@@ -10,9 +10,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// refreshPerformance recalculates cached performance from active order
-// principal. A direct referral and all of its descendants form one branch.
-func refreshPerformance(db *gorm.DB, sourceUserID int64) error {
+// refreshPerformance recalculates cached performance from cumulative order
+// principal (active + exited). Performance only increases on new subscriptions;
+// downline orders completing release do not reduce team/small-area figures.
+//
+// seedMode:
+//   - "" / full: refresh every user
+//   - "ancestors": refresh parents of each seed (not the seed itself); used after subscribe
+//   - "seeds": refresh each seed and its ancestors; used after changing inviter
+func refreshPerformance(db *gorm.DB, seedMode string, seedIDs ...int64) error {
 	type userNode struct {
 		ID              int64
 		InviterID       *int64
@@ -30,7 +36,7 @@ func refreshPerformance(db *gorm.DB, sourceUserID int64) error {
 	var principals []principalRow
 	if err := db.Model(&OrderPO{}).
 		Select("user_id, COALESCE(SUM(principal), 0) AS total").
-		Where("status = ?", biz.OrderStatusActive).
+		Where("status IN ?", []string{biz.OrderStatusActive, biz.OrderStatusExited}).
 		Group("user_id").Scan(&principals).Error; err != nil {
 		return err
 	}
@@ -76,21 +82,41 @@ func refreshPerformance(db *gorm.DB, sourceUserID int64) error {
 	}
 
 	targets := users
-	if sourceUserID > 0 {
+	if seedMode == "ancestors" || seedMode == "seeds" {
 		targets = make([]userNode, 0)
-		seen := map[int64]bool{sourceUserID: true}
-		currentID := sourceUserID
-		for {
-			parentID, ok := parents[currentID]
-			if !ok {
-				break
+		seen := map[int64]bool{}
+		for _, seedID := range seedIDs {
+			if seedID <= 0 {
+				continue
 			}
-			if seen[parentID] {
-				return fmt.Errorf("invite relationship contains a cycle at user %d", parentID)
+			currentID := seedID
+			if seedMode == "ancestors" {
+				parentID, ok := parents[currentID]
+				if !ok {
+					continue
+				}
+				currentID = parentID
 			}
-			seen[parentID] = true
-			targets = append(targets, userByID[parentID])
-			currentID = parentID
+			pathSeen := map[int64]bool{}
+			for currentID > 0 {
+				if pathSeen[currentID] {
+					return fmt.Errorf("invite relationship contains a cycle at user %d", currentID)
+				}
+				pathSeen[currentID] = true
+				if !seen[currentID] {
+					node, ok := userByID[currentID]
+					if !ok {
+						break
+					}
+					seen[currentID] = true
+					targets = append(targets, node)
+				}
+				parentID, ok := parents[currentID]
+				if !ok {
+					break
+				}
+				currentID = parentID
+			}
 		}
 	}
 
@@ -121,15 +147,26 @@ func refreshPerformance(db *gorm.DB, sourceUserID int64) error {
 }
 
 func refreshAllPerformance(db *gorm.DB) error {
-	return refreshPerformance(db, 0)
+	return refreshPerformance(db, "")
 }
 
 func refreshAncestorPerformance(db *gorm.DB, sourceUserID int64) error {
-	return refreshPerformance(db, sourceUserID)
+	return refreshPerformance(db, "ancestors", sourceUserID)
+}
+
+func refreshSeedAndAncestors(db *gorm.DB, seedIDs ...int64) error {
+	return refreshPerformance(db, "seeds", seedIDs...)
 }
 
 func (r *userRepo) RefreshPerformance(ctx context.Context) error {
 	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return refreshAllPerformance(tx)
+	})
+}
+
+// RefreshPerformanceFromUsers 仅刷新指定用户及其上级链的业绩缓存。
+func (r *userRepo) RefreshPerformanceFromUsers(ctx context.Context, userIDs ...int64) error {
+	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return refreshSeedAndAncestors(tx, userIDs...)
 	})
 }

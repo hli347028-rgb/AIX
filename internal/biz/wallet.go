@@ -17,17 +17,20 @@ const (
 
 	PayFromRecharge = "recharge"
 	PayFromReward   = "reward"
-	PayFromWin      = "win" // 用 WIN 充值钱包按 win_price 折算认购（产生直推）
+	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推）
+	PayFromWinA     = "win_a" // 用 WIN-A 充值钱包按 win_a_price 折算认购（不产生直推/管理奖/AIX-USDT）
 
 	OrderStatusActive = "active"
 	OrderStatusExited = "exited"
 
 	// Legacy aliases
 	OrderStatusCompleted    = "exited"
+	WithdrawStatusReview    = "review"
 	WithdrawStatusPending   = "pending"
 	WithdrawStatusDoing     = "doing"
 	WithdrawStatusCompleted = "completed"
 	WithdrawStatusFailed    = "failed"
+	WithdrawStatusRejected  = "rejected"
 
 	PayoutStatusSubmitted = "submitted"
 	PayoutStatusConfirmed = "confirmed"
@@ -36,7 +39,12 @@ const (
 	TokenUSDT = "USDT"
 	TokenAIX  = "AIX"
 	TokenWIN  = "WIN"
+	TokenWINA = "WIN-A"
 	TokenSDT  = "SDT"
+
+	// 下级 USDT 充值时，上级角色奖励比例（入账可提 U 余额，不参与订单释放）
+	ZeroAccountRechargeRate      = 0.10
+	CommunitySubsidyRechargeRate = 0.05
 
 	RewardTypeStaticAix         = "static_aix"
 	RewardTypeDynamicUsdt       = "dynamic_usdt"
@@ -46,12 +54,19 @@ const (
 	RewardTypeExitAccel         = "exit_accel"
 	RewardTypeTransferIn        = "transfer_in"
 	RewardTypeTransferOut       = "transfer_out"
+	RewardTypeZeroAccount       = "zero_account"       // 零号账户：下级充值奖励
+	RewardTypeCommunitySubsidy  = "community_subsidy"  // 社区补贴：下级充值奖励
 )
 
 // GetWinPrice 返回 WIN 代币价格（USDT/枚）。
 // 由 WinPriceOracleJob 每分钟从链上 Pair 储备更新；管理后台亦可手动覆盖。
 func GetWinPrice() float64 {
 	return WinPrice
+}
+
+// GetWinAPrice 返回 WIN-A 代币价格（USDT/枚），由管理后台手动配置。
+func GetWinAPrice() float64 {
+	return WinAPrice
 }
 
 // GetExchangeFeeRate 返回兑换手续费率（如 0.05 = 5%）。
@@ -73,6 +88,55 @@ func GetMinWinRecharge() string {
 		return conf.DefaultMinWinRecharge
 	}
 	return MinWinRecharge
+}
+
+// GetMinWinARecharge 返回 WIN-A 充值最小值（管理端可配，绝对下限 10）。
+func GetMinWinARecharge() string {
+	if strings.TrimSpace(MinWinARecharge) == "" {
+		return conf.DefaultMinWinARecharge
+	}
+	return MinWinARecharge
+}
+
+func GetWinWithdrawReviewThreshold() string {
+	if strings.TrimSpace(WinWithdrawReviewThreshold) == "" {
+		return "0"
+	}
+	return WinWithdrawReviewThreshold
+}
+
+func GetSdtWithdrawReviewThreshold() string {
+	if strings.TrimSpace(SdtWithdrawReviewThreshold) == "" {
+		return "0"
+	}
+	return SdtWithdrawReviewThreshold
+}
+
+func GetUsdtWithdrawReviewThreshold() string {
+	if strings.TrimSpace(UsdtWithdrawReviewThreshold) == "" {
+		return "0"
+	}
+	return UsdtWithdrawReviewThreshold
+}
+
+// NeedsWithdrawReview 提现金额超过阈值时需人工审核；阈值为 0 表示不审核。
+func NeedsWithdrawReview(asset string, amount decimal.Decimal) bool {
+	thresholdStr := "0"
+	switch strings.ToUpper(strings.TrimSpace(asset)) {
+	case TokenWIN:
+		thresholdStr = GetWinWithdrawReviewThreshold()
+	case TokenSDT:
+		thresholdStr = GetSdtWithdrawReviewThreshold()
+	case TokenUSDT:
+		thresholdStr = GetUsdtWithdrawReviewThreshold()
+	default:
+		return false
+	}
+	threshold, err := decimal.NewFromString(strings.TrimSpace(thresholdStr))
+	if err != nil || !threshold.IsPositive() {
+		return false
+	}
+	return amount.GreaterThan(threshold)
 }
 
 // Recharge represents a USDT/WIN recharge order.
@@ -237,8 +301,10 @@ type Order struct {
 	FromRecharge string
 	FromReward   string
 	FromWin      string
+	FromWinA     string
 	Points       string // 本单获得积分（= 认购金额）
 	WinPrice     string // 认购时 WIN 价格快照（仅 pay_from=win）
+	WinAPrice    string // 认购时 WIN-A 价格快照（仅 pay_from=win_a）
 	FundSource   string
 	Status       string
 	ExitedTime   *time.Time
@@ -284,8 +350,11 @@ type WalletRepo interface {
 	AutoCreditChainRecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string, blockNumber uint64) (credited bool, err error)
 	// AutoCreditWinRecharge 链上/确认后入账 WIN → win_recharge_balance（按 tx_hash 幂等）
 	AutoCreditWinRecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinRechargeBalance string, err error)
+	// AutoCreditWinARecharge 链上入账 WIN-A → win_a_recharge_balance（按 tx_hash 幂等）
+	AutoCreditWinARecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinARechargeBalance string, err error)
 	ListRechargesByUser(ctx context.Context, userID int64) ([]*Recharge, error)
 	ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*Recharge, error)
+	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
 
 	Subscribe(ctx context.Context, userID int64, amount, payFrom string, exitMul, directRate float64) (*Order, string, error)
 	ListOrdersByUser(ctx context.Context, userID int64) ([]*Order, error)
@@ -306,6 +375,7 @@ type WalletRepo interface {
 	ListMgmtRewardsByUser(ctx context.Context, userID int64) ([]*MgmtReward, error)
 
 	GetAixPrice(ctx context.Context, date string) (string, error)
+	GetLatestAixPriceBefore(ctx context.Context, date string) (string, error)
 	UpsertAixPrice(ctx context.Context, date, price, remark string) error
 	// GetCurrentWinPrice / UpsertCurrentWinPrice：WIN 现价仅保留一条记录
 	GetCurrentWinPrice(ctx context.Context) (string, error)
@@ -317,9 +387,13 @@ type WalletRepo interface {
 	ListAllExchangeRecords(ctx context.Context) ([]*ExchangeRecord, error)
 
 	// CreateWinWithdrawal WIN 代币提现
-	CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*Withdrawal, string, error)
-	// CreateSdtWithdrawal AIX-SDT 提现：扣 points，创建 WithdrawalPO
-	CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*Withdrawal, string, error)
+	CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*Withdrawal, string, error)
+	// CreateSdtWithdrawal AIX-USDT 提现：扣 points，创建 WithdrawalPO
+	CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*Withdrawal, string, error)
+	// CreateUsdtWithdrawal 可提 U 余额提现：扣 usdt_withdrawable，创建 WithdrawalPO
+	CreateUsdtWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*Withdrawal, string, error)
+	ApproveWithdrawalReview(ctx context.Context, id int64) error
+	RejectWithdrawalReview(ctx context.Context, id int64, remark string) error
 	ListWithdrawalsByUser(ctx context.Context, userID int64) ([]*Withdrawal, error)
 	// 提现相关（USDT 审批路径未完成，保留接口）
 	CreateWithdrawal(ctx context.Context, userID int64, amount, fee, netAmount, toAddress string) (*Withdrawal, string, error)

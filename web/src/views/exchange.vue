@@ -47,7 +47,7 @@
         </div>
         <div v-if="hasRate" class="rate-row rate-sub">
           <span>{{ $t('exchange.aixPrice') }}</span>
-          <strong>{{ displayAmount(aixPrice) }} USDT</strong>
+          <strong>{{ displayPrice(aixPrice) }} USDT</strong>
         </div>
         <div v-if="hasRate" class="rate-row rate-sub">
           <span>{{ $t('exchange.winPrice') }}</span>
@@ -125,6 +125,7 @@ import {
   calcUnitExchangeRate,
   compareDecimals,
   displayDecimal,
+  displayAixPrice,
   divDecimal,
   formatFeeRate,
   isPositiveDecimal,
@@ -141,7 +142,7 @@ const records = ref<AixWinExchangeRecord[]>([])
 
 const aixBalance = computed(() => String(person.profile?.aix_balance || person.userinfo?.amountGet || '0'))
 const winBalance = computed(() => String(person.profile?.win_balance || '0'))
-const aixPrice = computed(() => Number(person.profile?.aix_price || 0))
+const aixPrice = computed(() => String(person.profile?.aix_price || '0'))
 const winPrice = computed(() => Number(person.profile?.win_price || 0))
 const exchangeFeeRate = computed(() => Number(person.profile?.exchange_fee_rate ?? 0.05))
 const aixToWinRate = computed(() => resolveAixToWinRate({
@@ -183,6 +184,10 @@ function fillAll() {
 
 function displayAmount(value: unknown) {
   return displayDecimal(value)
+}
+
+function displayPrice(value: unknown) {
+  return displayAixPrice(value)
 }
 
 function recordUnitRate(item: AixWinExchangeRecord) {

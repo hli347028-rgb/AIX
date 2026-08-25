@@ -110,10 +110,21 @@ func (r *walletRepo) ConfirmRechargeCredit(ctx context.Context, id int64, txHash
 		if asset == biz.TokenWIN {
 			user.WinRechargeBalance = user.WinRechargeBalance.Add(po.Amount)
 			newBal = user.WinRechargeBalance.String()
+			if err := r.payWinRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
+				return err
+			}
 			return tx.Model(&user).Update("win_recharge_balance", user.WinRechargeBalance).Error
+		}
+		if asset == biz.TokenWINA {
+			user.WinARechargeBalance = user.WinARechargeBalance.Add(po.Amount)
+			newBal = user.WinARechargeBalance.String()
+			return tx.Model(&user).Update("win_a_recharge_balance", user.WinARechargeBalance).Error
 		}
 		user.UsdtRecharge = user.UsdtRecharge.Add(po.Amount)
 		newBal = user.UsdtRecharge.String()
+		if err := r.payUSDTRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
+			return err
+		}
 		return tx.Model(&user).Update("usdt_recharge", user.UsdtRecharge).Error
 	})
 	return newBal, err
@@ -181,6 +192,9 @@ func (r *walletRepo) AutoCreditChainRecharge(
 		}
 
 		user.UsdtRecharge = user.UsdtRecharge.Add(amountDec)
+		if err := r.payUSDTRechargeRoleRewards(tx, user.ID, amountDec); err != nil {
+			return err
+		}
 		if err := tx.Model(&user).Update("usdt_recharge", user.UsdtRecharge).Error; err != nil {
 			return err
 		}
@@ -254,7 +268,81 @@ func (r *walletRepo) AutoCreditWinRecharge(
 		if err := tx.Model(&user).Update("win_recharge_balance", user.WinRechargeBalance).Error; err != nil {
 			return err
 		}
+		if err := r.payWinRechargeRoleRewards(tx, user.ID, amountDec); err != nil {
+			return err
+		}
 		newBal = user.WinRechargeBalance.String()
+		credited = true
+		return nil
+	})
+	return credited, newBal, err
+}
+
+// AutoCreditWinARecharge 确认链上 WIN-A 入账 → win_a_recharge_balance（tx_hash 幂等）。
+func (r *walletRepo) AutoCreditWinARecharge(
+	ctx context.Context,
+	txHash, fromAddress, toAddress, amount string,
+) (bool, string, error) {
+	txHash = strings.TrimSpace(txHash)
+	fromAddress = strings.TrimSpace(fromAddress)
+	toAddress = strings.TrimSpace(toAddress)
+	amountDec, err := decimal.NewFromString(strings.TrimSpace(amount))
+	if txHash == "" || fromAddress == "" || toAddress == "" || err != nil || !amountDec.GreaterThan(decimal.Zero) {
+		return false, "", fmt.Errorf("invalid win-a recharge")
+	}
+
+	credited := false
+	var newBal string
+	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing RechargePO
+		findErr := tx.Where("tx_hash = ?", txHash).First(&existing).Error
+		if findErr == nil {
+			if existing.Status == biz.RechargeStatusConfirmed && strings.EqualFold(existing.Asset, biz.TokenWINA) {
+				var user UserPO
+				if err := tx.First(&user, existing.UserID).Error; err != nil {
+					return err
+				}
+				newBal = user.WinARechargeBalance.String()
+			}
+			return nil
+		}
+		if findErr != nil && findErr != gorm.ErrRecordNotFound {
+			return findErr
+		}
+
+		var user UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("LOWER(address) = ?", strings.ToLower(fromAddress)).First(&user).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("user not found")
+			}
+			return err
+		}
+
+		now := time.Now()
+		recharge := &RechargePO{
+			UserID:        user.ID,
+			Asset:         biz.TokenWINA,
+			Amount:        amountDec,
+			TxHash:        txHash,
+			FromAddress:   fromAddress,
+			ToAddress:     toAddress,
+			Status:        biz.RechargeStatusConfirmed,
+			Message:       "win_a_deposit_only",
+			ConfirmedTime: &now,
+		}
+		if err := tx.Create(recharge).Error; err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+				return nil
+			}
+			return err
+		}
+
+		user.WinARechargeBalance = user.WinARechargeBalance.Add(amountDec)
+		if err := tx.Model(&user).Update("win_a_recharge_balance", user.WinARechargeBalance).Error; err != nil {
+			return err
+		}
+		newBal = user.WinARechargeBalance.String()
 		credited = true
 		return nil
 	})
@@ -290,6 +378,55 @@ func (r *walletRepo) ListRechargesByUserAsset(ctx context.Context, userID int64,
 	return out, nil
 }
 
+func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
+	ctx context.Context, userIDs []int64, offset, limit int,
+) ([]*biz.Recharge, int64, error) {
+	if len(userIDs) == 0 {
+		return nil, 0, nil
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	base := r.data.db.WithContext(ctx).
+		Model(&RechargePO{}).
+		Where("user_id IN ?", userIDs).
+		Where("asset = ? AND status = ?", biz.TokenUSDT, biz.RechargeStatusConfirmed)
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	type rechargeRow struct {
+		RechargePO
+		UserAddress string `gorm:"column:user_address"`
+	}
+	var rows []rechargeRow
+	if err := r.data.db.WithContext(ctx).
+		Table("recharges r").
+		Select("r.*, u.address AS user_address").
+		Joins("JOIN users u ON u.id = r.user_id").
+		Where("r.user_id IN ?", userIDs).
+		Where("r.asset = ? AND r.status = ?", biz.TokenUSDT, biz.RechargeStatusConfirmed).
+		Order("r.id DESC").
+		Offset(offset).
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.Recharge, 0, len(rows))
+	for i := range rows {
+		rec := r.rechargeToBiz(&rows[i].RechargePO)
+		if addr := strings.TrimSpace(rows[i].UserAddress); addr != "" {
+			rec.Address = addr
+		}
+		out = append(out, rec)
+	}
+	return out, total, nil
+}
+
 func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFrom string, exitMul, directRate float64) (*biz.Order, string, error) {
 	principal, err := decimal.NewFromString(amount)
 	if err != nil {
@@ -313,8 +450,10 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		fromRecharge := decimal.Zero
 		fromReward := decimal.Zero
 		fromWin := decimal.Zero
+		fromWinA := decimal.Zero
 		directBase := decimal.Zero
 		winPriceSnap := decimal.Zero
+		winAPriceSnap := decimal.Zero
 		updates := map[string]interface{}{}
 		switch payFrom {
 		case biz.PayFromRecharge:
@@ -352,6 +491,23 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			directBase = principal // 与充值钱包一致，产生直推
 			balOut = user.WinRechargeBalance.String()
 			updates["win_recharge_balance"] = user.WinRechargeBalance
+		case biz.PayFromWinA:
+			winAPriceSnap = decimal.NewFromFloat(biz.GetWinAPrice())
+			if !winAPriceSnap.IsPositive() {
+				return fmt.Errorf("win-a price not configured")
+			}
+			winANeeded := principal.Div(winAPriceSnap).Round(8)
+			if !winANeeded.IsPositive() {
+				return fmt.Errorf("win-a amount too small")
+			}
+			if user.WinARechargeBalance.LessThan(winANeeded) {
+				return fmt.Errorf("insufficient win_a_recharge_balance")
+			}
+			user.WinARechargeBalance = user.WinARechargeBalance.Sub(winANeeded)
+			fromWinA = winANeeded
+			// WIN-A 认购不产生直推奖、管理奖
+			balOut = user.WinARechargeBalance.String()
+			updates["win_a_recharge_balance"] = user.WinARechargeBalance
 		default:
 			return fmt.Errorf("invalid pay_from")
 		}
@@ -367,28 +523,38 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			FromRecharge: fromRecharge,
 			FromReward:   fromReward,
 			FromWin:      fromWin,
-			Points:       principal, // 认购金额即本单积分
+			FromWinA:     fromWinA,
 			FundSource:   payFrom,
 			Status:       biz.OrderStatusActive,
+		}
+		if payFrom == biz.PayFromWinA {
+			po.Points = decimal.Zero // WIN-A 认购不产生 AIX-USDT（积分）
+		} else {
+			po.Points = principal // 认购金额即本单积分
 		}
 		if err := tx.Create(po).Error; err != nil {
 			return err
 		}
-		// 用户积分：当前积分与累计总积分均增加认购金额
-		user.Points = user.Points.Add(principal)
-		user.PointsAll = user.PointsAll.Add(principal)
-		if err := tx.Model(&user).Updates(map[string]interface{}{
-			"points":     user.Points,
-			"points_all": user.PointsAll,
-		}).Error; err != nil {
-			return err
+		// WIN-A 认购不计入 AIX-USDT（积分）
+		if payFrom != biz.PayFromWinA {
+			user.Points = user.Points.Add(principal)
+			user.PointsAll = user.PointsAll.Add(principal)
+			if err := tx.Model(&user).Updates(map[string]interface{}{
+				"points":     user.Points,
+				"points_all": user.PointsAll,
+			}).Error; err != nil {
+				return err
+			}
 		}
 		created = r.orderToBiz(po)
 		if payFrom == biz.PayFromWin {
 			created.WinPrice = winPriceSnap.String()
 		}
+		if payFrom == biz.PayFromWinA {
+			created.WinAPrice = winAPriceSnap.String()
+		}
 
-		// 直推奖：recharge / win 且有上级
+		// 直推奖：recharge / win 且有上级（WIN-A 不产生直推奖）
 		if directBase.IsPositive() && user.InviterID != nil {
 			if err := r.payDirectReward(tx, *user.InviterID, userID, po.ID, directBase, directRate); err != nil {
 				return err
@@ -398,11 +564,11 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		if err := refreshAncestorPerformance(tx, userID); err != nil {
 			return err
 		}
-		// A subscription creates one-time differential management entitlements
-		// for its uplines. Any older pending entitlement owned by the subscriber
-		// is also released now that their own principal capacity has increased.
-		if err := r.createManagementRewards(tx, &user, po); err != nil {
-			return err
+		// WIN-A 认购不产生管理奖
+		if payFrom != biz.PayFromWinA {
+			if err := r.createManagementRewards(tx, &user, po); err != nil {
+				return err
+			}
 		}
 		// 本人新认购：只释放直推溢出；管理奖已在下级认购时一次性入账
 		if err := r.releasePendingManagementRewards(tx, userID); err != nil {
@@ -874,7 +1040,9 @@ func (r *walletRepo) ListSubscribeOrdersPaged(ctx context.Context, offset, limit
 			CreatedTime: rw.CreatedTime,
 		}
 		if o.Points == "" || o.Points == "0" {
-			o.Points = o.Principal
+			if o.FundSource != biz.PayFromWinA {
+				o.Points = o.Principal
+			}
 		}
 		o.SyncCompatFields()
 		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rw.Address})
@@ -1144,7 +1312,7 @@ func (r *walletRepo) ListAllExchangeRecords(ctx context.Context) ([]*biz.Exchang
 }
 
 // CreateWinWithdrawal WIN 代币提现：扣 WinBalance，创建 WithdrawalPO
-func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*biz.Withdrawal, string, error) {
+func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*biz.Withdrawal, string, error) {
 	amt, err := decimal.NewFromString(amount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", fmt.Errorf("invalid amount")
@@ -1163,6 +1331,9 @@ func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amou
 		if err := tx.Model(&u).Update("win_balance", u.WinBalance).Error; err != nil {
 			return err
 		}
+		if strings.TrimSpace(status) == "" {
+			status = biz.WithdrawStatusPending
+		}
 		po := &WithdrawalPO{
 			UserID:    userID,
 			Asset:     biz.TokenWIN,
@@ -1170,7 +1341,7 @@ func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amou
 			Fee:       decimal.Zero,
 			PayAmount: amt,
 			ToAddress: toAddress,
-			Status:    biz.WithdrawStatusPending,
+			Status:    status,
 			Remark:    "WIN token withdraw; chain payout pending",
 		}
 		if err := tx.Create(po).Error; err != nil {
@@ -1189,8 +1360,8 @@ func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amou
 	return created, left, err
 }
 
-// CreateSdtWithdrawal AIX-SDT 提现：扣 points，创建 WithdrawalPO
-func (r *walletRepo) CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*biz.Withdrawal, string, error) {
+// CreateSdtWithdrawal AIX-USDT 提现：扣 points，创建 WithdrawalPO
+func (r *walletRepo) CreateSdtWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*biz.Withdrawal, string, error) {
 	amt, err := decimal.NewFromString(amount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", fmt.Errorf("invalid amount")
@@ -1209,6 +1380,9 @@ func (r *walletRepo) CreateSdtWithdrawal(ctx context.Context, userID int64, amou
 		if err := tx.Model(&u).Update("points", u.Points).Error; err != nil {
 			return err
 		}
+		if strings.TrimSpace(status) == "" {
+			status = biz.WithdrawStatusPending
+		}
 		po := &WithdrawalPO{
 			UserID:    userID,
 			Asset:     biz.TokenSDT,
@@ -1216,13 +1390,65 @@ func (r *walletRepo) CreateSdtWithdrawal(ctx context.Context, userID int64, amou
 			Fee:       decimal.Zero,
 			PayAmount: amt,
 			ToAddress: toAddress,
-			Status:    biz.WithdrawStatusPending,
-			Remark:    "AIX-SDT withdraw; ERC20 payout pending",
+			Status:    status,
+			Remark:    "AIX-USDT withdraw; ERC20 payout pending",
 		}
 		if err := tx.Create(po).Error; err != nil {
 			return err
 		}
 		left = u.Points.String()
+		created = &biz.Withdrawal{
+			ID: po.ID, UserID: po.UserID, Address: u.Address,
+			ToAddress: po.ToAddress, Amount: po.Amount.String(),
+			Fee: po.Fee.String(), NetAmount: po.PayAmount.String(),
+			Status: po.Status, TxHash: po.TxHash, Asset: po.Asset,
+			CreatedAt: po.CreatedTime,
+		}
+		return nil
+	})
+	return created, left, err
+}
+
+// CreateUsdtWithdrawal 可提 U 余额提现：扣 UsdtWithdrawable，创建 WithdrawalPO
+func (r *walletRepo) CreateUsdtWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*biz.Withdrawal, string, error) {
+	amt, err := decimal.NewFromString(amount)
+	if err != nil || !amt.GreaterThan(decimal.Zero) {
+		return nil, "", fmt.Errorf("invalid amount")
+	}
+	var created *biz.Withdrawal
+	var left string
+	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
+			return err
+		}
+		if !u.IsZeroAccount && !u.IsCommunitySubsidy {
+			return fmt.Errorf("usdt withdraw not allowed")
+		}
+		if u.UsdtWithdrawable.LessThan(amt) {
+			return fmt.Errorf("insufficient usdt_withdrawable")
+		}
+		u.UsdtWithdrawable = u.UsdtWithdrawable.Sub(amt)
+		if err := tx.Model(&u).Update("usdt_withdrawable", u.UsdtWithdrawable).Error; err != nil {
+			return err
+		}
+		if strings.TrimSpace(status) == "" {
+			status = biz.WithdrawStatusPending
+		}
+		po := &WithdrawalPO{
+			UserID:    userID,
+			Asset:     biz.TokenUSDT,
+			Amount:    amt,
+			Fee:       decimal.Zero,
+			PayAmount: amt,
+			ToAddress: toAddress,
+			Status:    status,
+			Remark:    "USDT withdrawable withdraw; ERC20 payout pending",
+		}
+		if err := tx.Create(po).Error; err != nil {
+			return err
+		}
+		left = u.UsdtWithdrawable.String()
 		created = &biz.Withdrawal{
 			ID: po.ID, UserID: po.UserID, Address: u.Address,
 			ToAddress: po.ToAddress, Amount: po.Amount.String(),
@@ -1347,7 +1573,22 @@ func (r *walletRepo) GetAixPrice(ctx context.Context, date string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return po.Price.String(), nil
+	return po.Price.StringFixed(biz.AixPriceDecimals), nil
+}
+
+func (r *walletRepo) GetLatestAixPriceBefore(ctx context.Context, date string) (string, error) {
+	var po AixPricePO
+	err := r.data.db.WithContext(ctx).
+		Where("effective_date < ?", date).
+		Order("effective_date DESC").
+		First(&po).Error
+	if err == gorm.ErrRecordNotFound {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return po.Price.StringFixed(biz.AixPriceDecimals), nil
 }
 
 func (r *walletRepo) UpsertAixPrice(ctx context.Context, date, price, remark string) error {
@@ -1355,6 +1596,7 @@ func (r *walletRepo) UpsertAixPrice(ctx context.Context, date, price, remark str
 	if err != nil {
 		return err
 	}
+	p = p.Round(biz.AixPriceDecimals)
 	var po AixPricePO
 	err = r.data.db.WithContext(ctx).Where("effective_date = ?", date).First(&po).Error
 	if err == gorm.ErrRecordNotFound {
@@ -1449,6 +1691,7 @@ func (r *walletRepo) orderToBiz(po *OrderPO) *biz.Order {
 		FromRecharge: po.FromRecharge.String(),
 		FromReward:   po.FromReward.String(),
 		FromWin:      po.FromWin.String(),
+		FromWinA:     po.FromWinA.String(),
 		Points:       po.Points.String(),
 		FundSource:   po.FundSource,
 		Status:       po.Status,
@@ -1532,7 +1775,7 @@ func (r *walletRepo) SumWithdrawnByUser(ctx context.Context, userID int64) (stri
 func (r *walletRepo) ListAllWithdrawals(ctx context.Context) ([]*biz.Withdrawal, error) {
 	var list []WithdrawalPO
 	if err := r.data.db.WithContext(ctx).
-		Where("asset IN ?", []string{biz.TokenWIN, biz.TokenSDT}).
+		Where("asset IN ?", []string{biz.TokenWIN, biz.TokenSDT, biz.TokenUSDT}).
 		Order("id desc").
 		Find(&list).Error; err != nil {
 		return nil, err
@@ -1589,7 +1832,7 @@ func (r *walletRepo) ClaimNextPendingWinWithdrawal(ctx context.Context) (*biz.Wi
 		var po WithdrawalPO
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')",
-				[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusPending).
+				[]string{biz.TokenWIN, biz.TokenSDT, biz.TokenUSDT}, biz.WithdrawStatusPending).
 			Order("id asc").
 			First(&po).Error
 		if err == gorm.ErrRecordNotFound {
@@ -1709,7 +1952,7 @@ func (r *walletRepo) ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*biz
 	var list []WithdrawalPO
 	if err := r.data.db.WithContext(ctx).
 		Where("asset IN ? AND status = ? AND tx_hash IS NOT NULL AND tx_hash != ''",
-			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing).
+			[]string{biz.TokenWIN, biz.TokenSDT, biz.TokenUSDT}, biz.WithdrawStatusDoing).
 		Order("id asc").
 		Find(&list).Error; err != nil {
 		return nil, err
@@ -1720,7 +1963,7 @@ func (r *walletRepo) ListDoingWithdrawalsWithTxHash(ctx context.Context) ([]*biz
 func (r *walletRepo) ReleaseStaleDoingWithdrawals(ctx context.Context, staleBefore time.Time) (int64, error) {
 	res := r.data.db.WithContext(ctx).Model(&WithdrawalPO{}).
 		Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '') AND updated_time < ?",
-			[]string{biz.TokenWIN, biz.TokenSDT}, biz.WithdrawStatusDoing, staleBefore).
+			[]string{biz.TokenWIN, biz.TokenSDT, biz.TokenUSDT}, biz.WithdrawStatusDoing, staleBefore).
 		Updates(map[string]interface{}{
 			"status": biz.WithdrawStatusPending,
 			"remark": "payout timed out; retry pending",
@@ -1755,8 +1998,66 @@ func (r *walletRepo) withdrawalsWithUserAddress(ctx context.Context, list []With
 	return out, nil
 }
 
+func (r *walletRepo) ApproveWithdrawalReview(ctx context.Context, id int64) error {
+	res := r.data.db.WithContext(ctx).Model(&WithdrawalPO{}).
+		Where("id = ? AND status = ?", id, biz.WithdrawStatusReview).
+		Updates(map[string]interface{}{
+			"status": biz.WithdrawStatusPending,
+			"remark": "admin approved; awaiting chain payout",
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("withdrawal %d not in review status", id)
+	}
+	return nil
+}
+
+func (r *walletRepo) RejectWithdrawalReview(ctx context.Context, id int64, remark string) error {
+	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var po WithdrawalPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&po, id).Error; err != nil {
+			return err
+		}
+		if po.Status != biz.WithdrawStatusReview {
+			return fmt.Errorf("withdrawal %d not in review status", id)
+		}
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, po.UserID).Error; err != nil {
+			return err
+		}
+		switch strings.ToUpper(strings.TrimSpace(po.Asset)) {
+		case biz.TokenWIN:
+			u.WinBalance = u.WinBalance.Add(po.Amount)
+			if err := tx.Model(&u).Update("win_balance", u.WinBalance).Error; err != nil {
+				return err
+			}
+		case biz.TokenSDT:
+			u.Points = u.Points.Add(po.Amount)
+			if err := tx.Model(&u).Update("points", u.Points).Error; err != nil {
+				return err
+			}
+		case biz.TokenUSDT:
+			u.UsdtWithdrawable = u.UsdtWithdrawable.Add(po.Amount)
+			if err := tx.Model(&u).Update("usdt_withdrawable", u.UsdtWithdrawable).Error; err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupported withdraw asset %s", po.Asset)
+		}
+		if strings.TrimSpace(remark) == "" {
+			remark = "admin rejected"
+		}
+		return tx.Model(&po).Updates(map[string]interface{}{
+			"status": biz.WithdrawStatusRejected,
+			"remark": remark,
+		}).Error
+	})
+}
+
 func (r *walletRepo) ApproveWithdrawal(ctx context.Context, id int64) error {
-	return fmt.Errorf("not supported in AIX")
+	return r.ApproveWithdrawalReview(ctx, id)
 }
 func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrderUpdate) (*biz.Order, error) {
 	updates := map[string]interface{}{}
@@ -1805,4 +2106,125 @@ func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrde
 		return nil, err
 	}
 	return r.FindOrder(ctx, update.OrderID)
+}
+
+// payWinRechargeRoleRewards 下级 WIN 充值时，按实时 WIN 价折算 USDT 后向上级发放零号/社区补贴奖励。
+func (r *walletRepo) payWinRechargeRoleRewards(tx *gorm.DB, fromUserID int64, winAmount decimal.Decimal) error {
+	if !winAmount.GreaterThan(decimal.Zero) {
+		return nil
+	}
+	winPrice := decimal.NewFromFloat(biz.GetWinPrice())
+	if !winPrice.IsPositive() {
+		return nil
+	}
+	usdtAmount := winAmount.Mul(winPrice).Round(8)
+	return r.payUSDTRechargeRoleRewards(tx, fromUserID, usdtAmount)
+}
+
+// payUSDTRechargeRoleRewards 下级 USDT 充值（或 WIN 折算 USDT）时，向上查找首个开通对应角色的上级并发放奖励（入账可提 U 余额）。
+// 0号账户与社区补贴分别独立向上查找：各自找到最近一位开通者后发放并停止，互不影响。
+func (r *walletRepo) payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
+	if !amount.GreaterThan(decimal.Zero) {
+		return nil
+	}
+	zeroRate := decimal.NewFromFloat(biz.ZeroAccountRechargeRate)
+	subsRate := decimal.NewFromFloat(biz.CommunitySubsidyRechargeRate)
+
+	var child UserPO
+	if err := tx.Select("id", "inviter_id").First(&child, fromUserID).Error; err != nil {
+		return err
+	}
+	if child.InviterID == nil {
+		return nil
+	}
+
+	startInviterID := *child.InviterID
+
+	// 0号账户：向上找首个开通者
+	for currentInviterID := startInviterID; currentInviterID > 0; {
+		var ancestor UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ancestor, currentInviterID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				break
+			}
+			return err
+		}
+		if ancestor.IsZeroAccount {
+			reward := amount.Mul(zeroRate).Round(8)
+			if reward.IsPositive() {
+				ancestor.UsdtWithdrawable = ancestor.UsdtWithdrawable.Add(reward)
+				ancestor.ZeroAccountRewardTotal = ancestor.ZeroAccountRewardTotal.Add(reward)
+				if err := tx.Model(&ancestor).Updates(map[string]interface{}{
+					"usdt_withdrawable":         ancestor.UsdtWithdrawable,
+					"zero_account_reward_total": ancestor.ZeroAccountRewardTotal,
+				}).Error; err != nil {
+					return err
+				}
+				base := amount
+				rate := zeroRate
+				fromID := fromUserID
+				if err := tx.Create(&RewardLogPO{
+					UserID:     ancestor.ID,
+					FromUserID: &fromID,
+					Type:       biz.RewardTypeZeroAccount,
+					Asset:      biz.TokenUSDT,
+					Amount:     reward,
+					BaseAmount: &base,
+					Rate:       &rate,
+				}).Error; err != nil {
+					return err
+				}
+			}
+			break
+		}
+		if ancestor.InviterID == nil {
+			break
+		}
+		currentInviterID = *ancestor.InviterID
+	}
+
+	// 社区补贴：向上找首个开通者
+	for currentInviterID := startInviterID; currentInviterID > 0; {
+		var ancestor UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ancestor, currentInviterID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				break
+			}
+			return err
+		}
+		if ancestor.IsCommunitySubsidy {
+			reward := amount.Mul(subsRate).Round(8)
+			if reward.IsPositive() {
+				ancestor.UsdtWithdrawable = ancestor.UsdtWithdrawable.Add(reward)
+				ancestor.CommunitySubsidyTotal = ancestor.CommunitySubsidyTotal.Add(reward)
+				if err := tx.Model(&ancestor).Updates(map[string]interface{}{
+					"usdt_withdrawable":       ancestor.UsdtWithdrawable,
+					"community_subsidy_total": ancestor.CommunitySubsidyTotal,
+				}).Error; err != nil {
+					return err
+				}
+				base := amount
+				rate := subsRate
+				fromID := fromUserID
+				if err := tx.Create(&RewardLogPO{
+					UserID:     ancestor.ID,
+					FromUserID: &fromID,
+					Type:       biz.RewardTypeCommunitySubsidy,
+					Asset:      biz.TokenUSDT,
+					Amount:     reward,
+					BaseAmount: &base,
+					Rate:       &rate,
+				}).Error; err != nil {
+					return err
+				}
+			}
+			break
+		}
+		if ancestor.InviterID == nil {
+			break
+		}
+		currentInviterID = *ancestor.InviterID
+	}
+
+	return nil
 }

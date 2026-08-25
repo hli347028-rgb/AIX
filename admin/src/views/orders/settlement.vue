@@ -71,6 +71,17 @@ export default {
                 {
                     title: 'AIX价格',
                     dataIndex: 'aixPrice',
+                    customRender: (v) => {
+                        const n = Number(v)
+                        if (!Number.isFinite(n) || n <= 0) return v || '-'
+                        // 优先保留后端已格式化的 15 位字符串
+                        const text = String(v ?? '')
+                        if (/^\d+(\.\d+)?$/.test(text)) {
+                            const [i, f = ''] = text.split('.')
+                            return `${i}.${f.padEnd(15, '0').slice(0, 15)}`
+                        }
+                        return n.toFixed(15)
+                    },
                 },
                 {
                     title: '静态合计',

@@ -1,124 +1,12 @@
 <template>
     <PageView>
         <a-card class="cardCon" title="AIX 数据统计" :loading="loading">
-            <a-row :gutter="0">
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="team" />
+            <a-row v-for="(row, rowIndex) in statRows" :key="rowIndex" :gutter="0">
+                <a-col v-for="(key, colIndex) in row" :key="`${rowIndex}-${colIndex}`" :xs="12" :md="6" :lg="6" :xl="6">
+                    <a-card-grid v-if="key && statMeta[key]">
+                        <a-icon :type="statMeta[key].icon" />
                         <div>
-                            <a>注册人数:</a> {{ data.totalUserR || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="team" />
-                        <div>
-                            <a>报单人数:</a> {{ data.totalUser || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="team" />
-                        <div>
-                            <a>今日注册:</a> {{ data.todayUserR || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="team" />
-                        <div>
-                            <a>今日报单人数:</a> {{ data.todayUser || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="pay-circle" />
-                        <div>
-                            <a>报单总额(U):</a> {{ data.buyTotal || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="pay-circle" />
-                        <div>
-                            <a>今日报单(U):</a> {{ data.todayBuy || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="wallet" />
-                        <div>
-                            <a>USDT奖励合计:</a> {{ data.balanceUsdt || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="wallet" />
-                        <div>
-                            <a>USDT充值合计:</a> {{ data.usdtRechargeTotal || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="fund" />
-                        <div>
-                            <a>AIX余额合计:</a> {{ data.aixTotal || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="ordered-list" />
-                        <div>
-                            <a>活跃订单:</a> {{ data.orderActive || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="check-circle" />
-                        <div>
-                            <a>已出局订单:</a> {{ data.orderExited || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="rise" />
-                        <div>
-                            <a>今日静态(AIX):</a> {{ data.todayOne || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="rise" />
-                        <div>
-                            <a>今日动态(U):</a> {{ data.todayTwo || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="rise" />
-                        <div>
-                            <a>今日动静态:</a> {{ data.todayThree || 0 }}
-                        </div>
-                    </a-card-grid>
-                </a-col>
-                <a-col :xs="12" :md="8" :lg="6" :xl="6">
-                    <a-card-grid>
-                        <a-icon type="bar-chart" />
-                        <div>
-                            <a>奖励累计:</a> {{ data.totalReward || 0 }}
+                            <a>{{ statMeta[key].label }}:</a> {{ formatValue(key) }}
                         </div>
                     </a-card-grid>
                 </a-col>
@@ -129,12 +17,64 @@
 
 <script type="text/jsx">
 import Gai from '../../api/Gai'
+
+// 四列布局，与需求表格一致（按行从左到右）
+const statRows = [
+    ['totalUserR', 'totalUser', 'todayUserR', 'todayUser'],
+    ['buyTotal', 'todayBuy', 'totalUsdtChainRecharge', 'todayUsdtChainRecharge'],
+    ['totalWinChainRecharge', 'todayWinChainRecharge', 'totalWinAChainRecharge', 'todayWinAChainRecharge'],
+    ['totalRewardReinvest', 'todayRewardReinvest', 'totalDynamic', 'todayDynamic'],
+    ['totalStaticRelease', 'yesterdayStaticRelease', 'totalWinWithdraw', 'todayWinWithdraw'],
+    ['totalSdtWithdraw', 'todaySdtWithdraw', 'totalSdtAsset', 'totalWinAsset'],
+    ['totalAdminRecharge', 'todayAdminRecharge', 'totalZeroAccountReward', 'todayZeroAccountReward'],
+    ['totalCommunitySubsidyReward', 'todayCommunitySubsidyReward', 'totalUsdtWithdrawable', 'totalUsdtWithdraw'],
+    ['todayUsdtWithdraw'],
+]
+
+const statMeta = {
+    totalUserR: { label: '注册人数', icon: 'team' },
+    totalUser: { label: '报单人数', icon: 'team' },
+    todayUserR: { label: '今日注册', icon: 'team' },
+    todayUser: { label: '今日报单人数', icon: 'team' },
+    buyTotal: { label: '报单总额', icon: 'pay-circle' },
+    todayBuy: { label: '今日报单', icon: 'pay-circle' },
+    totalUsdtChainRecharge: { label: '总链上充值（USDT）', icon: 'wallet' },
+    todayUsdtChainRecharge: { label: '今日链上充值（USDT）', icon: 'wallet' },
+    totalWinChainRecharge: { label: '总链上充值（WIN）', icon: 'wallet' },
+    todayWinChainRecharge: { label: '今日链上充值（WIN）', icon: 'wallet' },
+    totalWinAChainRecharge: { label: '总链上充值（WIN-A）', icon: 'wallet' },
+    todayWinAChainRecharge: { label: '今日链上充值（WIN-A）', icon: 'wallet' },
+    totalRewardReinvest: { label: '总奖励复投', icon: 'redo' },
+    todayRewardReinvest: { label: '今日奖励复投', icon: 'redo' },
+    totalDynamic: { label: '总动态', icon: 'rise' },
+    todayDynamic: { label: '今日动态', icon: 'rise' },
+    totalStaticRelease: { label: '总静态释放', icon: 'bar-chart' },
+    yesterdayStaticRelease: { label: '昨日静态释放', icon: 'bar-chart' },
+    totalWinWithdraw: { label: '总WIN提现', icon: 'export' },
+    todayWinWithdraw: { label: '今日WIN提现', icon: 'export' },
+    totalSdtWithdraw: { label: '总AIX-USDT提现', icon: 'export' },
+    todaySdtWithdraw: { label: '今日AIX-USDT提现', icon: 'export' },
+    totalSdtAsset: { label: '总AIX-USDT资产', icon: 'fund' },
+    totalWinAsset: { label: '总WIN资产', icon: 'fund' },
+    totalAdminRecharge: { label: '总后台手动充值', icon: 'plus-circle' },
+    todayAdminRecharge: { label: '今日后台手动充值', icon: 'plus-circle' },
+    totalZeroAccountReward: { label: '总零号账户累计金额', icon: 'gift' },
+    todayZeroAccountReward: { label: '今日零号账户金额', icon: 'gift' },
+    totalCommunitySubsidyReward: { label: '总社区补贴累计金额', icon: 'gift' },
+    todayCommunitySubsidyReward: { label: '今日社区补贴金额', icon: 'gift' },
+    totalUsdtWithdrawable: { label: '全网可提U', icon: 'wallet' }, // 零号+社区补贴合计
+    totalUsdtWithdraw: { label: '总提现U', icon: 'export' }, // 零号+社区补贴提现合计
+    todayUsdtWithdraw: { label: '今日提现U', icon: 'export' }, // 今日零号+社区补贴提现
+}
+
 export default {
     name: 'home',
     data() {
         return {
             loading: true,
             data: {},
+            statRows,
+            statMeta,
         }
     },
     activated() {
@@ -144,9 +84,15 @@ export default {
         getList() {
             this.loading = true
             Gai.all().then(res => {
-                this.data = res
+                this.data = res || {}
+                this.loading = false
+            }).catch(() => {
                 this.loading = false
             })
+        },
+        formatValue(key) {
+            const value = this.data[key]
+            return value == null || value === '' ? 0 : value
         },
     }
 }
@@ -172,12 +118,6 @@ export default {
             border-radius: 8px;
             background: #1890ff;
         }
-    }
-}
-
-.inputGroup {
-    >div {
-        margin: 20px;
     }
 }
 </style>

@@ -116,6 +116,13 @@ export default {
             data: parameter
         })
     },
+    withdraw_reject: (parameter) => {
+        return axios({
+            url: `${api8005}/withdraw_reject`,
+            method: 'post',
+            data: parameter
+        })
+    },
     all: (parameter) => {
         return axios({
             url: `${api8005}/all`,
@@ -170,6 +177,14 @@ export default {
             url: `${api8005}/record_list`,
             method: 'get',
             params: parameter
+        })
+    },
+    record_list_export: (parameter) => {
+        return axios({
+            url: `${api8005}/record_list_export`,
+            method: 'get',
+            params: parameter,
+            responseType: 'blob'
         })
     },
     trade_list: (parameter) => {
@@ -260,6 +275,27 @@ export default {
     vip_update: (parameter) => {
         return axios({
             url: `${api8006}/vip_update`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    set_zero_account: (parameter) => {
+        return axios({
+            url: `${api8006}/set_zero_account`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    set_community_subsidy: (parameter) => {
+        return axios({
+            url: `${api8006}/set_community_subsidy`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    set_inviter: (parameter) => {
+        return axios({
+            url: `${api8006}/set_inviter`,
             method: 'post',
             data: parameter
         })

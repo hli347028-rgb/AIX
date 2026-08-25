@@ -20,18 +20,20 @@ const (
 
 // SettlementUsecase AIX daily settlement
 type SettlementUsecase struct {
-	userRepo    UserRepo
-	stakingRepo StakingRepo
-	walletRepo  WalletRepo
-	log         *log.Helper
+	userRepo     UserRepo
+	stakingRepo  StakingRepo
+	walletRepo   WalletRepo
+	settingsRepo SettingsRepo
+	log          *log.Helper
 }
 
-func NewSettlementUsecase(userRepo UserRepo, stakingRepo StakingRepo, walletRepo WalletRepo, logger log.Logger) *SettlementUsecase {
+func NewSettlementUsecase(userRepo UserRepo, stakingRepo StakingRepo, walletRepo WalletRepo, settingsRepo SettingsRepo, logger log.Logger) *SettlementUsecase {
 	return &SettlementUsecase{
-		userRepo:    userRepo,
-		stakingRepo: stakingRepo,
-		walletRepo:  walletRepo,
-		log:         log.NewHelper(logger),
+		userRepo:     userRepo,
+		stakingRepo:  stakingRepo,
+		walletRepo:   walletRepo,
+		settingsRepo: settingsRepo,
+		log:          log.NewHelper(logger),
 	}
 }
 
@@ -61,20 +63,15 @@ func (uc *SettlementUsecase) runDailySettlement(ctx context.Context, settlementD
 		}
 	}
 
-	price, err := uc.stakingRepo.GetAixPrice(ctx, settlementDate)
+	priceDec, err := uc.ensureAixPriceForSettlement(ctx, settlementDate)
 	if err != nil {
 		return err
 	}
-	if price == "" || price == "0" {
-		price = decimal.NewFromFloat(AixPriceInitial).String()
-		_ = uc.stakingRepo.UpsertAixPrice(ctx, settlementDate, price, "settlement default")
-	}
-	priceDec, _ := decimal.NewFromString(price)
 
 	started := time.Now()
 	batch := &SettlementBatch{
 		SettlementDate: settlementDate,
-		AixPrice:       priceDec.String(),
+		AixPrice:       FormatAixPriceDecimal(priceDec),
 		Status:         SettlementStatusRunning,
 		StartedAt:      started,
 	}

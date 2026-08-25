@@ -34,17 +34,18 @@ export async function fetchWinRechargeRecords(address?: string): Promise<WinChai
   return records.reverse()
 }
 
-/** 链上充值成功后轮询 profile，等待 win_recharge_balance 入账 */
+/** 链上充值成功后轮询 profile，等待余额入账 */
 export async function pollWinBalance(
   refreshProfile: () => Promise<unknown>,
   beforeBalance: string,
   attempts = 5,
   intervalMs = 2000,
+  balanceKey = 'win_recharge_balance',
 ) {
   for (let i = 0; i < attempts; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
     const profile: any = await refreshProfile()
-    const nextBalance = String(profile?.win_recharge_balance ?? '0')
+    const nextBalance = String(profile?.[balanceKey] ?? '0')
     if (compareDecimals(nextBalance, beforeBalance) > 0) {
       return { updated: true, balance: nextBalance }
     }

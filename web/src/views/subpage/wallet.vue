@@ -8,7 +8,7 @@
     @click-left="handleBack"
   />
   <div class="page-main">
-    <div class="usdt-price">
+    <div class="usdt-price" :class="{ 'is-compact': showUsdtWithdrawable }">
       <div class="price-list">
         <div class="price-item">
           <p>{{ $t('wallet.rechargeBalance') }}</p>
@@ -27,6 +27,10 @@
         <div class="price-item">
           <p>{{ $t('wallet.winBalance') }}</p>
           <p>{{ winBalance }}</p>
+        </div>
+        <div v-if="showUsdtWithdrawable" class="price-item">
+          <p>{{ $t('wallet.usdtWithdrawable') }}</p>
+          <p>{{ usdtWithdrawable }}</p>
         </div>
       </div>
     </div>
@@ -57,14 +61,14 @@
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.earnedIncome') }}</p>
-            <p>{{ userinfo.amountGet || 0 }}</p>
+            <p>{{ formatFour(userinfo.amountGet || 0) }}</p>
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.overflowReward') }}</p>
             <p>{{ userinfo.overflowReward || 0 }}</p>
           </div>
           <div class="pledge-item">
-            <p>AIX-SDT</p>
+            <p>{{ $t('wallet.aixUsdt') }}</p>
             <p>{{ profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0 }}</p>
           </div>
         </div>
@@ -96,7 +100,7 @@
         </div>
         <div v-else-if="isTableTab" class="subscribe-table" :class="{ 'is-two-col': isTwoColTab }">
           <div class="table-header">
-            <span class="col-amount">{{ active === 'points' ? 'AIX-SDT' : $t('node.amount') }}</span>
+            <span class="col-amount">{{ active === 'points' ? $t('wallet.aixUsdt') : $t('node.amount') }}</span>
             <span v-if="!isTwoColTab" class="col-status">{{ tableMiddleTitle }}</span>
             <span class="col-time">{{ $t('node.time') }}</span>
           </div>
@@ -206,6 +210,17 @@ const rechargeBalance = $computed(() => pickBalance([userinfo.usdt, profile.usdt
 const rewardBalance = $computed(() => pickBalance([userinfo.reward, profile.usdt_reward]))
 const aixBalance = $computed(() => pickBalance([profile.aix_balance, userinfo.aix]))
 const winBalance = $computed(() => pickBalance([profile.win_balance, userinfo.win]))
+const usdtWithdrawable = $computed(() => pickBalance([profile.usdt_withdrawable, userinfo.usdtWithdrawable]))
+const showUsdtWithdrawable = $computed(() => {
+  const u = profile || {}
+  const info = userinfo || {}
+  return !!(
+    u.is_zero_account || u.is_community_subsidy ||
+    u.isZeroAccount || u.isCommunitySubsidy ||
+    info.is_zero_account || info.is_community_subsidy ||
+    info.isZeroAccount || info.isCommunitySubsidy
+  )
+})
 
 let active = $ref('1')
 let page = $ref(1);
@@ -220,7 +235,7 @@ const menuType = computed(() => [
   ['2', $t('wallet.staticIncome')],
   ['3', $t('wallet.directReferralReward')],
   ['5', $t('wallet.managementReward')],
-  ['points', 'AIX-SDT'],
+  ['points', $t('wallet.pointsRecords')],
 ])
 
 const isTableTab = computed(() => ['1', '2', '3', 'points'].includes(String(active)))
@@ -545,6 +560,39 @@ const handleBack = () => {
 
           &.price-item-action {
             grid-template-columns: 72px minmax(0, 1fr);
+          }
+        }
+      }
+
+      // 5 项（含可提 U）时压缩字号与行距，避免贴底挤在一起
+      &.is-compact {
+        height: 128px;
+        background-size: 100% 128px;
+        padding: 18px 18px 8px 18px;
+        font-size: 11px;
+        line-height: 1.2;
+
+        .price-list {
+          gap: 2px;
+
+          .price-item {
+            min-height: 16px;
+            grid-template-columns: 68px minmax(0, 1fr);
+            gap: 6px;
+
+            > p:first-child {
+              font-size: 10px;
+            }
+
+            > p:nth-child(2),
+            .price-value-action > p {
+              font-size: 11px;
+              font-weight: 600;
+            }
+
+            &.price-item-action {
+              grid-template-columns: 68px minmax(0, 1fr);
+            }
           }
         }
       }

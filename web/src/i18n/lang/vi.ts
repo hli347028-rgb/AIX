@@ -101,7 +101,7 @@ export default {
     communityPerformance: 'Thành tích cộng đồng',
     totalPerformance: 'Tổng thành tích',
     regionalPerformance: 'Thành tích khu vực',
-    directInviteData: 'Dữ liệu mời trực tiếp',
+    directInviteData: 'Số tiền đăng ký cấp dưới',
     teamIdoTotal: 'Tổng IDO nhóm',
     personalRedeemed: 'Thành tích đã chuộc cá nhân',
     teamRedeemed: 'Thành tích đã chuộc nhóm',
@@ -239,10 +239,10 @@ export default {
     noRecords: 'Chưa có lịch sử rút tiền',
     insufficientBalance: 'Số dư có thể rút không đủ',
     insufficientWin: 'Số dư WIN không đủ',
-    insufficientSdt: 'Số dư AIX-SDT không đủ',
-    sdtSubtitle: 'Rút AIX-SDT',
-    sdtAvailableBalance: 'Số dư AIX-SDT',
-    sdtExchangeHint: 'AIX-SDT sẽ được chuyển tới ví liên kết dưới dạng token SDT on-chain',
+    insufficientSdt: 'Số dư AIX-USDT không đủ',
+    sdtSubtitle: 'Rút AIX-USDT',
+    sdtAvailableBalance: 'Số dư AIX-USDT',
+    sdtExchangeHint: 'AIX-USDT sẽ được chuyển tới ví liên kết dưới dạng token USDT on-chain',
     insufficientHint: 'Số dư có thể rút không đủ (số dư tài khoản không thể rút trực tiếp, cần có ghi có tĩnh/cổ tức)',
     aixExchangeHint: 'Không thể rút AIX trực tiếp. Vui lòng đổi sang WIN trước',
     toAddress: 'Địa chỉ rút',
@@ -363,7 +363,7 @@ export default {
     income: 'Thu nhập',
     exitProgress: 'Tiến độ thoát', rechargeBalance: 'Số dư nạp', rewardBalance: 'Số dư thưởng',
     withdrawableAix: 'AIX có thể rút', aixBalance: 'Số dư AIX', winBalance: 'Số dư WIN', rawNewBalance: 'Số dư token', exchange: 'Đổi', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý', releasedManagementReward: 'Thưởng quản lý đã phát hành', pendingManagementReward: 'Thưởng quản lý đang chờ', overflowReward: 'Thưởng tràn', totalIncome: 'Tổng thu nhập',
-    points: 'Điểm hiện tại', pointsAll: 'Tổng điểm', pointsRecords: 'AIX-SDT', noPointsRecords: 'Chưa có lịch sử AIX-SDT'
+    points: 'Điểm hiện tại', pointsAll: 'Tổng điểm', pointsRecords: 'AIX-USDT', noPointsRecords: 'Chưa có lịch sử AIX-USDT'
   },
   exchange: {
     title: 'Đổi AIX sang WIN', availableAix: 'AIX khả dụng', currentWin: 'Số dư WIN', exchangeAmount: 'Số lượng đổi', all: 'Tất cả',

@@ -16,6 +16,7 @@
       <a-radio-group v-model:value="assetType" button-style="solid" class="asset-tabs" @change="onAssetTypeChange">
         <a-radio-button value="usdt">USDT</a-radio-button>
         <a-radio-button value="win">WIN</a-radio-button>
+        <a-radio-button value="win_a">WIN-A</a-radio-button>
       </a-radio-group>
 
       <div class="dialog-main">
@@ -33,7 +34,7 @@
           </div>
         </template>
 
-        <template v-else>
+        <template v-else-if="assetType === 'win'">
           <a-input-number
             autofocus
             style="width: 100%; margin-top: 20px;"
@@ -49,9 +50,32 @@
             <p>{{ $t('recharge.minWinRecharge', { amount: minWinRecharge }) }}</p>
           </div>
         </template>
+
+        <template v-else-if="assetType === 'win_a' && !winARechargeEnabled">
+          <div class="dialog-closed">
+            <p>{{ $t('recharge.winARechargeClosed') }}</p>
+          </div>
+        </template>
+
+        <template v-else>
+          <a-input-number
+            autofocus
+            style="width: 100%; margin-top: 20px;"
+            v-model:value="amount"
+            :min="minWinARecharge"
+            :precision="0"
+            :step="1"
+            size="large"
+            :placeholder="$t('recharge.enterWinAInteger')"
+          />
+          <p v-if="winPayableAmount" class="dialog-payable">{{ $t('recharge.winAPayable', { num: winPayableAmount }) }}</p>
+          <div class="dialog-info">
+            <p>{{ $t('recharge.minWinARecharge', { amount: minWinARecharge }) }}</p>
+          </div>
+        </template>
       </div>
 
-      <a-button class="withdraw-btn" :disabled="loading" size="large" @click="handleSubmit" type="primary">
+      <a-button class="withdraw-btn" :disabled="loading || winARechargeBlocked" size="large" @click="handleSubmit" type="primary">
         {{ $t('recharge.recharge') }}
       </a-button>
     </div>
@@ -72,6 +96,7 @@ import { mapWinRechargeError, pollWinBalance } from '@/tools/winRecharge'
 
 const BUY_USDT = new Contract(import.meta.env.VITE_BUY_USDT || import.meta.env.VITE_BUY, 'BUY')
 const BUY_WIN = new Contract(import.meta.env.VITE_BUY, 'BUY')
+const BUY_WIN_A = new Contract(import.meta.env.VITE_BUY_WIN_A || '0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040', 'BUY')
 const USDT = import.meta.env.VITE_USDT ? new Contract(import.meta.env.VITE_USDT, 'ERC20') : null
 
 const person = userPerson()
@@ -101,10 +126,23 @@ const minWinRecharge = computed(() => {
   return Number.isFinite(min) && min >= 10 ? min : 10
 })
 
+const minWinARecharge = computed(() => {
+  const min = Number(person.profile?.min_win_a_recharge || 10)
+  return Number.isFinite(min) && min >= 10 ? min : 10
+})
+
 const minUsdtRecharge = computed(() => {
   const min = Number(person.profile?.min_usdt_recharge || 10)
   return Number.isFinite(min) && min >= 10 ? min : 10
 })
+
+const winARechargeEnabled = computed(() => {
+  const flag = person.profile?.win_a_recharge_enabled
+  if (flag === undefined || flag === null) return true
+  return !!flag
+})
+
+const winARechargeBlocked = computed(() => assetType.value === 'win_a' && !winARechargeEnabled.value)
 
 const winPayableAmount = computed(() => {
   const num = Number(amount.value)
@@ -158,8 +196,12 @@ const open = async () => {
 
 const onAssetTypeChange = async () => {
   amount.value = null
+  if (assetType.value === 'win_a' && !winARechargeEnabled.value) {
+    showRechargeToast($t('recharge.winARechargeClosed'))
+    return
+  }
   await ensureRechargeChain()
-  if (assetType.value === 'win') {
+  if (assetType.value === 'win' || assetType.value === 'win_a') {
     await refreshNativeBalance()
   }
 }
@@ -317,6 +359,66 @@ const submitWinRecharge = async () => {
   isOpen.value = false
 }
 
+const submitWinARecharge = async () => {
+  if (!winARechargeEnabled.value) {
+    showRechargeToast($t('recharge.winARechargeClosed'))
+    return
+  }
+  const num = Number(amount.value)
+  if (!Number.isInteger(num) || num < minWinARecharge.value) {
+    showRechargeToast($t('recharge.minWinARechargeError', { amount: minWinARecharge.value }))
+    return
+  }
+
+  await ETH.getAccount('eoeo')
+  const value = ethers.utils.parseEther(String(num))
+  const beforeBalance = String(person.profile?.win_a_recharge_balance || '0')
+  let hash = ''
+  try {
+    const result = await BUY_WIN_A.send('buy', [num], { value, gasLimit: 350000, silent: true })
+    hash = result.hash
+  } catch (error) {
+    if (isWalletCancelled(error)) throw error
+    nativeWinBalance.value = await ETH.getNativeBalance()
+    if (compareDecimals(String(nativeWinBalance.value), String(num)) < 0) {
+      showRechargeToast($t('recharge.winInsufficientNative'))
+      return
+    }
+    throw error
+  }
+
+  startRechargeLoading($t('recharge.winConfirming'))
+
+  const pollResult = await pollWinBalance(
+    () => person.refreshProfile?.(),
+    beforeBalance,
+    30,
+    2000,
+    'win_a_recharge_balance',
+  )
+
+  stopRechargeLoading()
+
+  const successMessage = pollResult.updated
+    ? $t('recharge.winARechargeSuccess')
+    : $t('recharge.winARechargePending')
+
+  await showDialog({
+    title: $t('common.prompt'),
+    message: `${successMessage}\n${$t('recharge.txHash')}: ${hash.slice(0, 10)}…${hash.slice(-8)}`,
+    theme: 'round-button',
+    confirmButtonColor: '#0A1724',
+    confirmButtonText: $t('common.gotIt'),
+  })
+
+  await Promise.allSettled([
+    person.refreshProfile?.(),
+    props.onChange?.(),
+    refreshNativeBalance(),
+  ])
+  isOpen.value = false
+}
+
 const handleSubmit = async () => {
   if (loading.value) return
 
@@ -324,6 +426,8 @@ const handleSubmit = async () => {
   try {
     if (assetType.value === 'usdt') {
       await submitUsdtRecharge()
+    } else if (assetType.value === 'win_a') {
+      await submitWinARecharge()
     } else {
       await submitWinRecharge()
     }
@@ -442,6 +546,22 @@ defineExpose({ open })
     text-align: right;
     color: $text-muted;
     font-size: 12px;
+  }
+}
+
+.dialog-closed {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+
+  p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: $text-muted;
+    text-align: center;
   }
 }
 

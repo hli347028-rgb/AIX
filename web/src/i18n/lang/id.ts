@@ -101,7 +101,7 @@ export default {
     communityPerformance: 'Kinerja Komunitas',
     totalPerformance: 'Total Kinerja',
     regionalPerformance: 'Kinerja Regional',
-    directInviteData: 'Data Undangan Langsung',
+    directInviteData: 'Jumlah Langganan Bawahan',
     teamIdoTotal: 'Total IDO Tim',
     personalRedeemed: 'Ditebus Pribadi',
     teamRedeemed: 'Ditebus Tim',
@@ -239,10 +239,10 @@ export default {
     noRecords: 'Tidak ada catatan penarikan',
     insufficientBalance: 'Saldo yang dapat ditarik tidak cukup',
     insufficientWin: 'Saldo WIN tidak cukup',
-    insufficientSdt: 'Saldo AIX-SDT tidak cukup',
-    sdtSubtitle: 'Penarikan AIX-SDT',
-    sdtAvailableBalance: 'Saldo AIX-SDT',
-    sdtExchangeHint: 'AIX-SDT akan dikirim ke dompet terhubung Anda sebagai token SDT on-chain',
+    insufficientSdt: 'Saldo AIX-USDT tidak cukup',
+    sdtSubtitle: 'Penarikan AIX-USDT',
+    sdtAvailableBalance: 'Saldo AIX-USDT',
+    sdtExchangeHint: 'AIX-USDT akan dikirim ke dompet terhubung Anda sebagai token USDT on-chain',
     insufficientHint: 'Saldo yang dapat ditarik tidak cukup (saldo akun tidak dapat ditarik langsung; diperlukan kredit statis/dividen)',
     aixExchangeHint: 'AIX tidak dapat ditarik langsung. Silakan tukar ke WIN terlebih dahulu.',
     toAddress: 'Alamat Penarikan',
@@ -367,7 +367,7 @@ export default {
     exitProgress: 'Progres Keluar', rechargeBalance: 'Saldo Isi Ulang', rewardBalance: 'Saldo Hadiah',
     withdrawableAix: 'AIX Dapat Ditarik', aixBalance: 'Saldo AIX', winBalance: 'Saldo WIN', rawNewBalance: 'Saldo Token', exchange: 'Tukar', directReferralReward: 'Hadiah Rujukan Langsung',
     managementReward: 'Hadiah Manajemen', releasedManagementReward: 'Hadiah Manajemen Dirilis', pendingManagementReward: 'Hadiah Manajemen Tertunda', overflowReward: 'Hadiah Overflow', totalIncome: 'Total Pendapatan',
-    points: 'Poin', pointsAll: 'Total Poin', pointsRecords: 'AIX-SDT', noPointsRecords: 'Tidak ada catatan AIX-SDT'
+    points: 'Poin', pointsAll: 'Total Poin', pointsRecords: 'AIX-USDT', noPointsRecords: 'Tidak ada catatan AIX-USDT'
   },
   exchange: {
     title: 'Tukar AIX ke WIN', availableAix: 'AIX Tersedia', currentWin: 'Saldo WIN', exchangeAmount: 'Jumlah Tukar', all: 'Semua',

@@ -101,7 +101,7 @@ export default {
     communityPerformance: '커뮤니티 실적',
     totalPerformance: '총 실적',
     regionalPerformance: '대구 실적',
-    directInviteData: '직접 초대 데이터',
+    directInviteData: '하위 구독 금액',
     teamIdoTotal: '팀 IDO 총량',
     personalRedeemed: '개인 상환 실적',
     teamRedeemed: '팀 상환 실적',
@@ -239,10 +239,10 @@ export default {
     noRecords: '출금 기록이 없습니다',
     insufficientBalance: '출금 가능 잔액이 부족합니다',
     insufficientWin: 'WIN 잔액이 부족합니다',
-    insufficientSdt: 'AIX-SDT 잔액이 부족합니다',
-    sdtSubtitle: 'AIX-SDT 출금',
-    sdtAvailableBalance: 'AIX-SDT 잔액',
-    sdtExchangeHint: 'AIX-SDT는 연결된 지갑으로 SDT 토큰으로 전송됩니다',
+    insufficientSdt: 'AIX-USDT 잔액이 부족합니다',
+    sdtSubtitle: 'AIX-USDT 출금',
+    sdtAvailableBalance: 'AIX-USDT 잔액',
+    sdtExchangeHint: 'AIX-USDT는 연결된 지갑으로 USDT 토큰으로 전송됩니다',
     insufficientHint: '출금 가능 잔액이 부족합니다(계정 잔액은 직접 출금 불가, 정적/배당 입금 필요)',
     aixExchangeHint: 'AIX는 직접 출금할 수 없습니다. 먼저 WIN으로 교환하세요',
     toAddress: '출금 주소',
@@ -363,7 +363,7 @@ export default {
     income: '수익',
     exitProgress: '아웃 진행', rechargeBalance: '충전 잔액', rewardBalance: '보상 잔액',
     withdrawableAix: '출금 가능 AIX', aixBalance: 'AIX 잔액', winBalance: 'WIN 잔액', rawNewBalance: '토큰 잔액', exchange: '교환', directReferralReward: '직접 추천 보상', managementReward: '관리 보상', releasedManagementReward: '지급된 관리 보상', pendingManagementReward: '대기 중인 관리 보상', overflowReward: '초과 보상', totalIncome: '누적 수익',
-    points: '현재 포인트', pointsAll: '누적 포인트', pointsRecords: 'AIX-SDT', noPointsRecords: 'AIX-SDT 기록이 없습니다'
+    points: '현재 포인트', pointsAll: '누적 포인트', pointsRecords: 'AIX-USDT', noPointsRecords: 'AIX-USDT 기록이 없습니다'
   },
   exchange: {
     title: 'AIX를 WIN으로 교환', availableAix: '사용 가능 AIX', currentWin: 'WIN 잔액', exchangeAmount: '교환 수량', all: '전체',

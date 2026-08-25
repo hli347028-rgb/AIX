@@ -27,9 +27,14 @@ type SystemConfigSnapshot struct {
 	MgmtRates             []float64 `json:"mgmt_rates"`              // W1–W10 管理奖比例
 	AixPriceInitial       float64   `json:"aix_price_initial"`       // 初始 AIX 价格
 	WinPrice              float64   `json:"win_price"`               // WIN 代币价格（USDT/枚）
+	WinAPrice             float64   `json:"win_a_price"`             // WIN-A 代币价格（USDT/枚）
 	ExchangeFeeRate       float64   `json:"exchange_fee_rate"`       // 兑换手续费率（0.05 = 5%）
 	MinUsdtRecharge       string    `json:"min_usdt_recharge"`       // USDT 充值最小值（≥10）
 	MinWinRecharge        string    `json:"min_win_recharge"`        // WIN 充值最小值（≥10）
+	MinWinARecharge       string    `json:"min_win_a_recharge"`      // WIN-A 充值最小值（≥10）
+	WinWithdrawReviewThreshold string `json:"win_withdraw_review_threshold"` // WIN 提现审核阈值（≥此金额需审核，0=不审核）
+	SdtWithdrawReviewThreshold string `json:"sdt_withdraw_review_threshold"` // AIX-USDT 提现审核阈值
+	UsdtWithdrawReviewThreshold string `json:"usdt_withdraw_review_threshold"` // 可提 U 提现审核阈值
 	MgmtCountsTowardExit  bool      `json:"mgmt_counts_toward_exit"` // 管理奖是否计入出局
 	MgmtCountsTowardExitP *bool     `json:"-"`                       // 内部：区分 JSON 缺省与 false
 
@@ -47,12 +52,15 @@ const (
 	DefaultStaticRate      = 0.5
 	DefaultExitMultiplier  = 4.0
 	DefaultDirectRate      = 0.5
-	DefaultAixPrice        = 1.0
+	DefaultAixPrice              = 1.0
+	DefaultAixPriceDailyGrowth   = 0.02 // AIX 每日上涨 2%
 	DefaultWinPrice          = 1.0
+	DefaultWinAPrice         = 1.0
 	DefaultExchangeFeeRate   = 0.05
 	DefaultMinSubscribe      = "100"
 	DefaultMinUsdtRecharge   = "10"
 	DefaultMinWinRecharge    = "10"
+	DefaultMinWinARecharge   = "10"
 	FloorMinRechargeAmount   = 10.0 // 管理端与业务校验的绝对下限
 )
 
@@ -86,6 +94,9 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	if s.WinPrice <= 0 {
 		s.WinPrice = DefaultWinPrice
 	}
+	if s.WinAPrice <= 0 {
+		s.WinAPrice = DefaultWinAPrice
+	}
 	if s.ExchangeFeeRate <= 0 {
 		s.ExchangeFeeRate = DefaultExchangeFeeRate
 	}
@@ -94,6 +105,7 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	}
 	s.MinUsdtRecharge = normalizeMinRecharge(s.MinUsdtRecharge, DefaultMinUsdtRecharge)
 	s.MinWinRecharge = normalizeMinRecharge(s.MinWinRecharge, DefaultMinWinRecharge)
+	s.MinWinARecharge = normalizeMinRecharge(s.MinWinARecharge, DefaultMinWinARecharge)
 	if len(s.MgmtThresholds) != 10 {
 		s.MgmtThresholds = DefaultMgmtThresholds()
 	}

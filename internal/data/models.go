@@ -18,6 +18,8 @@ type UserPO struct {
 	AixBalance        decimal.Decimal `gorm:"column:aix_balance;type:decimal(36,18);default:0;not null"`         // AIX 代币数（静态换算入账）
 	WinBalance          decimal.Decimal `gorm:"column:win_balance;type:decimal(36,18);default:0;not null"`                 // WIN 提现钱包（AIX 兑换）
 	WinRechargeBalance  decimal.Decimal `gorm:"column:win_recharge_balance;type:decimal(36,18);default:0;not null"`       // WIN 充值钱包
+	WinARechargeBalance decimal.Decimal `gorm:"column:win_a_recharge_balance;type:decimal(36,18);default:0;not null"`     // WIN-A 充值钱包
+	UsdtWithdrawable    decimal.Decimal `gorm:"column:usdt_withdrawable;type:decimal(36,18);default:0;not null"`           // 可提 U 余额（0号/社区补贴）
 	PendingMgmtReward decimal.Decimal `gorm:"column:pending_mgmt_reward;type:decimal(36,18);default:0;not null"` // 兼容旧列；= OverflowReward
 	OverflowReward    decimal.Decimal `gorm:"column:overflow_reward;type:decimal(36,18);default:0;not null"`     // 管理奖溢出
 	OverflowDirect    decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`     // 直推奖溢出
@@ -29,6 +31,12 @@ type UserPO struct {
 	LargeAreaPerf     decimal.Decimal `gorm:"column:large_area_perf;type:decimal(36,18);default:0;not null"`
 	SmallAreaPerf     decimal.Decimal `gorm:"column:small_area_perf;type:decimal(36,18);default:0;not null"`
 	TeamPerf          decimal.Decimal `gorm:"column:team_perf;type:decimal(36,18);default:0;not null"`
+	IsZeroAccount          bool            `gorm:"column:is_zero_account;default:false;not null"`
+	IsCommunitySubsidy     bool            `gorm:"column:is_community_subsidy;default:false;not null"`
+	ZeroAccountSetAt       *time.Time      `gorm:"column:zero_account_set_at"`
+	CommunitySubsidySetAt  *time.Time      `gorm:"column:community_subsidy_set_at"`
+	ZeroAccountRewardTotal decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`
+	CommunitySubsidyTotal  decimal.Decimal `gorm:"column:community_subsidy_total;type:decimal(36,18);default:0;not null"`
 	Status            int32           `gorm:"default:1;not null"`
 	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
 	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
@@ -46,8 +54,9 @@ type OrderPO struct {
 	DirectBase   decimal.Decimal `gorm:"column:direct_base;type:decimal(36,18);default:0;not null"`
 	FromRecharge decimal.Decimal `gorm:"column:from_recharge;type:decimal(36,18);default:0;not null"`
 	FromReward   decimal.Decimal `gorm:"column:from_reward;type:decimal(36,18);default:0;not null"`
-	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"` // WIN 扣款数量（按认购时 win_price 折算）
-	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`   // 本单获得积分（= 认购金额）
+	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"`       // WIN 扣款数量（按认购时 win_price 折算）
+	FromWinA     decimal.Decimal `gorm:"column:from_win_a;type:decimal(36,18);default:0;not null"`     // WIN-A 扣款数量（按认购时 win_a_price 折算）
+	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得积分（= 认购金额）
 	FundSource   string          `gorm:"column:fund_source;size:16;not null"`
 	Status       string          `gorm:"size:16;default:active;not null"`
 	ExitedTime   *time.Time      `gorm:"column:exited_time"`
@@ -60,7 +69,7 @@ func (OrderPO) TableName() string { return "orders" }
 type RechargePO struct {
 	ID            int64           `gorm:"primaryKey;autoIncrement"`
 	UserID        int64           `gorm:"index;not null"`
-	Asset         string          `gorm:"size:16;default:USDT;not null;index"` // USDT | WIN
+	Asset         string          `gorm:"size:16;default:USDT;not null;index"` // USDT | WIN | WIN-A
 	Amount        decimal.Decimal `gorm:"type:decimal(36,18);not null"`
 	TxHash        string          `gorm:"size:66;uniqueIndex;not null"`
 	FromAddress   string          `gorm:"column:from_address;size:42"`

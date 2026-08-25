@@ -101,7 +101,7 @@ export default {
     communityPerformance: 'ผลงานชุมชน',
     totalPerformance: 'ผลงานรวม',
     regionalPerformance: 'ผลงานภูมิภาค',
-    directInviteData: 'ข้อมูลเชิญตรง',
+    directInviteData: 'จำนวนการสมัครของลูกทีม',
     teamIdoTotal: 'IDO ทีมรวม',
     personalRedeemed: 'แลกส่วนตัว',
     teamRedeemed: 'แลกทีม',
@@ -239,10 +239,10 @@ export default {
     noRecords: 'ไม่มีบันทึกการถอน',
     insufficientBalance: 'ยอดที่ถอนได้ไม่เพียงพอ',
     insufficientWin: 'ยอด WIN ไม่เพียงพอ',
-    insufficientSdt: 'ยอด AIX-SDT ไม่เพียงพอ',
-    sdtSubtitle: 'ถอน AIX-SDT',
-    sdtAvailableBalance: 'ยอด AIX-SDT',
-    sdtExchangeHint: 'AIX-SDT จะถูกส่งไปยังกระเป๋าที่เชื่อมต่อเป็นโทเคน SDT บนเชน',
+    insufficientSdt: 'ยอด AIX-USDT ไม่เพียงพอ',
+    sdtSubtitle: 'ถอน AIX-USDT',
+    sdtAvailableBalance: 'ยอด AIX-USDT',
+    sdtExchangeHint: 'AIX-USDT จะถูกส่งไปยังกระเป๋าที่เชื่อมต่อเป็นโทเคน USDT บนเชน',
     insufficientHint: 'ยอดที่ถอนได้ไม่เพียงพอ (ยอดบัญชีถอนโดยตรงไม่ได้ ต้องมีเครดิตคงที่/เงินปันผล)',
     aixExchangeHint: 'ถอน AIX โดยตรงไม่ได้ กรุณาแลกเป็น WIN ก่อน',
     toAddress: 'ที่อยู่ถอน',
@@ -367,7 +367,7 @@ export default {
     exitProgress: 'ความคืบหน้าการออก', rechargeBalance: 'ยอดเติมเงิน', rewardBalance: 'ยอดรางวัล',
     withdrawableAix: 'AIX ที่ถอนได้', aixBalance: 'ยอด AIX', winBalance: 'ยอด WIN', rawNewBalance: 'ยอดโทเคน', exchange: 'แลก', directReferralReward: 'รางวัลแนะนำตรง',
     managementReward: 'รางวัลการจัดการ', releasedManagementReward: 'รางวัลการจัดการที่ปล่อยแล้ว', pendingManagementReward: 'รางวัลการจัดการรอ', overflowReward: 'รางวัลล้น', totalIncome: 'รายได้รวม',
-    points: 'คะแนน', pointsAll: 'คะแนนรวม', pointsRecords: 'AIX-SDT', noPointsRecords: 'ไม่มีบันทึก AIX-SDT'
+    points: 'คะแนน', pointsAll: 'คะแนนรวม', pointsRecords: 'AIX-USDT', noPointsRecords: 'ไม่มีบันทึก AIX-USDT'
   },
   exchange: {
     title: 'แลก AIX เป็น WIN', availableAix: 'AIX ที่ใช้ได้', currentWin: 'ยอด WIN', exchangeAmount: 'จำนวนแลก', all: 'ทั้งหมด',

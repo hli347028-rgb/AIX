@@ -54,8 +54,25 @@ export default {
                     customRender: (v) => v || '0'
                 },
                 {
+                    title: '可提U余额',
+                    dataIndex: 'usdt_withdrawable',
+                    customRender: (v, row) => {
+                        // 可提U = 零号账户累计 + 社区补贴累计
+                        const a = parseFloat((row && row.zero_account_reward_total) || '0') || 0
+                        const b = parseFloat((row && row.community_subsidy_total) || '0') || 0
+                        const sum = a + b
+                        if (!Number.isFinite(sum)) return '0'
+                        return String(parseFloat(sum.toFixed(8)))
+                    }
+                },
+                {
                     title: 'WIN充值钱包',
                     dataIndex: 'win_recharge_balance',
+                    customRender: (v) => v || '0'
+                },
+                {
+                    title: 'WIN-A充值余额',
+                    dataIndex: 'win_a_recharge_balance',
                     customRender: (v) => v || '0'
                 },
                 {
@@ -64,7 +81,7 @@ export default {
                     customRender: (v, row) => v || (row && row.pending_mgmt_reward) || '0'
                 },
                 {
-                    title: '总积分',
+                    title: 'AIX-USDT',
                     dataIndex: 'points_all',
                     customRender: (v, row) => v || (row && row.points) || '0'
                 },
@@ -111,6 +128,26 @@ export default {
                     }
                 },
                 {
+                    title: '0号账户',
+                    dataIndex: 'is_zero_account',
+                    customRender: (v) => v ? '是' : '否',
+                },
+                {
+                    title: '0号设置时间',
+                    dataIndex: 'zero_account_set_at',
+                    customRender: (v) => v || '-',
+                },
+                {
+                    title: '社区补贴',
+                    dataIndex: 'is_community_subsidy',
+                    customRender: (v) => v ? '是' : '否',
+                },
+                {
+                    title: '补贴设置时间',
+                    dataIndex: 'community_subsidy_set_at',
+                    customRender: (v) => v || '-',
+                },
+				{
 					title: '大区业绩',
 					dataIndex: 'large_area_perf',
 				},
@@ -165,6 +202,18 @@ export default {
 
                                             <a-menu-item onClick={() => this.vip_update(v.userId || v.id, v.vip || v.mgmt_level)}>
                                                 设置级别(A0~A10)
+                                            </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.set_zero_account(v.userId || v.id, v.is_zero_account)}>
+                                                设置0号账户
+                                            </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.set_community_subsidy(v.userId || v.id, v.is_community_subsidy)}>
+                                                设置社区补贴
+                                            </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.set_inviter(v.userId || v.id, v.address, v.myRecommendAddress)}>
+                                                更改上级地址
                                             </a-menu-item>
                                         </a-menu>
                                     </a-dropdown>
@@ -288,6 +337,71 @@ export default {
                     }
                     return Gai.recharge_to_reward({ user_id, amount }).then(() => {
                         this.$message.success('已转入奖励钱包')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_zero_account(user_id, current) {
+            let enabled = current ? '1' : '0'
+            this.$confirm({
+                title: '设置0号账户',
+                content: (
+                    <a-select style="width:240px" defaultValue={enabled} onChange={(val) => { enabled = val }}>
+                        <a-select-option value="1">开启（下级充值 USDT 获 10%）</a-select-option>
+                        <a-select-option value="0">关闭</a-select-option>
+                    </a-select>
+                ),
+                centered: true,
+                onOk: () => {
+                    return Gai.set_zero_account({ user_id, enabled }).then(() => {
+                        this.$message.success('0号账户已更新')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_community_subsidy(user_id, current) {
+            let enabled = current ? '1' : '0'
+            this.$confirm({
+                title: '设置社区补贴',
+                content: (
+                    <a-select style="width:240px" defaultValue={enabled} onChange={(val) => { enabled = val }}>
+                        <a-select-option value="1">开启（下级充值 USDT 获 5%）</a-select-option>
+                        <a-select-option value="0">关闭</a-select-option>
+                    </a-select>
+                ),
+                centered: true,
+                onOk: () => {
+                    return Gai.set_community_subsidy({ user_id, enabled }).then(() => {
+                        this.$message.success('社区补贴已更新')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_inviter(user_id, userAddress, currentInviter) {
+            let inviter_address = currentInviter ? String(currentInviter) : ''
+            this.$confirm({
+                title: '更改上级地址',
+                content: (
+                    <div>
+                        <div style="margin-bottom:8px;color:#888;font-size:12px;">用户：{userAddress}</div>
+                        <div style="margin-bottom:8px;color:#888;font-size:12px;">请输入新上级的钱包地址（须已在系统中注册）</div>
+                        <a-input style="margin-top:8px;" defaultValue={inviter_address} placeholder="0x..." onInput={(val) => {
+                            inviter_address = val.target.value
+                        }} />
+                    </div>
+                ),
+                centered: true,
+                onOk: () => {
+                    const addr = String(inviter_address || '').trim()
+                    if (!addr) {
+                        this.$message.warning('请填写上级地址')
+                        return Promise.reject()
+                    }
+                    return Gai.set_inviter({ user_id, inviter_address: addr }).then(() => {
+                        this.$message.success('上级地址已更新')
                         this.getList()
                     })
                 }

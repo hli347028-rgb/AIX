@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"backend/internal/biz"
 
@@ -121,6 +122,38 @@ func (r *userRepo) ListUsersUnder(ctx context.Context, rootID int64) ([]*biz.Use
 	return out, nil
 }
 
+func (r *userRepo) CountUsersUnder(ctx context.Context, rootID int64) (int32, error) {
+	ids, err := r.listUserIDsUnder(ctx, rootID)
+	if err != nil {
+		return 0, err
+	}
+	return int32(len(ids)), nil
+}
+
+func (r *userRepo) ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error) {
+	return r.listUserIDsUnder(ctx, rootID)
+}
+
+func (r *userRepo) listUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error) {
+	var all []int64
+	current := []int64{rootID}
+	for depth := 0; depth < 1000 && len(current) > 0; depth++ {
+		var ids []int64
+		if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+			Where("inviter_id IN ?", current).
+			Order("id asc").
+			Pluck("id", &ids).Error; err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			break
+		}
+		all = append(all, ids...)
+		current = ids
+	}
+	return all, nil
+}
+
 func (r *userRepo) listUsersUnder(ctx context.Context, rootID int64) ([]UserPO, error) {
 	var all []UserPO
 	current := []int64{rootID}
@@ -150,11 +183,42 @@ func (r *userRepo) ListAllUsers(ctx context.Context) ([]*biz.User, error) {
 	if err := r.data.db.WithContext(ctx).Order("id desc").Find(&list).Error; err != nil {
 		return nil, err
 	}
+	inviterIDs := make([]int64, 0, len(list))
+	for i := range list {
+		if list[i].InviterID != nil {
+			inviterIDs = append(inviterIDs, *list[i].InviterID)
+		}
+	}
+	inviterAddr := r.batchUserAddresses(ctx, inviterIDs)
 	out := make([]*biz.User, 0, len(list))
 	for i := range list {
-		out = append(out, r.toBiz(ctx, &list[i]))
+		addr := ""
+		if list[i].InviterID != nil {
+			addr = inviterAddr[*list[i].InviterID]
+		}
+		out = append(out, r.toBizWithInviter(&list[i], addr))
 	}
 	return out, nil
+}
+
+func (r *userRepo) batchUserAddresses(ctx context.Context, ids []int64) map[int64]string {
+	out := make(map[int64]string)
+	if len(ids) == 0 {
+		return out
+	}
+	type row struct {
+		ID      int64
+		Address string
+	}
+	var rows []row
+	if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Select("id, address").Where("id IN ?", ids).Scan(&rows).Error; err != nil {
+		return out
+	}
+	for _, item := range rows {
+		out[item.ID] = item.Address
+	}
+	return out
 }
 
 func (r *userRepo) ListDirectInvitees(ctx context.Context, userID int64) ([]*biz.User, error) {
@@ -254,6 +318,13 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 		}
 		updates["win_recharge_balance"] = v
 	}
+	if update.WinARechargeBalance != "" {
+		v, err := decimal.NewFromString(update.WinARechargeBalance)
+		if err != nil {
+			return err
+		}
+		updates["win_a_recharge_balance"] = v
+	}
 	if update.PendingMgmtReward != "" {
 		v, err := decimal.NewFromString(update.PendingMgmtReward)
 		if err != nil {
@@ -326,6 +397,16 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 	}
 	if update.InviterID != nil {
 		updates["inviter_id"] = update.InviterID
+	}
+	if update.SetIsZeroAccount {
+		now := time.Now()
+		updates["is_zero_account"] = update.IsZeroAccount
+		updates["zero_account_set_at"] = now
+	}
+	if update.SetIsCommunitySubsidy {
+		now := time.Now()
+		updates["is_community_subsidy"] = update.IsCommunitySubsidy
+		updates["community_subsidy_set_at"] = now
 	}
 	if len(updates) == 0 {
 		return nil
@@ -458,6 +539,18 @@ func (r *userRepo) DeductBalance(ctx context.Context, userID int64, amount strin
 }
 
 func (r *userRepo) toBiz(ctx context.Context, po *UserPO) *biz.User {
+	inviterAddress := ""
+	if po.InviterID != nil {
+		var addr string
+		if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+			Select("address").Where("id = ?", *po.InviterID).Scan(&addr).Error; err == nil {
+			inviterAddress = addr
+		}
+	}
+	return r.toBizWithInviter(po, inviterAddress)
+}
+
+func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User {
 	user := &biz.User{
 		ID:                   po.ID,
 		Address:              po.Address,
@@ -467,6 +560,8 @@ func (r *userRepo) toBiz(ctx context.Context, po *UserPO) *biz.User {
 		AixBalance:           po.AixBalance.String(),
 		WinBalance:          po.WinBalance.String(),
 		WinRechargeBalance:  po.WinRechargeBalance.String(),
+		WinARechargeBalance: po.WinARechargeBalance.String(),
+		UsdtWithdrawable:    po.UsdtWithdrawable.String(),
 		PendingMgmtReward:    po.OverflowReward.Add(po.OverflowDirect).String(), // 兼容：溢出奖励合计
 		OverflowReward:       po.OverflowReward.String(),
 		OverflowDirect:       po.OverflowDirect.String(),
@@ -478,18 +573,18 @@ func (r *userRepo) toBiz(ctx context.Context, po *UserPO) *biz.User {
 		LargeAreaPerf:        po.LargeAreaPerf.String(),
 		SmallAreaPerf:        po.SmallAreaPerf.String(),
 		TeamPerf:             po.TeamPerf.String(),
+		IsZeroAccount:          po.IsZeroAccount,
+		IsCommunitySubsidy:     po.IsCommunitySubsidy,
+		ZeroAccountSetAt:       po.ZeroAccountSetAt,
+		CommunitySubsidySetAt:  po.CommunitySubsidySetAt,
+		ZeroAccountRewardTotal: po.ZeroAccountRewardTotal.String(),
+		CommunitySubsidyTotal:  po.CommunitySubsidyTotal.String(),
 		Status:               po.Status,
 		InviterID:            po.InviterID,
 		Role:                 po.Role,
 		CreatedTime:          po.CreatedTime,
 		UpdatedTime:          po.UpdatedTime,
-	}
-	if po.InviterID != nil {
-		var addr string
-		if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
-			Select("address").Where("id = ?", *po.InviterID).Scan(&addr).Error; err == nil {
-			user.InviterAddress = addr
-		}
+		InviterAddress:       inviterAddress,
 	}
 	user.SyncCompatFields()
 	return user
