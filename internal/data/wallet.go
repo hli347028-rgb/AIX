@@ -110,9 +110,7 @@ func (r *walletRepo) ConfirmRechargeCredit(ctx context.Context, id int64, txHash
 		if asset == biz.TokenWIN {
 			user.WinRechargeBalance = user.WinRechargeBalance.Add(po.Amount)
 			newBal = user.WinRechargeBalance.String()
-			if err := r.payWinRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
-				return err
-			}
+			// WIN 充值不产生零号账户/社区补贴奖励（仅 USDT 充值触发）
 			return tx.Model(&user).Update("win_recharge_balance", user.WinRechargeBalance).Error
 		}
 		if asset == biz.TokenWINA {
@@ -268,9 +266,7 @@ func (r *walletRepo) AutoCreditWinRecharge(
 		if err := tx.Model(&user).Update("win_recharge_balance", user.WinRechargeBalance).Error; err != nil {
 			return err
 		}
-		if err := r.payWinRechargeRoleRewards(tx, user.ID, amountDec); err != nil {
-			return err
-		}
+		// WIN 充值不产生零号账户/社区补贴奖励（仅 USDT 充值触发）
 		newBal = user.WinRechargeBalance.String()
 		credited = true
 		return nil
@@ -479,6 +475,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			}
 			user.UsdtReward = user.UsdtReward.Sub(principal)
 			fromReward = principal
+			// 奖励复投：上级只增加业绩，不产生直推奖/管理奖（directBase 保持 0）
 			balOut = user.UsdtReward.String()
 			updates["usdt_reward"] = user.UsdtReward
 		case biz.PayFromWin:
@@ -513,7 +510,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			}
 			user.WinARechargeBalance = user.WinARechargeBalance.Sub(winANeeded)
 			fromWinA = winANeeded
-			// WIN-A 认购不产生直推奖、管理奖
+			directBase = principal // 与充值钱包 / WIN 一致，产生直推奖
 			balOut = user.WinARechargeBalance.String()
 			updates["win_a_recharge_balance"] = user.WinARechargeBalance
 		default:
@@ -532,27 +529,20 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			FromReward:   fromReward,
 			FromWin:      fromWin,
 			FromWinA:     fromWinA,
+			Points:       principal, // 认购金额即本单积分（含 WIN-A）
 			FundSource:   payFrom,
 			Status:       biz.OrderStatusActive,
-		}
-		if payFrom == biz.PayFromWinA {
-			po.Points = decimal.Zero // WIN-A 认购不产生 AIX-USDT（积分）
-		} else {
-			po.Points = principal // 认购金额即本单积分
 		}
 		if err := tx.Create(po).Error; err != nil {
 			return err
 		}
-		// WIN-A 认购不计入 AIX-USDT（积分）
-		if payFrom != biz.PayFromWinA {
-			user.Points = user.Points.Add(principal)
-			user.PointsAll = user.PointsAll.Add(principal)
-			if err := tx.Model(&user).Updates(map[string]interface{}{
-				"points":     user.Points,
-				"points_all": user.PointsAll,
-			}).Error; err != nil {
-				return err
-			}
+		user.Points = user.Points.Add(principal)
+		user.PointsAll = user.PointsAll.Add(principal)
+		if err := tx.Model(&user).Updates(map[string]interface{}{
+			"points":     user.Points,
+			"points_all": user.PointsAll,
+		}).Error; err != nil {
+			return err
 		}
 		created = r.orderToBiz(po)
 		if payFrom == biz.PayFromWin {
@@ -562,7 +552,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			created.WinAPrice = winAPriceSnap.String()
 		}
 
-		// 直推奖：recharge / win 且有上级（WIN-A 不产生直推奖）
+		// 直推奖：recharge / win / win_a 且有上级（奖励复投不产生直推奖）
 		if directBase.IsPositive() && user.InviterID != nil {
 			if err := r.payDirectReward(tx, *user.InviterID, userID, po.ID, directBase, directRate); err != nil {
 				return err
@@ -572,8 +562,8 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		if err := refreshAncestorPerformance(tx, userID); err != nil {
 			return err
 		}
-		// WIN-A 认购不产生管理奖
-		if payFrom != biz.PayFromWinA {
+		// 管理奖：充值钱包 / WIN / WIN-A 报单产生；奖励复投只增加上级业绩
+		if payFrom != biz.PayFromReward {
 			if err := r.createManagementRewards(tx, &user, po); err != nil {
 				return err
 			}
@@ -1048,9 +1038,7 @@ func (r *walletRepo) ListSubscribeOrdersPaged(ctx context.Context, offset, limit
 			CreatedTime: rw.CreatedTime,
 		}
 		if o.Points == "" || o.Points == "0" {
-			if o.FundSource != biz.PayFromWinA {
-				o.Points = o.Principal
-			}
+			o.Points = o.Principal
 		}
 		o.SyncCompatFields()
 		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rw.Address})
@@ -2116,20 +2104,8 @@ func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrde
 	return r.FindOrder(ctx, update.OrderID)
 }
 
-// payWinRechargeRoleRewards 下级 WIN 充值时，按实时 WIN 价折算 USDT 后向上级发放零号/社区补贴奖励。
-func (r *walletRepo) payWinRechargeRoleRewards(tx *gorm.DB, fromUserID int64, winAmount decimal.Decimal) error {
-	if !winAmount.GreaterThan(decimal.Zero) {
-		return nil
-	}
-	winPrice := decimal.NewFromFloat(biz.GetWinPrice())
-	if !winPrice.IsPositive() {
-		return nil
-	}
-	usdtAmount := winAmount.Mul(winPrice).Round(8)
-	return r.payUSDTRechargeRoleRewards(tx, fromUserID, usdtAmount)
-}
-
-// payUSDTRechargeRoleRewards 下级 USDT 充值（或 WIN 折算 USDT）时，向上查找首个开通对应角色的上级并发放奖励（入账可提 U 余额）。
+// payUSDTRechargeRoleRewards 下级 USDT 充值时，向上查找首个开通对应角色的上级并发放奖励（入账可提 U 余额）。
+// 仅 USDT 充值触发；WIN / WIN-A 充值不发放零号账户与社区补贴奖励。
 // 0号账户与社区补贴分别独立向上查找：各自找到最近一位开通者后发放并停止，互不影响。
 func (r *walletRepo) payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
 	if !amount.GreaterThan(decimal.Zero) {

@@ -26,9 +26,9 @@ const statRows = [
     ['totalRewardReinvest', 'todayRewardReinvest', 'totalDynamic', 'todayDynamic'],
     ['totalStaticRelease', 'yesterdayStaticRelease', 'totalWinWithdraw', 'todayWinWithdraw'],
     ['totalSdtWithdraw', 'todaySdtWithdraw', 'totalSdtAsset', 'totalWinAsset'],
-    ['totalAdminRecharge', 'todayAdminRecharge', 'totalZeroAccountReward', 'todayZeroAccountReward'],
-    ['totalCommunitySubsidyReward', 'todayCommunitySubsidyReward', 'totalUsdtWithdrawable', 'totalUsdtWithdraw'],
-    ['todayUsdtWithdraw'],
+    ['totalRewardWallet', 'totalOverflowWallet', 'totalAdminRecharge', 'todayAdminRecharge'],
+    ['totalZeroAccountReward', 'todayZeroAccountReward', 'totalCommunitySubsidyReward', 'todayCommunitySubsidyReward'],
+    ['totalUsdtWithdrawable', 'totalUsdtWithdraw', 'todayUsdtWithdraw'],
 ]
 
 const statMeta = {
@@ -56,6 +56,8 @@ const statMeta = {
     todaySdtWithdraw: { label: '今日AIX-USDT提现', icon: 'export' },
     totalSdtAsset: { label: '总AIX-USDT资产', icon: 'fund' },
     totalWinAsset: { label: '总WIN资产', icon: 'fund' },
+    totalRewardWallet: { label: '总奖励钱包余额', icon: 'wallet' },
+    totalOverflowWallet: { label: '总溢出钱包余额', icon: 'wallet' },
     totalAdminRecharge: { label: '总后台手动充值', icon: 'plus-circle' },
     todayAdminRecharge: { label: '今日后台手动充值', icon: 'plus-circle' },
     totalZeroAccountReward: { label: '总零号账户累计金额', icon: 'gift' },

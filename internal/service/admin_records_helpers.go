@@ -128,7 +128,8 @@ func (s *AdminLegacyService) sumStaticRelease(ctx context.Context, settlementDat
 }
 
 func (s *AdminLegacyService) sumOrderPrincipal(ctx context.Context, fundSource string, since *time.Time) (decimal.Decimal, error) {
-	db := s.data.DB().WithContext(ctx).Table("orders")
+	db := s.data.DB().WithContext(ctx).Table("orders").
+		Where("status IN ?", []string{biz.OrderStatusActive, biz.OrderStatusExited})
 	if fundSource != "" {
 		db = db.Where("fund_source = ?", fundSource)
 	}

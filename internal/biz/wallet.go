@@ -16,12 +16,13 @@ const (
 	RechargeStatusRejected  = "rejected"
 
 	PayFromRecharge = "recharge"
-	PayFromReward   = "reward"
-	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推）
-	PayFromWinA     = "win_a" // 用 WIN-A 充值钱包按 win_a_price 折算认购（不产生直推/管理奖/AIX-USDT）
+	PayFromReward   = "reward" // 奖励钱包复投：上级只增业绩，不产生直推/管理奖
+	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
+	PayFromWinA     = "win_a" // 用 WIN-A 充值钱包按 win_a_price 折算认购（产生直推/管理奖与积分）
 
-	OrderStatusActive = "active"
-	OrderStatusExited = "exited"
+	OrderStatusActive    = "active"
+	OrderStatusExited    = "exited"
+	OrderStatusCancelled = "cancelled"
 
 	// Legacy aliases
 	OrderStatusCompleted    = "exited"
@@ -42,7 +43,7 @@ const (
 	TokenWINA = "WIN-A"
 	TokenSDT  = "SDT"
 
-	// 下级 USDT 充值时，上级角色奖励比例（入账可提 U 余额，不参与订单释放）
+	// 下级 USDT 充值时，上级角色奖励比例（入账可提 U 余额；仅 USDT，不含 WIN/WIN-A）
 	ZeroAccountRechargeRate      = 0.10
 	CommunitySubsidyRechargeRate = 0.05
 
@@ -54,8 +55,8 @@ const (
 	RewardTypeExitAccel         = "exit_accel"
 	RewardTypeTransferIn        = "transfer_in"
 	RewardTypeTransferOut       = "transfer_out"
-	RewardTypeZeroAccount       = "zero_account"       // 零号账户：下级充值奖励
-	RewardTypeCommunitySubsidy  = "community_subsidy"  // 社区补贴：下级充值奖励
+	RewardTypeZeroAccount       = "zero_account"       // 零号账户：下级 USDT 充值奖励
+	RewardTypeCommunitySubsidy  = "community_subsidy"  // 社区补贴：下级 USDT 充值奖励
 )
 
 // GetWinPrice 返回 WIN 代币价格（USDT/枚）。

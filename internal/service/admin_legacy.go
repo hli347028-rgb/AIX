@@ -1361,6 +1361,19 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	totalRewardWallet, err := s.sumUserAsset(ctx, "usdt_reward")
+	if err != nil {
+		return nil, err
+	}
+	overflowMgmt, err := s.sumUserAsset(ctx, "overflow_reward")
+	if err != nil {
+		return nil, err
+	}
+	overflowDirect, err := s.sumUserAsset(ctx, "overflow_direct")
+	if err != nil {
+		return nil, err
+	}
+	totalOverflowWallet := overflowMgmt.Add(overflowDirect)
 	winBalance, err := s.sumUserAsset(ctx, "win_balance")
 	if err != nil {
 		return nil, err
@@ -1433,6 +1446,8 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 		"todaySdtWithdraw":       todaySdtWithdraw.String(),
 		"totalSdtAsset":          totalSdtAsset.String(),
 		"totalWinAsset":          totalWinAsset.String(),
+		"totalRewardWallet":      totalRewardWallet.String(),
+		"totalOverflowWallet":    totalOverflowWallet.String(),
 		"totalAdminRecharge":     totalAdminRecharge.String(),
 		"todayAdminRecharge":     todayAdminRecharge.String(),
 		"totalZeroAccountReward": totalZeroAccountReward.String(),
