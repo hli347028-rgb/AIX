@@ -3,7 +3,7 @@
     <div class="header-container">
       <div class="header-left" @click="handleSidebarClick">
         <img src="/assets/logo.png" alt="Logo" class="logo" />
-        <span class="home-label">{{ $t('tab.home') }}</span>
+        <span v-if="isHome" class="home-label">{{ $t('tab.home') }}</span>
       </div>
       <div class="header-right">
         <button class="connect-btn" @click="handleWalletClick">
@@ -45,10 +45,14 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { Teleport } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import userPerson from '@/pinia/person'
 import Sidebar from '@/components/Sidebar.vue'
 import { userLanguageOptions } from '@/i18n/languages'
+
+const route = useRoute()
+const isHome = computed(() => route.path === '/')
 
 const person = userPerson()
 const { locale } = useI18n()

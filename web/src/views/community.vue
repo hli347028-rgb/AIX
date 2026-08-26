@@ -78,7 +78,7 @@
         </div>
       </div>
 
-      <h3 class="list-title">{{ $t('community.directInviteData') }}</h3>
+      <h3 class="list-title">{{ $t('community.downlineRechargeAmount') }}</h3>
       <div class="table-card downline-table" :class="{ 'is-empty': downlineRechargeList.length === 0 }">
         <div class="table-header downline-recharge-header">
           <span>{{ $t('community.walletAddress') }}</span>

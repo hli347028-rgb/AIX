@@ -134,6 +134,7 @@ export default {
     usdtAmount: 'จำนวน USDT',
     rechargeType: 'ประเภทการเติม',
     rechargeAmount: 'จำนวนเงินที่เติม',
+    downlineRechargeAmount: 'จำนวนเงินที่เติมของระดับล่าง',
     brc20Amount: 'จำนวน BRC20'
   },
   count: {

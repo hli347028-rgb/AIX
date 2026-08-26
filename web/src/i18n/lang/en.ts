@@ -137,6 +137,7 @@ export default {
     usdtAmount: 'USDT Amount',
     rechargeType: 'Recharge Type',
     rechargeAmount: 'Recharge Amount',
+    downlineRechargeAmount: 'Downline Recharge Amount',
     brc20Amount: 'BRC20 Amount'
   },
   count: {

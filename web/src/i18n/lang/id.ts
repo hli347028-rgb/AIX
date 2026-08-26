@@ -134,6 +134,7 @@ export default {
     usdtAmount: 'Jumlah USDT',
     rechargeType: 'Jenis Isi Ulang',
     rechargeAmount: 'Jumlah Isi Ulang',
+    downlineRechargeAmount: 'Jumlah Isi Ulang Bawahan',
     brc20Amount: 'Jumlah BRC20'
   },
   count: {

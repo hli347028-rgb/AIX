@@ -134,6 +134,7 @@ export default {
     usdtAmount: 'Số lượng USDT',
     rechargeType: 'Loại nạp',
     rechargeAmount: 'Số tiền nạp',
+    downlineRechargeAmount: 'Số tiền nạp cấp dưới',
     brc20Amount: 'Số lượng BRC20'
   },
   count: {

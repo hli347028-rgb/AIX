@@ -134,6 +134,7 @@ export default {
     usdtAmount: 'USDT 수량',
     rechargeType: '충전 유형',
     rechargeAmount: '충전 금액',
+    downlineRechargeAmount: '하위 충전 금액',
     brc20Amount: 'BRC20 수량'
   },
   count: {
