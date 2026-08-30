@@ -283,6 +283,35 @@ func CalcAreaPerformance(branches []decimal.Decimal) (large, small, team decimal
 	return large, small, team
 }
 
+// PickLargeAreaChild 在直推分支业绩中选出大区根节点：业绩最大；并列时取更小的 childID（稳定）。
+// 无分支时返回 0。
+func PickLargeAreaChild(branchStakes map[int64]decimal.Decimal) int64 {
+	var largeID int64
+	largeStake := decimal.Zero
+	first := true
+	for childID, stake := range branchStakes {
+		if first || stake.GreaterThan(largeStake) || (stake.Equal(largeStake) && (largeID == 0 || childID < largeID)) {
+			largeID = childID
+			largeStake = stake
+			first = false
+		}
+	}
+	return largeID
+}
+
+// IsInSmallAreaBranch 报单来源是否落在上级的小区（非大区直推分支）。
+// 用于大区/小区业绩展示；管理奖发放已不再依赖该判断。
+func IsInSmallAreaBranch(branchStakes map[int64]decimal.Decimal, sourceBranchChildID int64) bool {
+	if sourceBranchChildID <= 0 || len(branchStakes) == 0 {
+		return false
+	}
+	if _, ok := branchStakes[sourceBranchChildID]; !ok {
+		return false
+	}
+	largeID := PickLargeAreaChild(branchStakes)
+	return sourceBranchChildID != largeID
+}
+
 // IsLinealRelation reports whether one user is an ancestor of the other.
 // Siblings and users in different invitation branches are not lineal.
 func IsLinealRelation(a, b int64, parentByUser map[int64]int64) bool {

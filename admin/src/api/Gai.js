@@ -102,9 +102,44 @@ export default {
             params: parameter
         })
     },
+    exchange_pass: (parameter) => {
+        return axios({
+            url: `${api8005}/exchange_pass`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    exchange_reject: (parameter) => {
+        return axios({
+            url: `${api8005}/exchange_reject`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    operation_log_list: (parameter) => {
+        return axios({
+            url: `${api8005}/operation_log_list`,
+            method: 'get',
+            params: parameter
+        })
+    },
     transfer_list: (parameter) => {
         return axios({
             url: `${api8005}/transfer_list`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    partner_credit_list: (parameter) => {
+        return axios({
+            url: `${api8005}/partner_credit_list`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    partner_credit_partners: (parameter) => {
+        return axios({
+            url: `${api8005}/partner_credit_partners`,
             method: 'get',
             params: parameter
         })
@@ -289,6 +324,13 @@ export default {
     set_community_subsidy: (parameter) => {
         return axios({
             url: `${api8006}/set_community_subsidy`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    set_frozen: (parameter) => {
+        return axios({
+            url: `${api8006}/set_frozen`,
             method: 'post',
             data: parameter
         })

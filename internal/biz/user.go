@@ -8,6 +8,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	// AccountFrozenReason 账户被后台冻结时的错误原因码
+	AccountFrozenReason = "ACCOUNT_FROZEN"
+	// AccountFrozenMessage 账户被后台冻结时的提示文案
+	AccountFrozenMessage = "账户已被冻结，请联系客服"
+)
+
 // User represents an AIX wallet user.
 type User struct {
 	ID              int64
@@ -37,6 +44,8 @@ type User struct {
 	ZeroAccountRewardTotal string
 	CommunitySubsidyTotal  string
 	Status          int32
+	IsFrozen        bool
+	FrozenAt        *time.Time
 	InviterID       *int64
 	InviterAddress  string
 	Role            string

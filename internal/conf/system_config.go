@@ -32,11 +32,24 @@ type SystemConfigSnapshot struct {
 	MinUsdtRecharge       string    `json:"min_usdt_recharge"`       // USDT 充值最小值（≥10）
 	MinWinRecharge        string    `json:"min_win_recharge"`        // WIN 充值最小值（≥10）
 	MinWinARecharge       string    `json:"min_win_a_recharge"`      // WIN-A 充值最小值（≥10）
+	RegisterBonus         string    `json:"register_bonus"`          // 注册赠送金额，入充值钱包（0=不赠送）
 	WinWithdrawReviewThreshold string `json:"win_withdraw_review_threshold"` // WIN 提现审核阈值（≥此金额需审核，0=不审核）
 	SdtWithdrawReviewThreshold string `json:"sdt_withdraw_review_threshold"` // AIX-USDT 提现审核阈值
 	UsdtWithdrawReviewThreshold string `json:"usdt_withdraw_review_threshold"` // 可提 U 提现审核阈值
+
+	// 交易所划转（合作方转账加款接口 /v1/transfer/credit）限额
+	PartnerMinAmount  string `json:"partner_min_amount"`  // 单笔下限
+	PartnerMaxAmount  string `json:"partner_max_amount"`  // 单笔上限
+	PartnerDailyLimit string `json:"partner_daily_limit"` // 单日累计上限
+
+	// AIX 兑换审核：全网当日已兑换 AIX 超过「今日AIX数量 × 阈值%」后，后续兑换进待审核
+	ExchangeReviewThresholdPercent string `json:"exchange_review_threshold_percent"`
+
 	MgmtCountsTowardExit  bool      `json:"mgmt_counts_toward_exit"` // 管理奖是否计入出局
 	MgmtCountsTowardExitP *bool     `json:"-"`                       // 内部：区分 JSON 缺省与 false
+
+	// 子账户（密码与可访问模块，主账户在配置项维护；覆盖 yaml 默认值）
+	AdminSubAccounts []AdminSubAccount `json:"admin_sub_accounts,omitempty"`
 
 	// 兼容旧 admin 字段（忽略）
 	WithdrawFeeRate float64   `json:"withdraw_fee_rate,omitempty"`
@@ -61,7 +74,16 @@ const (
 	DefaultMinUsdtRecharge   = "10"
 	DefaultMinWinRecharge    = "10"
 	DefaultMinWinARecharge   = "10"
+	DefaultRegisterBonus     = "0" // 注册赠送默认关闭，各环境自行开启
 	FloorMinRechargeAmount   = 10.0 // 管理端与业务校验的绝对下限
+
+	// 交易所划转限额默认值
+	DefaultPartnerMinAmount  = "10"
+	DefaultPartnerMaxAmount  = "100000"
+	DefaultPartnerDailyLimit = "1000000"
+
+	// 兑换审核阈值（%）：当日已兑换 AIX 超过「今日AIX × 该百分比」后，后续兑换需审核。默认 100=不提前触发。
+	DefaultExchangeReviewThresholdPercent = "100"
 )
 
 // DefaultMgmtThresholds W1→W10 小区业绩门槛（USDT）
@@ -105,6 +127,13 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	s.MinUsdtRecharge = normalizeMinRecharge(s.MinUsdtRecharge, DefaultMinUsdtRecharge)
 	s.MinWinRecharge = normalizeMinRecharge(s.MinWinRecharge, DefaultMinWinRecharge)
 	s.MinWinARecharge = normalizeMinRecharge(s.MinWinARecharge, DefaultMinWinARecharge)
+	if strings.TrimSpace(s.RegisterBonus) == "" {
+		s.RegisterBonus = DefaultRegisterBonus
+	}
+	s.PartnerMinAmount = normalizePositiveAmount(s.PartnerMinAmount, DefaultPartnerMinAmount)
+	s.PartnerMaxAmount = normalizePositiveAmount(s.PartnerMaxAmount, DefaultPartnerMaxAmount)
+	s.PartnerDailyLimit = normalizePositiveAmount(s.PartnerDailyLimit, DefaultPartnerDailyLimit)
+	s.ExchangeReviewThresholdPercent = normalizePercent(s.ExchangeReviewThresholdPercent, DefaultExchangeReviewThresholdPercent)
 	if len(s.MgmtThresholds) != 10 {
 		s.MgmtThresholds = DefaultMgmtThresholds()
 	}
@@ -117,6 +146,34 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 		// 使用：若从未设置过业务开关，默认 true
 		s.MgmtCountsTowardExit = true
 	}
+}
+
+// normalizePercent 空值或非法值回落默认；允许 0（表示一兑换就审）。
+func normalizePercent(raw, fallback string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = fallback
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v < 0 {
+		return fallback
+	}
+	return strconv.FormatFloat(v, 'f', -1, 64)
+}
+
+// normalizePositiveAmount 空值或非正数回落到默认值。
+// 与 normalizeMinRecharge 的区别：不强制抬到 FloorMinRechargeAmount，
+// 因为上限/日限额没有那条 ≥10 的业务下限。
+func normalizePositiveAmount(raw, fallback string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		raw = fallback
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
 // normalizeMinRecharge 空值回落默认；若解析失败或 < 绝对下限，则抬到下限。

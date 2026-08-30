@@ -144,6 +144,9 @@ type AdminUserUpdate struct {
 	IsZeroAccount            bool
 	SetIsCommunitySubsidy    bool
 	IsCommunitySubsidy       bool
+	SetIsFrozen              bool
+	IsFrozen                 bool
+	Address                  string // 非空时更新钱包地址（及 invite_code）
 }
 
 func (uc *AdminUsecase) UpdateUser(ctx context.Context, tokenString string, update *AdminUserUpdate) (*AdminUserDetail, error) {
@@ -242,6 +245,48 @@ func (uc *AdminUsecase) SetUserInviter(ctx context.Context, tokenString string, 
 	return uc.userRepo.RefreshPerformanceFromUsers(ctx, seeds...)
 }
 
+// ChangeUserAddress 用未注册钱包地址替换已注册用户地址（同步 invite_code）。
+func (uc *AdminUsecase) ChangeUserAddress(ctx context.Context, tokenString string, userID int64, newAddress string) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	user, err := uc.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.NotFound("USER_NOT_FOUND", "用户不存在")
+	}
+
+	newAddress = strings.TrimSpace(newAddress)
+	if newAddress == "" {
+		return errors.BadRequest("INVALID_ADDRESS", "新钱包地址不能为空")
+	}
+	normalized, err := eth.NormalizeAddress(newAddress)
+	if err != nil {
+		return errors.BadRequest("INVALID_ADDRESS", "新钱包地址格式无效")
+	}
+	if strings.EqualFold(normalized, user.Address) {
+		return errors.BadRequest("INVALID_ADDRESS", "新地址与当前地址相同")
+	}
+
+	existing, err := uc.userRepo.FindByAddress(ctx, normalized)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return errors.BadRequest("ADDRESS_TAKEN", "该钱包地址已被其他用户注册")
+	}
+
+	return uc.userRepo.AdminUpdateUser(ctx, &AdminUserUpdate{
+		UserID:  userID,
+		Address: normalized,
+	})
+}
+
 func (uc *AdminUsecase) GetSystemConfig(ctx context.Context, tokenString string) (*conf.SystemConfigSnapshot, error) {
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return nil, err
@@ -298,10 +343,16 @@ func (uc *AdminUsecase) buildConfigSnapshot() *conf.SystemConfigSnapshot {
 		MinUsdtRecharge:            MinUsdtRecharge,
 		MinWinRecharge:             MinWinRecharge,
 		MinWinARecharge:            MinWinARecharge,
+		RegisterBonus:              RegisterBonus,
 		WinWithdrawReviewThreshold: WinWithdrawReviewThreshold,
 		SdtWithdrawReviewThreshold: SdtWithdrawReviewThreshold,
 		UsdtWithdrawReviewThreshold: UsdtWithdrawReviewThreshold,
 		MgmtCountsTowardExit:       MgmtCountsTowardExit,
+		PartnerMinAmount:           PartnerMinAmount,
+		PartnerMaxAmount:           PartnerMaxAmount,
+		PartnerDailyLimit:          PartnerDailyLimit,
+		ExchangeReviewThresholdPercent: ExchangeReviewThresholdPercent,
+		AdminSubAccounts:           append([]conf.AdminSubAccount(nil), uc.authCfg.GetAdminSubAccounts()...),
 	}
 	conf.NormalizeBusinessDefaults(snap)
 	return snap
@@ -338,6 +389,9 @@ func (uc *AdminUsecase) applyConfigSnapshot(snapshot *conf.SystemConfigSnapshot)
 	uc.walletCfg.RPCURL = snapshot.RPCURL
 	if snapshot.MinSubscribe != "" {
 		uc.walletCfg.MinSubscribe = snapshot.MinSubscribe
+	}
+	if len(snapshot.AdminSubAccounts) > 0 {
+		uc.authCfg.AdminSubAccounts = append([]conf.AdminSubAccount(nil), snapshot.AdminSubAccounts...)
 	}
 	ApplyAixConfig(snapshot)
 }
@@ -425,7 +479,11 @@ func (uc *AdminUsecase) TriggerSettlement(ctx context.Context, tokenString, sett
 	if settlementDate == "" {
 		settlementDate = TodaySettlementDate(token.NowChina())
 	}
-	return uc.settlement.ForceDailySettlement(ctx, settlementDate)
+	// 日结遍历全网活跃订单，通常超过 HTTP server.timeout（当前 5s）。
+	// 鉴权仍用请求 ctx；真正跑结算改用独立超时，避免被请求 deadline 掐断。
+	runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Minute)
+	defer cancel()
+	return uc.settlement.ForceDailySettlement(runCtx, settlementDate)
 }
 
 func (uc *AdminUsecase) AdminCreditBalance(ctx context.Context, tokenString, address, amount string) (string, string, error) {
@@ -601,6 +659,32 @@ func (uc *AdminUsecase) RejectWithdrawalReview(ctx context.Context, tokenString 
 		return errors.BadRequest("INVALID_ID", "提现 ID 无效")
 	}
 	if err := uc.walletRepo.RejectWithdrawalReview(ctx, id, remark); err != nil {
+		return errors.BadRequest("REJECT_FAILED", err.Error())
+	}
+	return nil
+}
+
+func (uc *AdminUsecase) ApproveExchangeReview(ctx context.Context, tokenString string, id int64) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if id <= 0 {
+		return errors.BadRequest("INVALID_ID", "兑换 ID 无效")
+	}
+	if err := uc.walletRepo.ApproveExchangeReview(ctx, id); err != nil {
+		return errors.BadRequest("APPROVE_FAILED", err.Error())
+	}
+	return nil
+}
+
+func (uc *AdminUsecase) RejectExchangeReview(ctx context.Context, tokenString string, id int64, remark string) error {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return err
+	}
+	if id <= 0 {
+		return errors.BadRequest("INVALID_ID", "兑换 ID 无效")
+	}
+	if err := uc.walletRepo.RejectExchangeReview(ctx, id, remark); err != nil {
 		return errors.BadRequest("REJECT_FAILED", err.Error())
 	}
 	return nil

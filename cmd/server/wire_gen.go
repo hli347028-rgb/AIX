@@ -22,7 +22,7 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-func wireApp(confServer *conf.Server, dbCfg *conf.DatabaseConfig, authCfg *conf.AuthConfig, walletCfg *conf.WalletConfig, logger log.Logger) (*kratos.App, *job.SettlementJob, *job.ChainRechargeJob, *job.WinPriceOracleJob, *biz.AdminUsecase, func(), error) {
+func wireApp(confServer *conf.Server, dbCfg *conf.DatabaseConfig, authCfg *conf.AuthConfig, walletCfg *conf.WalletConfig, partnerCfg *conf.TransferPartnerConfig, logger log.Logger) (*kratos.App, *job.SettlementJob, *job.ChainRechargeJob, *job.WinPriceOracleJob, *biz.AdminUsecase, func(), error) {
 	dataData, cleanup, err := data.NewData(dbCfg, logger)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
@@ -39,14 +39,17 @@ func wireApp(confServer *conf.Server, dbCfg *conf.DatabaseConfig, authCfg *conf.
 	settlementUsecase := biz.NewSettlementUsecase(userRepo, stakingRepo, walletRepo, settingsRepo, logger)
 	adminUsecase := biz.NewAdminUsecase(userRepo, walletRepo, settingsRepo, settlementUsecase, authCfg, walletCfg, logger)
 	adminService := service.NewAdminService(adminUsecase)
-	adminLegacyService := service.NewAdminLegacyService(adminUsecase, userRepo, walletRepo, dataData, authCfg, walletCfg)
+	adminLegacyService := service.NewAdminLegacyService(adminUsecase, userRepo, walletRepo, dataData, authCfg, walletCfg, partnerCfg)
 	openService := service.NewOpenService(walletRepo, authCfg, logger)
+	partnerNonceRepo := data.NewPartnerNonceRepo(dataData, logger)
+	transferCreditUsecase := biz.NewTransferCreditUsecase(walletRepo, partnerNonceRepo, partnerCfg, logger)
+	transferCreditService := service.NewTransferCreditService(transferCreditUsecase, partnerCfg, logger)
 	settlementJob := job.NewSettlementJob(settlementUsecase, logger)
 	chainRechargeJob := job.NewChainRechargeJob(walletRepo, settingsRepo, walletCfg, logger)
 	winPriceOracleJob := job.NewWinPriceOracleJob(adminUsecase, walletCfg, logger)
 	withdrawPayoutJob := job.NewWithdrawPayoutJob(walletRepo, walletCfg, logger)
 	grpcServer := server.NewGRPCServer(confServer, authService, walletService, logger)
-	httpServer := server.NewHTTPServer(confServer, authService, walletService, adminService, adminLegacyService, openService, chainRechargeJob, winPriceOracleJob, withdrawPayoutJob, logger)
+	httpServer := server.NewHTTPServer(confServer, authService, walletService, adminService, adminLegacyService, openService, transferCreditService, chainRechargeJob, winPriceOracleJob, withdrawPayoutJob, logger)
 	app := newApp(logger, grpcServer, httpServer)
 	return app, settlementJob, chainRechargeJob, winPriceOracleJob, adminUsecase, func() {
 		cleanup()

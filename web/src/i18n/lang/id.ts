@@ -29,7 +29,7 @@ export default {
     operationFailed: 'Operasi gagal',
     close: 'Tutup',
     protocol: 'Protokol', gotIt: 'Mengerti', languageSwitch: 'Bahasa', switchWallet: 'Ganti Dompet', back: 'Kembali',
-    days: '{count} hari', retry: 'Coba Lagi'
+    days: '{count} hari', retry: 'Coba Lagi', loadFailed: 'Gagal memuat, silakan coba lagi nanti'
   },
   index: {
     welcomeSubtitle: 'Rantai Aplikasi Pelacakan AI Pertama di Dunia',
@@ -177,7 +177,7 @@ export default {
     pageTitle: 'Keuangan Stake',
     pageSubtitle: 'Silakan pilih rentang investasi yang sesuai',
     balance: 'Saldo Akun',
-    reportOrder: 'Berlangganan',
+    reportOrder: 'USDT',
     reinvest: 'Investasi Ulang',
     rechargeWallet: 'Dompet Isi Ulang',
     rewardWallet: 'Dompet Hadiah',
@@ -190,7 +190,7 @@ export default {
     rechargeWalletBalance: 'Saldo Dompet Isi Ulang',
     rewardWalletBalance: 'Saldo Dompet Hadiah',
     winWalletBalance: 'Saldo Isi Ulang WIN',
-    winPay: 'Bayar dengan WIN',
+    winPay: 'WIN',
     winPayNow: 'Bayar dengan WIN',
     winPaySuccess: 'Langganan WIN berhasil',
     winPayFailed: 'Langganan WIN gagal',
@@ -213,6 +213,7 @@ export default {
     statusComing: 'Segera Hadir',
     subscribeNow: 'Gabung Sekarang',
     customAmountHint: 'Jumlah kustom (≥ {amount} USDT)',
+    all: 'Semua',
     minPlaceholder: 'Min {amount}',
     subscribeSuccess: 'Langganan Berhasil',
     subscribeFailed: 'Langganan Gagal',
@@ -226,6 +227,7 @@ export default {
     statusCompleted: 'Selesai',
     statusPending: 'Tertunda',
     minSubscribeAmount: 'Jumlah langganan tidak boleh kurang dari {amount}',
+    subscribeStep: 'Jumlah langganan harus kelipatan {step}',
     enterSubscribeAmount: 'Silakan masukkan jumlah langganan'
   },
   withdraw: {
@@ -324,7 +326,7 @@ export default {
     globalLaunch: 'Peluncuran Global',
     networkHashrate: 'Hashrate Jaringan',
     walletDownload: 'Unduh Dompet',
-    orderZone: 'Zona Langganan',
+    orderZone: 'Zona Mint',
     hashrateMall: 'Mall Hashrate',
     rechargeZone: 'Zona Isi Ulang',
     crossChain: 'Zona Lintas Rantai',
@@ -370,7 +372,7 @@ export default {
     noDirectReferral: 'Tidak ada rujukan langsung',
     income: 'Pendapatan',
     exitProgress: 'Progres Keluar', rechargeBalance: 'Saldo Isi Ulang', rewardBalance: 'Saldo Hadiah',
-    withdrawableAix: 'AIX Dapat Ditarik', aixBalance: 'Saldo AIX', winBalance: 'Saldo WIN', rawNewBalance: 'Saldo Token', exchange: 'Tukar', directReferralReward: 'Hadiah Rujukan Langsung',
+    withdrawableAix: 'AIX Dapat Ditarik', aixBalance: 'Saldo AIX', winBalance: 'Saldo WIN', winRechargeBalance: 'Saldo Isi Ulang WIN', rawNewBalance: 'Saldo Token', exchange: 'Tukar', directReferralReward: 'Hadiah Rujukan Langsung',
     managementReward: 'Hadiah Manajemen', releasedManagementReward: 'Hadiah Manajemen Dirilis', pendingManagementReward: 'Hadiah Manajemen Tertunda', overflowReward: 'Hadiah Overflow', totalIncome: 'Total Pendapatan',
     points: 'Poin', pointsAll: 'Total Poin', pointsRecords: 'AIX-USDT', noPointsRecords: 'Tidak ada catatan AIX-USDT'
   },

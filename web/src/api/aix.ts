@@ -79,25 +79,26 @@ export function getAixBalance() {
   return get('/v1/wallet/balance')
 }
 
-export interface AixWinExchangeResult {
+export interface AixExchangeResult {
   record_id: number
   from_asset: 'AIX'
   from_amount: string
-  to_asset: 'WIN'
+  to_asset: 'USDT' | 'WIN'
   to_amount: string
   exchange_price: string
   exchange_fee_rate: number
   status: 'completed'
   aix_balance: string
-  win_balance: string
+  usdt_withdrawable?: string
+  win_balance?: string
   created_at: number
 }
 
-export interface AixWinExchangeRecord {
+export interface AixExchangeRecord {
   id: number
   from_asset: 'AIX'
   from_amount: string
-  to_asset: 'WIN'
+  to_asset: 'USDT' | 'WIN'
   to_amount: string
   fee_amount: string
   fee_rate: string
@@ -137,17 +138,11 @@ export interface WinWithdrawRecord {
 }
 
 export function exchangeAixToWin(aixAmount: string) {
-  return post<AixWinExchangeResult>('/v1/wallet/exchange-aix-to-win', { aix_amount: aixAmount })
+  return post<AixExchangeResult>('/v1/wallet/exchange-aix-to-win', { aix_amount: aixAmount })
 }
 
 export function getAixWinExchangeRecords() {
-  return get<{ records: AixWinExchangeRecord[] }>('/v1/wallet/exchange-records')
-}
-
-export function withdrawWin(amount: string, toAddress?: string) {
-  const payload: Record<string, string> = { amount }
-  if (toAddress?.trim()) payload.to_address = toAddress.trim()
-  return post<WinWithdrawResult>('/v1/wallet/withdraw-win', payload)
+  return get<{ records: AixExchangeRecord[] }>('/v1/wallet/exchange-records')
 }
 
 export function withdrawSdt(amount: string, toAddress?: string) {
@@ -166,7 +161,10 @@ export function getWinWithdrawRecords() {
   return get<{ records: WinWithdrawRecord[] }>('/v1/wallet/withdraw-records')
 }
 
-export function subscribeAix(amount: string, payFrom: 'recharge' | 'reward' | 'win' | 'win_a') {
+export function subscribeAix(
+  amount: string,
+  payFrom: 'recharge' | 'reward' | 'win',
+) {
   return post('/v1/wallet/subscribe-aix', { amount, pay_from: payFrom })
 }
 
@@ -179,7 +177,7 @@ function formatUnixTime(value: unknown): string {
 }
 
 export async function listAixOrders() {
-  const result: any = await get('/v1/wallet/orders')
+  const result: any = await get('/v1/wallet/subscribe-orders')
   return {
     ...result,
     orders: (result?.orders || []).map((order: any) => {

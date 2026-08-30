@@ -118,3 +118,25 @@ export function calcExchangePreview(aixAmount: string, aixToWinRate: string, exc
     feeRateText: formatFeeRate(exchangeFeeRate),
   }
 }
+
+/** AIX 按 USDT 价格兑换：毛量 = AIX × 价格，扣手续费得净 USDT */
+export function calcAixToUsdtPreview(aixAmount: string, aixPrice: string, exchangeFeeRate: number) {
+  if (!isPositiveDecimal(aixAmount) || !isPositiveDecimal(aixPrice)) {
+    return null
+  }
+  const usdtGross = mulDecimal(aixAmount, aixPrice)
+  const fee = mulDecimal(usdtGross, String(exchangeFeeRate || 0))
+  const usdtNet = subDecimal(usdtGross, fee)
+  return {
+    usdtGross,
+    fee,
+    usdtNet,
+    feeRateText: formatFeeRate(exchangeFeeRate),
+  }
+}
+
+/** 1 AIX 可兑换多少 USDT（毛量/净量） */
+export function calcUnitAixToUsdtRate(aixPrice: string, exchangeFeeRate: number) {
+  if (!isPositiveDecimal(aixPrice)) return null
+  return calcAixToUsdtPreview('1', aixPrice, exchangeFeeRate)
+}

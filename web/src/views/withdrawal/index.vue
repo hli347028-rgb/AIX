@@ -7,21 +7,12 @@
         <button
           type="button"
           class="asset-tab"
-          :class="{ active: assetType === 'WIN' }"
-          @click="switchAsset('WIN')"
-        >
-          WIN
-        </button>
-        <button
-          type="button"
-          class="asset-tab"
           :class="{ active: assetType === 'SDT' }"
           @click="switchAsset('SDT')"
         >
           AIX-USDT
         </button>
         <button
-          v-if="showUsdtTab"
           type="button"
           class="asset-tab"
           :class="{ active: assetType === 'USDT' }"
@@ -34,11 +25,7 @@
       <div class="page-header">
         <h1 class="page-title">{{ pageSubtitle }}</h1>
         <p class="page-balance">{{ balanceLabel }}: {{ displayAmount(currentBalance) }} {{ assetLabel }}</p>
-        <p v-if="assetType === 'WIN'" class="page-hint">
-          {{ $t('withdraw.aixExchangeHint') }}
-          <button type="button" class="link-btn" @click="router.push('/exchange')">{{ $t('wallet.exchange') }}</button>
-        </p>
-        <p v-else-if="assetType === 'USDT'" class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
+        <p v-if="assetType === 'USDT'" class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
         <p v-else class="page-hint">{{ $t('withdraw.sdtExchangeHint') }}</p>
       </div>
 
@@ -115,63 +102,50 @@
 <script setup lang="ts">
 import Header from '@/components/Header.vue'
 import userPerson from '@/pinia/person'
-import { getWinWithdrawRecords, withdrawSdt, withdrawUsdt, withdrawWin } from '@/api/aix'
+import { getWinWithdrawRecords, withdrawSdt, withdrawUsdt } from '@/api/aix'
 import type { WinWithdrawRecord } from '@/api/aix'
 import { compareDecimals, displayDecimal, isPositiveDecimal } from '@/tools/decimal'
 import { showToast } from 'vant'
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 
-type AssetType = 'WIN' | 'SDT' | 'USDT'
+type AssetType = 'SDT' | 'USDT'
 
-const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson()
 
-const assetType = ref<AssetType>('WIN')
+const assetType = ref<AssetType>('SDT')
 const amountInput = ref('')
 const loading = ref(false)
 const recordLoading = ref(false)
 const amountList = ref<WinWithdrawRecord[]>([])
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
-const showUsdtTab = computed(() => {
-  const p = person.profile || {}
-  return !!(p.is_zero_account || p.is_community_subsidy || p.isZeroAccount || p.isCommunitySubsidy)
-})
-
 const assetLabel = computed(() => {
-  if (assetType.value === 'WIN') return 'WIN'
   if (assetType.value === 'USDT') return 'USDT'
   return 'AIX-USDT'
 })
 const pageSubtitle = computed(() => {
-  if (assetType.value === 'WIN') return $t('withdraw.winSubtitle')
   if (assetType.value === 'USDT') return $t('withdraw.usdtSubtitle')
   return $t('withdraw.sdtSubtitle')
 })
 const balanceLabel = computed(() => {
-  if (assetType.value === 'WIN') return $t('withdraw.availableBalance')
   if (assetType.value === 'USDT') return $t('withdraw.usdtAvailableBalance')
   return $t('withdraw.sdtAvailableBalance')
 })
 
-const winBalance = computed(() => String(person.profile?.win_balance || '0'))
 const sdtBalance = computed(() => String(person.profile?.points || person.userinfo?.points || '0'))
 const usdtBalance = computed(() => String(person.profile?.usdt_withdrawable || '0'))
 const currentBalance = computed(() => {
-  if (assetType.value === 'WIN') return winBalance.value
   if (assetType.value === 'USDT') return usdtBalance.value
   return sdtBalance.value
 })
 
 const filteredRecords = computed(() =>
   amountList.value.filter((item) => {
-    const asset = String(item.asset || 'WIN').toUpperCase()
+    const asset = String(item.asset || '').toUpperCase()
     if (assetType.value === 'SDT') return asset === 'SDT'
-    if (assetType.value === 'USDT') return asset === 'USDT'
-    return asset === 'WIN'
+    return asset === 'USDT'
   })
 )
 
@@ -181,7 +155,6 @@ const amountError = computed(() => {
   if (!amountInput.value) return ''
   if (!isPositiveDecimal(amountInput.value)) return $t('withdraw.enterAmount')
   if (compareDecimals(amountInput.value, currentBalance.value) > 0) {
-    if (assetType.value === 'WIN') return $t('withdraw.insufficientWin')
     if (assetType.value === 'USDT') return $t('withdraw.insufficientUsdt')
     return $t('withdraw.insufficientSdt')
   }
@@ -191,10 +164,10 @@ const amountError = computed(() => {
 const canSubmit = computed(() => Boolean(amountInput.value) && !amountError.value)
 
 const recordAssetLabel = (asset?: string) => {
-  const a = String(asset || 'WIN').toUpperCase()
+  const a = String(asset || '').toUpperCase()
   if (a === 'SDT') return 'AIX-USDT'
   if (a === 'USDT') return 'USDT'
-  return 'WIN'
+  return asset || '-'
 }
 
 const withdrawStatusText = (status: string) => {
@@ -273,11 +246,9 @@ const syncWithdrawPolling = () => {
 const handleAllAmount = () => {
   if (!isPositiveDecimal(currentBalance.value)) {
     const msg =
-      assetType.value === 'WIN'
-        ? $t('withdraw.insufficientWin')
-        : assetType.value === 'USDT'
-          ? $t('withdraw.insufficientUsdt')
-          : $t('withdraw.insufficientSdt')
+      assetType.value === 'USDT'
+        ? $t('withdraw.insufficientUsdt')
+        : $t('withdraw.insufficientSdt')
     showToast({
       message: msg,
       position: 'middle',
@@ -301,21 +272,15 @@ const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
   loading.value = true
   try {
-    let result: Awaited<ReturnType<typeof withdrawWin>>
-    if (assetType.value === 'WIN') {
-      result = await withdrawWin(amountInput.value)
-    } else if (assetType.value === 'USDT') {
-      result = await withdrawUsdt(amountInput.value)
-    } else {
-      result = await withdrawSdt(amountInput.value)
-    }
+    const result =
+      assetType.value === 'USDT'
+        ? await withdrawUsdt(amountInput.value)
+        : await withdrawSdt(amountInput.value)
     person.profile = {
       ...person.profile,
-      ...(assetType.value === 'WIN'
-        ? { win_balance: result.win_balance }
-        : assetType.value === 'USDT'
-          ? { usdt_withdrawable: result.usdt_withdrawable }
-          : { points: result.points }),
+      ...(assetType.value === 'USDT'
+        ? { usdt_withdrawable: result.usdt_withdrawable }
+        : { points: result.points }),
     }
     showToast({
       message: $t('withdraw.submittedProcessing'),
@@ -329,12 +294,12 @@ const handleWithdrawal = async () => {
     const code = error?.response?.data?.reason || error?.response?.data?.code
     const messageKey: Record<string, string> = {
       INVALID_AMOUNT: 'withdraw.enterAmount',
-      INSUFFICIENT_WIN: 'withdraw.insufficientWin',
       INSUFFICIENT_SDT: 'withdraw.insufficientSdt',
       INSUFFICIENT_USDT: 'withdraw.insufficientUsdt',
       FORBIDDEN: 'withdraw.insufficientUsdt',
       INVALID_ADDRESS: 'withdraw.invalidAddress',
       AIX_WITHDRAW_FORBIDDEN: 'withdraw.aixExchangeHint',
+      WIN_WITHDRAW_DISABLED: 'withdraw.winWithdrawDisabled',
     }
     showToast({
       message: messageKey[code]
@@ -354,13 +319,6 @@ onMounted(async () => {
     person.refreshProfile?.(),
     getAmountList(),
   ])
-})
-
-watch(showUsdtTab, (enabled) => {
-  if (!enabled && assetType.value === 'USDT') {
-    assetType.value = 'WIN'
-    amountInput.value = ''
-  }
 })
 
 onUnmounted(() => {

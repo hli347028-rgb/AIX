@@ -20,13 +20,13 @@ import (
 func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r := srv.Route("/")
 	r.POST("/v1/wallet/subscribe-aix", wallet.HandleSubscribeAIX)
+	r.GET("/v1/wallet/subscribe-orders", wallet.HandleSubscribeOrders)
 	r.POST("/v1/wallet/transfer", wallet.HandleTransfer)
 	r.POST("/v1/wallet/recharge-to-reward", wallet.HandleRechargeToReward)
 	r.GET("/v1/wallet/transfer-records/self", wallet.HandleSelfTransferRecords)
 	r.GET("/v1/wallet/transfer-records/lineal", wallet.HandleLinealTransferRecords)
 	r.POST("/v1/wallet/withdraw-aix", wallet.HandleWithdrawAIX)
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
-	r.POST("/v1/wallet/withdraw-win", wallet.HandleWithdrawWIN)
 	r.POST("/v1/wallet/withdraw-sdt", wallet.HandleWithdrawSDT)
 	r.POST("/v1/wallet/withdraw-usdt", wallet.HandleWithdrawUSDT)
 	r.GET("/v1/wallet/withdraw-records", wallet.HandleWithdrawRecords)
@@ -40,7 +40,6 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
 	r.POST("/v1/wallet/recharge-win/confirm", wallet.HandleConfirmWinRecharge)
 	r.GET("/v1/wallet/recharges-win", wallet.HandleListWinRecharges)
-	r.GET("/v1/wallet/recharges-win-a", wallet.HandleListWinARecharges)
 }
 
 func transferRecordPagination(ctx khttp.Context) (page, pageSize int, err error) {
@@ -105,12 +104,22 @@ type subscribeAIXReq struct {
 	Token   string `json:"token"`
 	Amount  string `json:"amount"`
 	PayFrom string `json:"pay_from"`
+	// 已废弃：混合报单
+	PayFrom2 string `json:"pay_from_2"`
+	Amount1  string `json:"amount_1"`
 }
 
 func (s *WalletService) HandleSubscribeAIX(ctx khttp.Context) error {
 	var req subscribeAIXReq
 	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
+	}
+	if strings.TrimSpace(req.PayFrom2) != "" || strings.TrimSpace(req.Amount1) != "" {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{
+			"code":    400,
+			"reason":  "MIX_SUBSCRIBE_DISABLED",
+			"message": "混合报单已关闭",
+		})
 	}
 	token := tokenFromRequest(ctx, req.Token)
 	order, bal, err := s.uc.SubscribeAIX(ctx, token, req.Amount, req.PayFrom)
@@ -132,23 +141,61 @@ func (s *WalletService) HandleSubscribeAIX(ctx khttp.Context) error {
 		resp["points_balance"] = user.Points
 		resp["points_all"] = user.PointsAll
 	}
-	if order.FundSource == biz.PayFromWin {
+	if order.FromRecharge != "" && order.FromRecharge != "0" {
+		resp["from_recharge"] = order.FromRecharge
+	}
+	if order.FromWin != "" && order.FromWin != "0" {
 		resp["from_win"] = order.FromWin
 		resp["win_price"] = order.WinPrice
-		resp["win_recharge_balance"] = bal
 		if order.WinPrice == "" {
 			resp["win_price"] = fmt.Sprintf("%v", biz.GetWinPrice())
 		}
 	}
-	if order.FundSource == biz.PayFromWinA {
+	if order.FromWinA != "" && order.FromWinA != "0" {
 		resp["from_win_a"] = order.FromWinA
 		resp["win_a_price"] = order.WinAPrice
-		resp["win_a_recharge_balance"] = bal
 		if order.WinAPrice == "" {
 			resp["win_a_price"] = fmt.Sprintf("%v", biz.GetWinAPrice())
 		}
 	}
 	return ctx.JSON(http.StatusOK, resp)
+}
+
+// HandleSubscribeOrders 用户端认购记录（含 from_recharge / from_win / from_win_a）
+func (s *WalletService) HandleSubscribeOrders(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	orders, err := s.uc.ListOrders(ctx, token)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(orders))
+	for _, o := range orders {
+		items = append(items, map[string]any{
+			"id":              o.ID,
+			"principal":       o.Principal,
+			"total_amount":    o.Principal,
+			"amount":          o.Principal,
+			"exit_cap":        o.ExitCap,
+			"exit_target":     o.ExitCap,
+			"exit_multiplier": o.ExitMultiplier,
+			"released_amount": o.EarnedTotal,
+			"earned_total":    o.EarnedTotal,
+			"direct_base":     o.DirectBase,
+			"from_recharge":   o.FromRecharge,
+			"from_reward":     o.FromReward,
+			"from_win":        o.FromWin,
+			"from_win_a":      o.FromWinA,
+			"points":          o.Points,
+			"win_price":       o.WinPrice,
+			"win_a_price":     o.WinAPrice,
+			"fund_source":     o.FundSource,
+			"product_name":    o.FundSource,
+			"status":          o.Status,
+			"created_at":      o.CreatedTime.Unix(),
+			"createdAt":       o.CreatedTime.Unix(),
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{"orders": items, "count": len(items)})
 }
 
 type transferReq struct {
@@ -375,7 +422,6 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 	}
 	aixPriceDec, _ := decimal.NewFromString(aixPriceStr)
 	winPrice := biz.GetWinPrice()
-	winAPrice := biz.GetWinAPrice()
 	aixToWinRate := "0"
 	if winPrice > 0 && aixPriceDec.IsPositive() {
 		// 1 AIX 可兑多少 WIN（毛量，未扣手续费）= aix_price / win_price
@@ -434,21 +480,17 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"next_release_at":      nextReleaseAt,
 		"aix_price":            aixPriceStr,
 		"win_price":            winPrice,
-		"win_a_price":          winAPrice,
 		"aix_to_win_rate":      aixToWinRate,
 		"exchange_fee_rate":    biz.GetExchangeFeeRate(),
 		"aix_contract":         "", // TODO
 		"win_contract":           s.uc.WinContract(),
-		"win_a_contract":         s.uc.WinAContract(),
-		"win_a_deposit_contract":   s.uc.WinADepositContract(),
-		"win_a_recharge_enabled":   s.uc.WinARechargeEnabled(),
+		"win_a_recharge_enabled": false,
 		"min_usdt_recharge":    s.uc.MinUsdtRecharge(),
 		"min_win_recharge":     s.uc.MinWinRecharge(),
-		"min_win_a_recharge":   s.uc.MinWinARecharge(),
 	})
 }
 
-// HandleDownlineUSDTRecharges 当前用户所有下级 USDT/WIN 充值记录。
+// HandleDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录。
 func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	page, pageSize, err := transferRecordPagination(ctx)
@@ -538,7 +580,7 @@ func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	})
 }
 
-// HandleExchangeAixToWin 用户端：AIX → WIN 兑换
+// HandleExchangeAixToWin 用户端：AIX → 可提 U（USDT）兑换
 func (s *WalletService) HandleExchangeAixToWin(ctx khttp.Context) error {
 	var req struct {
 		Token     string `json:"token"`
@@ -548,7 +590,7 @@ func (s *WalletService) HandleExchangeAixToWin(ctx khttp.Context) error {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
 	}
 	token := tokenFromRequest(ctx, req.Token)
-	rec, aixLeft, winBal, err := s.uc.ExchangeAixToWin(ctx, token, req.AixAmount)
+	rec, aixLeft, usdtWithdrawable, err := s.uc.ExchangeAixToWin(ctx, token, req.AixAmount)
 	if err != nil {
 		return err
 	}
@@ -562,35 +604,8 @@ func (s *WalletService) HandleExchangeAixToWin(ctx khttp.Context) error {
 		"exchange_fee_rate": biz.GetExchangeFeeRate(),
 		"status":            rec.Status,
 		"aix_balance":       aixLeft,
-		"win_balance":       winBal,
+		"usdt_withdrawable": usdtWithdrawable,
 		"created_at":        rec.CreatedTime.Unix(),
-	})
-}
-
-// HandleWithdrawWIN 用户端：WIN 代币提现
-func (s *WalletService) HandleWithdrawWIN(ctx khttp.Context) error {
-	var req struct {
-		Token     string `json:"token"`
-		Amount    string `json:"amount"`
-		ToAddress string `json:"to_address"`
-	}
-	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
-		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
-	}
-	token := tokenFromRequest(ctx, req.Token)
-	w, left, err := s.uc.CreateWinWithdraw(ctx, token, req.Amount, req.ToAddress)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(http.StatusOK, map[string]any{
-		"withdraw_id":  w.ID,
-		"asset":        w.Asset,
-		"amount":       w.Amount,
-		"to_address":   w.ToAddress,
-		"status":       w.Status,
-		"tx_hash":      w.TxHash,
-		"win_balance":  left,
-		"win_contract": s.uc.WinContract(),
 	})
 }
 

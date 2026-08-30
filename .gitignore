@@ -13,3 +13,18 @@ node_modules/
 .env.prod
 .env.*.local
 !*.env.example
+
+# Partner HMAC keys (transfer credit API) — never commit
+configs/secrets/
+*.key
+
+# Compiled server binary & deploy bundles
+/server
+/release/
+*.tar.gz
+
+# Local scratch (ad-hoc prod queries, debug dumps, caches)
+.cache/
+tmpjwt/
+debug-*.log
+scripts/tmp-*

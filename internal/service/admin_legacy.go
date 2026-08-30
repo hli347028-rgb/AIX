@@ -29,6 +29,7 @@ type AdminLegacyService struct {
 	data       *data.Data
 	authCfg    *conf.AuthConfig
 	walletCfg  *conf.WalletConfig
+	partnerCfg *conf.TransferPartnerConfig
 }
 
 func NewAdminLegacyService(
@@ -38,17 +39,131 @@ func NewAdminLegacyService(
 	data *data.Data,
 	authCfg *conf.AuthConfig,
 	walletCfg *conf.WalletConfig,
+	partnerCfg *conf.TransferPartnerConfig,
 ) *AdminLegacyService {
 	return &AdminLegacyService{
 		admin: admin, userRepo: userRepo, walletRepo: walletRepo,
-		data: data, authCfg: authCfg, walletCfg: walletCfg,
+		data: data, authCfg: authCfg, walletCfg: walletCfg, partnerCfg: partnerCfg,
 	}
 }
 
 var legacyMenuPaths = []string{
 	"/home", "/member", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
-	"/settlement", "/news", "/newsEdit", "/lookChildren",
+	"/exchangeTransfer", "/settlement", "/news", "/newsEdit", "/lookChildren",
+}
+
+var legacyMainOnlyMenuPaths = []string{
+	"/operationLog",
+}
+
+// subAccountConfigDefs 主账户在配置项维护的子账户密码与模块（固定 user1~user3）。
+var subAccountConfigDefs = []struct {
+	ID       int
+	Slot     int
+	Kind     string // password | modules
+	NameTmpl string
+}{
+	{101, 0, "password", "子账户%s密码"},
+	{102, 0, "modules", "子账户%s可访问模块"},
+	{103, 1, "password", "子账户%s密码"},
+	{104, 1, "modules", "子账户%s可访问模块"},
+	{105, 2, "password", "子账户%s密码"},
+	{106, 2, "modules", "子账户%s可访问模块"},
+}
+
+func normalizeSubAccountMenuPaths(modules []string) []string {
+	allowed := make(map[string]bool)
+	for _, p := range legacyMenuPaths {
+		allowed[p] = true
+	}
+	out := make([]string, 0, len(modules)+2)
+	seen := make(map[string]bool)
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" || !allowed[p] || seen[p] {
+			return
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	for _, m := range modules {
+		add(m)
+	}
+	if seen["/news"] {
+		add("/newsEdit")
+	}
+	if seen["/member"] {
+		add("/lookChildren")
+	}
+	return out
+}
+
+func parseSubAccountModulesInput(value string) ([]string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	allowed := make(map[string]bool)
+	for _, p := range legacyMenuPaths {
+		allowed[p] = true
+	}
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		if !allowed[p] {
+			return nil, fmt.Errorf("无效模块路径: %s", p)
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func ensureSnapshotSubAccounts(snapshot *conf.SystemConfigSnapshot) {
+	if snapshot == nil {
+		return
+	}
+	defaults := conf.DefaultAdminSubAccounts()
+	if len(snapshot.AdminSubAccounts) >= len(defaults) {
+		return
+	}
+	base := make([]conf.AdminSubAccount, len(defaults))
+	for i, d := range defaults {
+		base[i] = d
+	}
+	for i := range base {
+		if i < len(snapshot.AdminSubAccounts) {
+			item := snapshot.AdminSubAccounts[i]
+			if strings.TrimSpace(item.Account) != "" {
+				base[i].Account = item.Account
+			}
+			if strings.TrimSpace(item.Password) != "" {
+				base[i].Password = item.Password
+			}
+			if len(item.Modules) > 0 {
+				base[i].Modules = append([]string(nil), item.Modules...)
+			}
+		}
+	}
+	snapshot.AdminSubAccounts = base
+}
+
+func subAccountConfigName(slot int, kind string) string {
+	defaults := conf.DefaultAdminSubAccounts()
+	acc := "user"
+	if slot >= 0 && slot < len(defaults) {
+		acc = defaults[slot].Account
+	}
+	for _, def := range subAccountConfigDefs {
+		if def.Slot == slot && def.Kind == kind {
+			return fmt.Sprintf(def.NameTmpl, acc)
+		}
+	}
+	return ""
 }
 
 type legacyConfigItem struct {
@@ -77,6 +192,10 @@ var legacyConfigDefs = []struct {
 	{33, "WIN提现审核阈值(超过需审核)"},
 	{34, "AIX-USDT提现审核阈值(超过需审核)"},
 	{35, "USDT提现审核阈值(超过需审核)"},
+	{38, "交易所划转单笔下限(WIN)"},
+	{39, "交易所划转单笔上限(WIN)"},
+	{40, "交易所划转单日上限(WIN)"},
+	{41, "AIX兑换审核阈值(%)"},
 	{11, "W1 收益系数"},
 	{12, "W2 收益系数"},
 	{13, "W3 收益系数"},
@@ -109,32 +228,59 @@ func (s *AdminLegacyService) HandleLogin(ctx khttp.Context) error {
 		ctx.Request().Form.Get("email"),
 	)
 	password := ctx.Request().Form.Get("password")
-	if account != s.authCfg.GetAdminAccount() || password != s.authCfg.GetAdminPassword() {
+	var session *AdminSession
+	var jwtAddr string
+	if account == s.authCfg.GetAdminAccount() && password == s.authCfg.GetAdminPassword() {
+		session = &AdminSession{Operator: s.authCfg.GetAdminAccount(), IsMain: true}
+		jwtAddr = biz.ZeroAddress
+	} else if s.validateSubLogin(account, password) {
+		sub := strings.TrimSpace(account)
+		session = &AdminSession{Operator: sub, IsMain: false}
+		jwtAddr = s.authCfg.SubAccountJWTAddress(sub)
+	} else {
 		return errors.Unauthorized("UNAUTHORIZED", "账号或密码错误")
 	}
-	token, _, err := jwtpkg.Generate(biz.ZeroAddress, s.authCfg.GetJwtSecret(), time.Now())
+	token, _, err := jwtpkg.Generate(jwtAddr, s.authCfg.GetJwtSecret(), time.Now())
 	if err != nil {
 		return err
 	}
+	s.logAdminLogin(ctx, session, ctx.Request())
 	return ctx.Result(200, map[string]string{"token": token})
 }
 
 func (s *AdminLegacyService) HandleMyAuthList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	session, err := s.requireAnyAdmin(ctx)
+	if err != nil {
 		return err
 	}
-	auth := make([]map[string]string, 0, len(legacyMenuPaths))
-	for _, p := range legacyMenuPaths {
+	var paths []string
+	if session.IsMain {
+		paths = append([]string{}, legacyMenuPaths...)
+		paths = append(paths, legacyMainOnlyMenuPaths...)
+	} else {
+		modules := s.subAccountModules(session.Operator)
+		paths = normalizeSubAccountMenuPaths(modules)
+		if len(paths) == 0 {
+			paths = append([]string{}, legacyMenuPaths...)
+		}
+	}
+	auth := make([]map[string]string, 0, len(paths))
+	for _, p := range paths {
 		auth = append(auth, map[string]string{"path": p})
 	}
+	super := "0"
+	if session.IsMain {
+		super = "1"
+	}
 	return ctx.Result(200, map[string]interface{}{
-		"super": "1",
-		"auth":  auth,
+		"super":   super,
+		"auth":    auth,
+		"account": session.Operator,
 	})
 }
 
 func (s *AdminLegacyService) HandleAll(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	stats, err := s.buildDashboardStats(ctx)
@@ -145,7 +291,7 @@ func (s *AdminLegacyService) HandleAll(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -224,6 +370,8 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"pendingRelease":      zeroIfEmpty(pendingRelease[u.ID]),  // 待释放
 			"vip":                 vip,
 			"historyRecommend":    strconv.Itoa(inviteeCount),
+			"is_frozen":           u.IsFrozen,
+			"frozen_at":           formatLegacyTimePtr(u.FrozenAt),
 			"is_zero_account":     u.IsZeroAccount,
 			"is_community_subsidy": u.IsCommunitySubsidy,
 			"zero_account_set_at": formatLegacyTimePtr(u.ZeroAccountSetAt),
@@ -240,7 +388,8 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleConfig(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	session, err := s.requireAnyAdmin(ctx)
+	if err != nil {
 		return err
 	}
 	cfg := s.admin.GetPersistedConfigSnapshot()
@@ -251,7 +400,7 @@ func (s *AdminLegacyService) HandleConfig(ctx khttp.Context) error {
 	} else if latest, err := s.walletRepo.GetLatestAixPriceBefore(ctx, today); err == nil && strings.TrimSpace(latest) != "" && latest != "0" {
 		liveAixPrice = biz.FormatAixPrice(latest)
 	}
-	items := make([]legacyConfigItem, 0, len(legacyConfigDefs))
+	items := make([]legacyConfigItem, 0, len(legacyConfigDefs)+len(subAccountConfigDefs))
 	for _, def := range legacyConfigDefs {
 		value := legacyConfigValue(cfg, s.walletCfg, def.ID)
 		if def.ID == 7 && liveAixPrice != "" {
@@ -261,20 +410,38 @@ func (s *AdminLegacyService) HandleConfig(ctx khttp.Context) error {
 			ID: def.ID, Name: def.Name, Value: value,
 		})
 	}
+	if session.IsMain {
+		ensureSnapshotSubAccounts(cfg)
+		for _, def := range subAccountConfigDefs {
+			items = append(items, legacyConfigItem{
+				ID:    def.ID,
+				Name:  subAccountConfigName(def.Slot, def.Kind),
+				Value: subAccountConfigValue(cfg, def.Slot, def.Kind),
+			})
+		}
+	}
 	return ctx.Result(200, map[string]interface{}{"config": items})
 }
 
 func (s *AdminLegacyService) HandleConfigUpdate(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
-		return err
-	}
 	if err := ctx.Request().ParseForm(); err != nil {
 		return errors.BadRequest("INVALID_FORM", "请求格式错误")
 	}
 	id, _ := strconv.Atoi(ctx.Request().Form.Get("id"))
 	value := ctx.Request().Form.Get("value")
+	if id >= 101 && id <= 106 {
+		if _, err := s.requireMainAdmin(ctx); err != nil {
+			return err
+		}
+	} else if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
 	snapshot := s.admin.GetPersistedConfigSnapshot()
-	if err := applyLegacyConfigUpdate(snapshot, s.walletCfg, id, value); err != nil {
+	if id >= 101 && id <= 106 {
+		if err := applySubAccountConfigUpdate(snapshot, id, value); err != nil {
+			return err
+		}
+	} else if err := applyLegacyConfigUpdate(snapshot, s.walletCfg, id, value); err != nil {
 		return err
 	}
 	if _, err := s.admin.UpdateSystemConfig(ctx, s.token(ctx), snapshot); err != nil {
@@ -296,7 +463,7 @@ func (s *AdminLegacyService) HandleBuyList(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -354,14 +521,18 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	})
 }
 
-// HandleExchangeList 管理端：AIX→WIN 兑换记录列表
+// HandleExchangeList 管理端：AIX→USDT 兑换记录列表
 func (s *AdminLegacyService) HandleExchangeList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
 	addressFilter := strings.TrimSpace(q.Get("address"))
+	statusFilter := strings.ToLower(strings.TrimSpace(q.Get("status")))
+	if statusFilter == "undefined" || statusFilter == "null" {
+		statusFilter = ""
+	}
 
 	list, err := s.admin.ListExchangeRecords(ctx, s.token(ctx))
 	if err != nil {
@@ -372,11 +543,20 @@ func (s *AdminLegacyService) HandleExchangeList(ctx khttp.Context) error {
 		if addressFilter != "" && !strings.Contains(strings.ToLower(r.UserAddress), strings.ToLower(addressFilter)) {
 			continue
 		}
+		if statusFilter != "" && strings.ToLower(r.Status) != statusFilter {
+			continue
+		}
 		filtered = append(filtered, r)
 	}
 	total := len(filtered)
 	pageItems := paginateSlice(filtered, offset, pageSize)
 	items := make([]map[string]interface{}, 0, len(pageItems))
+	reviewCount := 0
+	for _, r := range filtered {
+		if r.Status == biz.ExchangeStatusReview {
+			reviewCount++
+		}
+	}
 	for _, r := range pageItems {
 		items = append(items, map[string]interface{}{
 			"id":            r.ID,
@@ -397,12 +577,15 @@ func (s *AdminLegacyService) HandleExchangeList(ctx khttp.Context) error {
 		"list":  items,
 		"count": total,
 		"page":  page,
+		"stats": map[string]interface{}{
+			"reviewCount": reviewCount,
+		},
 	})
 }
 
 // HandleTransferList 管理端：用户互转 + 充值钱包→奖励钱包
 func (s *AdminLegacyService) HandleTransferList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -502,7 +685,7 @@ func transferKindLabel(kind string) (fromWallet, toWallet, label string) {
 }
 
 func (s *AdminLegacyService) HandleWithdrawPass(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -516,7 +699,7 @@ func (s *AdminLegacyService) HandleWithdrawPass(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleWithdrawReject(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -530,8 +713,37 @@ func (s *AdminLegacyService) HandleWithdrawReject(ctx khttp.Context) error {
 	return ctx.Result(200, map[string]string{"status": "ok", "message": "已拒绝并退回余额"})
 }
 
+func (s *AdminLegacyService) HandleExchangePass(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, _ := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	if err := s.admin.ApproveExchangeReview(ctx, s.token(ctx), id); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok", "message": "审核通过，已入账可提 U"})
+}
+
+func (s *AdminLegacyService) HandleExchangeReject(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, _ := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	remark := strings.TrimSpace(ctx.Request().Form.Get("remark"))
+	if err := s.admin.RejectExchangeReview(ctx, s.token(ctx), id, remark); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok", "message": "已拒绝并退回 AIX"})
+}
+
 func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -563,7 +775,7 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
 		switch typeFilter {
 		case "mgmt", "mgmt_pool_release", "管理奖":
-			db = db.Where("rl.type IN ?", []string{biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease})
+			db = db.Where("rl.type IN ?", []string{biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease, biz.RewardTypeMgmtOverflow})
 		case "dynamic_usdt", "direct_pool_release", "直推奖":
 			db = db.Where("rl.type IN ?", []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease})
 		default:
@@ -605,8 +817,8 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 
 func normalizeRewardType(t string) string {
 	switch strings.TrimSpace(t) {
-	case biz.RewardTypeMgmtPoolRelease:
-		return biz.RewardTypeMgmt // 管理端统一展示为管理奖
+	case biz.RewardTypeMgmtPoolRelease, biz.RewardTypeMgmtOverflow:
+		return biz.RewardTypeMgmt // 管理端统一展示为管理奖（含出局额度不足/全部出局的溢出）
 	case biz.RewardTypeDirectPoolRelease:
 		return biz.RewardTypeDynamicUsdt // 管理端统一展示为直推奖
 	default:
@@ -615,7 +827,7 @@ func normalizeRewardType(t string) string {
 }
 
 func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -649,7 +861,7 @@ func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleRecordListExport(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -678,7 +890,7 @@ func classifyRechargeType(asset, txHash, message string) (remark, typeCode strin
 }
 
 func (s *AdminLegacyService) HandleAdminRecharge(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -699,7 +911,7 @@ func (s *AdminLegacyService) HandleAdminRecharge(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleAdminRechargeWin(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -722,7 +934,7 @@ func (s *AdminLegacyService) HandleAdminRechargeWin(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleRechargeToReward(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -743,7 +955,7 @@ func (s *AdminLegacyService) HandleRechargeToReward(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleGoodList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]interface{}{
@@ -758,7 +970,7 @@ func (s *AdminLegacyService) HandleStubGoods(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleLockUserReward(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -776,7 +988,7 @@ func (s *AdminLegacyService) HandleLocationInsert(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -820,7 +1032,7 @@ func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleSettlementTrigger(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	date := ""
@@ -841,7 +1053,7 @@ func (s *AdminLegacyService) HandleSettlementTrigger(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleVipUpdate(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -868,7 +1080,7 @@ func (s *AdminLegacyService) HandleVipUpdate(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleSetZeroAccount(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -891,8 +1103,32 @@ func (s *AdminLegacyService) HandleSetZeroAccount(ctx khttp.Context) error {
 	return ctx.Result(200, map[string]string{"status": "ok"})
 }
 
+func (s *AdminLegacyService) HandleSetFrozen(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	enabled := strings.TrimSpace(ctx.Request().Form.Get("enabled")) == "1" ||
+		strings.EqualFold(strings.TrimSpace(ctx.Request().Form.Get("enabled")), "true")
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
+		UserID: userID, SetIsFrozen: true, IsFrozen: enabled,
+	}); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
 func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -916,7 +1152,7 @@ func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error 
 }
 
 func (s *AdminLegacyService) HandleSetInviter(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -937,43 +1173,65 @@ func (s *AdminLegacyService) HandleSetInviter(ctx khttp.Context) error {
 	return ctx.Result(200, map[string]string{"status": "ok"})
 }
 
+func (s *AdminLegacyService) HandleChangeAddress(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	newAddress := firstNonEmpty(
+		ctx.Request().Form.Get("new_address"),
+		ctx.Request().Form.Get("address"),
+		ctx.Request().Form.Get("wallet_address"),
+	)
+	if err := s.admin.ChangeUserAddress(ctx, s.token(ctx), userID, newAddress); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
 func (s *AdminLegacyService) HandleUpdateGoods(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]string{"status": "ok", "message": "not supported in AIX"})
 }
 
 func (s *AdminLegacyService) HandleUploadGoods(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]string{"status": "ok", "message": "not supported in AIX"})
 }
 
 func (s *AdminLegacyService) HandleStubOK(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]string{"status": "ok"})
 }
 
 func (s *AdminLegacyService) HandleStubRewards(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]interface{}{"rewards": []interface{}{}, "count": 0})
 }
 
 func (s *AdminLegacyService) HandleStubLocations(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	return ctx.Result(200, map[string]interface{}{"locations": []interface{}{}, "count": 0})
 }
 
 func (s *AdminLegacyService) HandleUserRecommend(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -1009,7 +1267,7 @@ func (s *AdminLegacyService) HandleUserRecommend(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -1025,6 +1283,11 @@ func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
 	if strings.EqualFold(addressFilter, "undefined") || strings.EqualFold(addressFilter, "null") {
 		addressFilter = ""
 	}
+	fundSourceFilter := strings.ToLower(strings.TrimSpace(firstNonEmpty(q.Get("fund_source"), q.Get("fundSource"))))
+	if fundSourceFilter == "undefined" || fundSourceFilter == "null" {
+		fundSourceFilter = ""
+	}
+	start, end := parseLegacyTimeRange(q)
 
 	orders, err := s.walletRepo.ListAllOrders(ctx)
 	if err != nil {
@@ -1038,8 +1301,15 @@ func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
 		if statusFilter != "" && strings.ToLower(strings.TrimSpace(o.Order.Status)) != statusFilter {
 			continue
 		}
+		if fundSourceFilter != "" && strings.ToLower(strings.TrimSpace(o.Order.FundSource)) != fundSourceFilter {
+			continue
+		}
+		if !orderWithinTime(o, start, end) {
+			continue
+		}
 		filtered = append(filtered, o)
 	}
+	stats := sumBuyOrderStats(filtered)
 	total := len(filtered)
 	pageItems := paginateSlice(filtered, offset, pageSize)
 	rewards := make([]map[string]interface{}, 0, len(pageItems))
@@ -1051,6 +1321,7 @@ func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
 		"count":    total,
 		"page":     page,
 		"pageSize": pageSize,
+		"stats":    stats,
 	})
 }
 
@@ -1074,7 +1345,7 @@ func mapAnnouncementItem(po data.AnnouncementPO) map[string]interface{} {
 }
 
 func (s *AdminLegacyService) HandleAnnouncementList(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	q := ctx.Request().URL.Query()
@@ -1106,7 +1377,7 @@ func (s *AdminLegacyService) HandleAnnouncementList(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleAnnouncementDetail(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	_ = ctx.Request().ParseForm()
@@ -1128,7 +1399,7 @@ func (s *AdminLegacyService) HandleAnnouncementDetail(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleAnnouncementSave(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -1164,7 +1435,7 @@ func (s *AdminLegacyService) HandleAnnouncementSave(ctx khttp.Context) error {
 }
 
 func (s *AdminLegacyService) HandleAnnouncementDelete(ctx khttp.Context) error {
-	if _, err := s.requireAdmin(ctx); err != nil {
+	if err := s.requireAdmin(ctx); err != nil {
 		return err
 	}
 	if err := ctx.Request().ParseForm(); err != nil {
@@ -1229,14 +1500,6 @@ func (s *AdminLegacyService) HandlePublicAnnouncementDetail(ctx khttp.Context) e
 		"created_at": formatLegacyTime(po.CreatedTime),
 		"add_time":   po.CreatedTime.Unix(),
 	})
-}
-
-func (s *AdminLegacyService) requireAdmin(ctx khttp.Context) (*biz.User, error) {
-	token := s.token(ctx)
-	if token == "" {
-		return nil, errors.Unauthorized("UNAUTHORIZED", "请先登录")
-	}
-	return s.admin.RequireAdminUser(ctx, token)
 }
 
 func (s *AdminLegacyService) token(ctx khttp.Context) string {
@@ -1384,6 +1647,22 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 	}
 	totalWinAsset := winBalance.Add(winRechargeBalance)
 
+	// 全网 AIX 持仓总量。注意与 totalSdtAsset 区分：后者统计的是 points 列，不是 AIX 数量。
+	totalAixAsset, err := s.sumUserAsset(ctx, "aix_balance")
+	if err != nil {
+		return nil, err
+	}
+	// 今日AIX数量：今天 0 点结算任务发放的静态 AIX（结算日=昨日）。
+	todayAixAmount, err := s.sumStaticAixAmount(ctx, biz.TodaySettlementDate(time.Now()))
+	if err != nil {
+		return nil, err
+	}
+	// 划转WIN数量：交易所（合作方）加款接口累计转入的 WIN，只增不减。
+	totalPartnerCreditWin, err := s.sumPartnerCreditWin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	totalAdminRecharge, err := s.sumAdminManualRecharge(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -1446,6 +1725,9 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 		"todaySdtWithdraw":       todaySdtWithdraw.String(),
 		"totalSdtAsset":          totalSdtAsset.String(),
 		"totalWinAsset":          totalWinAsset.String(),
+		"totalAixAsset":          totalAixAsset.String(),
+		"todayAixAmount":         todayAixAmount.String(),
+		"totalPartnerCreditWin":  totalPartnerCreditWin.String(),
 		"totalRewardWallet":      totalRewardWallet.String(),
 		"totalOverflowWallet":    totalOverflowWallet.String(),
 		"totalAdminRecharge":     totalAdminRecharge.String(),
@@ -1552,8 +1834,11 @@ func mapLegacyBuyOrder(o *biz.AdminOrderDetail) map[string]interface{} {
 		"amountGet":   earned.String(),
 		"amountLast":  remain.String(),
 		"points":      o.Order.Points,
-		"fund_source": o.Order.FundSource,
-		"status":      status,
+		"fund_source":   o.Order.FundSource,
+		"from_recharge": o.Order.FromRecharge,
+		"from_win":      o.Order.FromWin,
+		"from_win_a":    o.Order.FromWinA,
+		"status":        status,
 		"createdAt":   formatLegacyTime(o.Order.CreatedAt),
 		"one":         o.Order.FundSource,
 	}
@@ -1752,6 +2037,26 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 			return cfg.UsdtWithdrawReviewThreshold
 		}
 		return "0"
+	case 38:
+		if cfg != nil && strings.TrimSpace(cfg.PartnerMinAmount) != "" {
+			return cfg.PartnerMinAmount
+		}
+		return conf.DefaultPartnerMinAmount
+	case 39:
+		if cfg != nil && strings.TrimSpace(cfg.PartnerMaxAmount) != "" {
+			return cfg.PartnerMaxAmount
+		}
+		return conf.DefaultPartnerMaxAmount
+	case 40:
+		if cfg != nil && strings.TrimSpace(cfg.PartnerDailyLimit) != "" {
+			return cfg.PartnerDailyLimit
+		}
+		return conf.DefaultPartnerDailyLimit
+	case 41:
+		if cfg != nil && strings.TrimSpace(cfg.ExchangeReviewThresholdPercent) != "" {
+			return cfg.ExchangeReviewThresholdPercent
+		}
+		return conf.DefaultExchangeReviewThresholdPercent
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		idx := id - 11
 		rates := conf.DefaultMgmtRates()
@@ -1769,6 +2074,14 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 	default:
 		return ""
 	}
+}
+
+func parseFloatOr(raw string, fallback float64) float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil {
+		return fallback
+	}
+	return v
 }
 
 func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *conf.WalletConfig, id int, value string) error {
@@ -1867,6 +2180,37 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 		case 35:
 			snapshot.UsdtWithdrawReviewThreshold = v
 		}
+	case 38, 39, 40:
+		amt, err := strconv.ParseFloat(value, 64)
+		if err != nil || amt <= 0 {
+			return errors.BadRequest("INVALID_VALUE", "交易所划转限额必须为大于 0 的数字")
+		}
+		// 三者写入同一份快照，任一项改动都要重新校验 下限 ≤ 上限 ≤ 单日上限，
+		// 否则会配出「任何金额都被拒」的死区。
+		v := strconv.FormatFloat(amt, 'f', -1, 64)
+		switch id {
+		case 38:
+			snapshot.PartnerMinAmount = v
+		case 39:
+			snapshot.PartnerMaxAmount = v
+		case 40:
+			snapshot.PartnerDailyLimit = v
+		}
+		min := parseFloatOr(snapshot.PartnerMinAmount, 0)
+		max := parseFloatOr(snapshot.PartnerMaxAmount, 0)
+		daily := parseFloatOr(snapshot.PartnerDailyLimit, 0)
+		if min > max {
+			return errors.BadRequest("INVALID_VALUE", "交易所划转单笔下限不能大于单笔上限")
+		}
+		if max > daily {
+			return errors.BadRequest("INVALID_VALUE", "交易所划转单笔上限不能大于单日上限")
+		}
+	case 41:
+		pct, err := strconv.ParseFloat(value, 64)
+		if err != nil || pct < 0 {
+			return errors.BadRequest("INVALID_VALUE", "AIX兑换审核阈值须为 ≥0 的数字（百分数，如 40 表示 40%；100 表示兑完今日AIX后才审）")
+		}
+		snapshot.ExchangeReviewThresholdPercent = strconv.FormatFloat(pct, 'f', -1, 64)
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil || rate < 0 {
@@ -1894,6 +2238,64 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 		snapshot.MgmtThresholds[idx] = threshold
 	default:
 		return errors.BadRequest("INVALID_ID", "未知配置项")
+	}
+	return nil
+}
+
+func subAccountConfigValue(cfg *conf.SystemConfigSnapshot, slot int, kind string) string {
+	ensureSnapshotSubAccounts(cfg)
+	if cfg == nil || slot < 0 || slot >= len(cfg.AdminSubAccounts) {
+		return ""
+	}
+	item := cfg.AdminSubAccounts[slot]
+	switch kind {
+	case "password":
+		return item.Password
+	case "modules":
+		return strings.Join(item.Modules, ",")
+	default:
+		return ""
+	}
+}
+
+func applySubAccountConfigUpdate(snapshot *conf.SystemConfigSnapshot, id int, value string) error {
+	if snapshot == nil {
+		return errors.BadRequest("INVALID_CONFIG", "配置不可用")
+	}
+	var def *struct {
+		ID       int
+		Slot     int
+		Kind     string
+		NameTmpl string
+	}
+	for i := range subAccountConfigDefs {
+		if subAccountConfigDefs[i].ID == id {
+			def = &subAccountConfigDefs[i]
+			break
+		}
+	}
+	if def == nil {
+		return errors.BadRequest("INVALID_ID", "未知子账户配置项")
+	}
+	ensureSnapshotSubAccounts(snapshot)
+	if def.Slot < 0 || def.Slot >= len(snapshot.AdminSubAccounts) {
+		return errors.BadRequest("INVALID_CONFIG", "子账户槽位无效")
+	}
+	value = strings.TrimSpace(value)
+	switch def.Kind {
+	case "password":
+		if value == "" {
+			return errors.BadRequest("INVALID_VALUE", "密码不能为空")
+		}
+		snapshot.AdminSubAccounts[def.Slot].Password = value
+	case "modules":
+		modules, err := parseSubAccountModulesInput(value)
+		if err != nil {
+			return errors.BadRequest("INVALID_VALUE", err.Error())
+		}
+		snapshot.AdminSubAccounts[def.Slot].Modules = modules
+	default:
+		return errors.BadRequest("INVALID_ID", "未知子账户配置项")
 	}
 	return nil
 }

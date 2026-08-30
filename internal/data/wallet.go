@@ -114,13 +114,11 @@ func (r *walletRepo) ConfirmRechargeCredit(ctx context.Context, id int64, txHash
 			return tx.Model(&user).Update("win_recharge_balance", user.WinRechargeBalance).Error
 		}
 		if asset == biz.TokenWINA {
-			user.WinARechargeBalance = user.WinARechargeBalance.Add(po.Amount)
-			newBal = user.WinARechargeBalance.String()
-			return tx.Model(&user).Update("win_a_recharge_balance", user.WinARechargeBalance).Error
+			return fmt.Errorf("win-a recharge disabled")
 		}
 		user.UsdtRecharge = user.UsdtRecharge.Add(po.Amount)
 		newBal = user.UsdtRecharge.String()
-		if err := r.payUSDTRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
+		if err := payUSDTRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
 			return err
 		}
 		return tx.Model(&user).Update("usdt_recharge", user.UsdtRecharge).Error
@@ -190,7 +188,7 @@ func (r *walletRepo) AutoCreditChainRecharge(
 		}
 
 		user.UsdtRecharge = user.UsdtRecharge.Add(amountDec)
-		if err := r.payUSDTRechargeRoleRewards(tx, user.ID, amountDec); err != nil {
+		if err := payUSDTRechargeRoleRewards(tx, user.ID, amountDec); err != nil {
 			return err
 		}
 		if err := tx.Model(&user).Update("usdt_recharge", user.UsdtRecharge).Error; err != nil {
@@ -274,75 +272,12 @@ func (r *walletRepo) AutoCreditWinRecharge(
 	return credited, newBal, err
 }
 
-// AutoCreditWinARecharge 确认链上 WIN-A 入账 → win_a_recharge_balance（tx_hash 幂等）。
+// AutoCreditWinARecharge WIN-A 充值已关闭（保留接口供历史幂等查询）。
 func (r *walletRepo) AutoCreditWinARecharge(
 	ctx context.Context,
 	txHash, fromAddress, toAddress, amount string,
 ) (bool, string, error) {
-	txHash = strings.TrimSpace(txHash)
-	fromAddress = strings.TrimSpace(fromAddress)
-	toAddress = strings.TrimSpace(toAddress)
-	amountDec, err := decimal.NewFromString(strings.TrimSpace(amount))
-	if txHash == "" || fromAddress == "" || toAddress == "" || err != nil || !amountDec.GreaterThan(decimal.Zero) {
-		return false, "", fmt.Errorf("invalid win-a recharge")
-	}
-
-	credited := false
-	var newBal string
-	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var existing RechargePO
-		findErr := tx.Where("tx_hash = ?", txHash).First(&existing).Error
-		if findErr == nil {
-			if existing.Status == biz.RechargeStatusConfirmed && strings.EqualFold(existing.Asset, biz.TokenWINA) {
-				var user UserPO
-				if err := tx.First(&user, existing.UserID).Error; err != nil {
-					return err
-				}
-				newBal = user.WinARechargeBalance.String()
-			}
-			return nil
-		}
-		if findErr != nil && findErr != gorm.ErrRecordNotFound {
-			return findErr
-		}
-
-		var user UserPO
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("LOWER(address) = ?", strings.ToLower(fromAddress)).First(&user).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("user not found")
-			}
-			return err
-		}
-
-		now := time.Now()
-		recharge := &RechargePO{
-			UserID:        user.ID,
-			Asset:         biz.TokenWINA,
-			Amount:        amountDec,
-			TxHash:        txHash,
-			FromAddress:   fromAddress,
-			ToAddress:     toAddress,
-			Status:        biz.RechargeStatusConfirmed,
-			Message:       "win_a_deposit_only",
-			ConfirmedTime: &now,
-		}
-		if err := tx.Create(recharge).Error; err != nil {
-			if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
-				return nil
-			}
-			return err
-		}
-
-		user.WinARechargeBalance = user.WinARechargeBalance.Add(amountDec)
-		if err := tx.Model(&user).Update("win_a_recharge_balance", user.WinARechargeBalance).Error; err != nil {
-			return err
-		}
-		newBal = user.WinARechargeBalance.String()
-		credited = true
-		return nil
-	})
-	return credited, newBal, err
+	return false, "", fmt.Errorf("win-a recharge disabled")
 }
 
 func (r *walletRepo) ListRechargesByUser(ctx context.Context, userID int64) ([]*biz.Recharge, error) {
@@ -386,14 +321,13 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	if limit <= 0 {
 		limit = 10
 	}
-	// 下级认购/充值展示：USDT + WIN（不含 WIN-A；空 asset 视为 USDT）
-	assets := []string{biz.TokenUSDT, biz.TokenWIN}
-	assetCond := "(UPPER(asset) IN ? OR asset = '' OR asset IS NULL)"
+	// 下级充值展示：仅 USDT（空 asset 视为 USDT；不含 WIN / WIN-A）
+	assetCond := "(UPPER(asset) = ? OR asset = '' OR asset IS NULL)"
 	base := r.data.db.WithContext(ctx).
 		Model(&RechargePO{}).
 		Where("user_id IN ?", userIDs).
 		Where("status = ?", biz.RechargeStatusConfirmed).
-		Where(assetCond, assets)
+		Where(assetCond, biz.TokenUSDT)
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
@@ -410,7 +344,7 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 		Joins("JOIN users u ON u.id = r.user_id").
 		Where("r.user_id IN ?", userIDs).
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
-		Where("(UPPER(r.asset) IN ? OR r.asset = '' OR r.asset IS NULL)", assets).
+		Where("(UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL)", biz.TokenUSDT).
 		Order("r.id DESC").
 		Offset(offset).
 		Limit(limit).
@@ -431,17 +365,20 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	return out, total, nil
 }
 
-func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFrom string, exitMul, directRate float64) (*biz.Order, string, error) {
-	principal, err := decimal.NewFromString(amount)
+func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.SubscribeInput) (*biz.Order, string, error) {
+	principal, err := decimal.NewFromString(in.Amount)
 	if err != nil {
 		return nil, "", err
 	}
+	exitMul := in.ExitMul
+	directRate := in.DirectRate
 	if exitMul <= 0 {
 		exitMul = 4
 	}
 	if directRate <= 0 {
 		directRate = 0.5
 	}
+	payFrom := strings.ToLower(strings.TrimSpace(in.PayFrom))
 	exitCap := principal.Mul(decimal.NewFromFloat(exitMul))
 	var created *biz.Order
 	var balOut string
@@ -457,8 +394,17 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		fromWinA := decimal.Zero
 		directBase := decimal.Zero
 		winPriceSnap := decimal.Zero
-		winAPriceSnap := decimal.Zero
 		updates := map[string]interface{}{}
+		fundSource := payFrom
+		skipMgmt := payFrom == biz.PayFromReward
+
+		if payFrom != biz.PayFromRecharge && payFrom != biz.PayFromReward && payFrom != biz.PayFromWin {
+			return fmt.Errorf("invalid pay_from")
+		}
+		if payFrom != biz.PayFromReward {
+			directBase = principal
+		}
+
 		switch payFrom {
 		case biz.PayFromRecharge:
 			if user.UsdtRecharge.LessThan(principal) {
@@ -466,56 +412,34 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			}
 			user.UsdtRecharge = user.UsdtRecharge.Sub(principal)
 			fromRecharge = principal
-			directBase = principal
-			balOut = user.UsdtRecharge.String()
 			updates["usdt_recharge"] = user.UsdtRecharge
+			balOut = user.UsdtRecharge.String()
 		case biz.PayFromReward:
 			if user.UsdtReward.LessThan(principal) {
 				return fmt.Errorf("insufficient usdt_reward")
 			}
 			user.UsdtReward = user.UsdtReward.Sub(principal)
 			fromReward = principal
-			// 奖励复投：上级只增加业绩，不产生直推奖/管理奖（directBase 保持 0）
-			balOut = user.UsdtReward.String()
 			updates["usdt_reward"] = user.UsdtReward
+			balOut = user.UsdtReward.String()
 		case biz.PayFromWin:
-			// WIN 按当前价格折算替代充值钱包 USDT：WIN 需量 = USDT本金 ÷ win_price
 			winPriceSnap = decimal.NewFromFloat(biz.GetWinPrice())
 			if !winPriceSnap.IsPositive() {
 				return fmt.Errorf("win price not configured")
 			}
-			winNeeded := principal.Div(winPriceSnap).Round(8)
-			if !winNeeded.IsPositive() {
+			nativeAmt := principal.Div(winPriceSnap).Round(8)
+			if !nativeAmt.IsPositive() {
 				return fmt.Errorf("win amount too small")
 			}
-			if user.WinRechargeBalance.LessThan(winNeeded) {
+			if user.WinRechargeBalance.LessThan(nativeAmt) {
 				return fmt.Errorf("insufficient win_recharge_balance")
 			}
-			user.WinRechargeBalance = user.WinRechargeBalance.Sub(winNeeded)
-			fromWin = winNeeded
-			directBase = principal // 与充值钱包一致，产生直推
-			balOut = user.WinRechargeBalance.String()
+			user.WinRechargeBalance = user.WinRechargeBalance.Sub(nativeAmt)
+			fromWin = nativeAmt
 			updates["win_recharge_balance"] = user.WinRechargeBalance
-		case biz.PayFromWinA:
-			winAPriceSnap = decimal.NewFromFloat(biz.GetWinAPrice())
-			if !winAPriceSnap.IsPositive() {
-				return fmt.Errorf("win-a price not configured")
-			}
-			winANeeded := principal.Div(winAPriceSnap).Round(8)
-			if !winANeeded.IsPositive() {
-				return fmt.Errorf("win-a amount too small")
-			}
-			if user.WinARechargeBalance.LessThan(winANeeded) {
-				return fmt.Errorf("insufficient win_a_recharge_balance")
-			}
-			user.WinARechargeBalance = user.WinARechargeBalance.Sub(winANeeded)
-			fromWinA = winANeeded
-			directBase = principal // 与充值钱包 / WIN 一致，产生直推奖
-			balOut = user.WinARechargeBalance.String()
-			updates["win_a_recharge_balance"] = user.WinARechargeBalance
-		default:
-			return fmt.Errorf("invalid pay_from")
+			balOut = user.WinRechargeBalance.String()
 		}
+
 		if err := tx.Model(&user).Updates(updates).Error; err != nil {
 			return err
 		}
@@ -530,7 +454,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			FromWin:      fromWin,
 			FromWinA:     fromWinA,
 			Points:       principal, // 认购金额即本单积分（含 WIN-A）
-			FundSource:   payFrom,
+			FundSource:   fundSource,
 			Status:       biz.OrderStatusActive,
 		}
 		if err := tx.Create(po).Error; err != nil {
@@ -545,14 +469,11 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 			return err
 		}
 		created = r.orderToBiz(po)
-		if payFrom == biz.PayFromWin {
+		if fromWin.IsPositive() && winPriceSnap.IsPositive() {
 			created.WinPrice = winPriceSnap.String()
 		}
-		if payFrom == biz.PayFromWinA {
-			created.WinAPrice = winAPriceSnap.String()
-		}
 
-		// 直推奖：recharge / win / win_a 且有上级（奖励复投不产生直推奖）
+		// 直推奖：recharge / win 且有上级（奖励复投不产生直推奖）
 		if directBase.IsPositive() && user.InviterID != nil {
 			if err := r.payDirectReward(tx, *user.InviterID, userID, po.ID, directBase, directRate); err != nil {
 				return err
@@ -562,8 +483,8 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 		if err := refreshAncestorPerformance(tx, userID); err != nil {
 			return err
 		}
-		// 管理奖：充值钱包 / WIN / WIN-A 报单产生；奖励复投只增加上级业绩
-		if payFrom != biz.PayFromReward {
+		// 管理奖：充值钱包 / WIN 报单产生（大区、小区均可）；奖励复投只增加上级业绩
+		if !skipMgmt {
 			if err := r.createManagementRewards(tx, &user, po); err != nil {
 				return err
 			}
@@ -577,12 +498,10 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, amount, payFro
 	return created, balOut, err
 }
 
-// createManagementRewards applies the W-level differential to the source
-// order principal. Walking upward, only a positive rate gap creates a reward;
-// equal levels therefore create no reward (the former peer reward is gone).
-// Each MgmtRewardPO is released against the upline's remaining exit capacity:
-// payable amount enters usdt_reward; the rest goes to overflow_reward and is
-// drained on the upline's next subscription.
+// createManagementRewards 下级认购时按级差发放管理奖。
+// 规则：等级仍由小区业绩门槛决定；管理奖对大区、小区来源均发放（不再排除大区分支）。
+// 向上级差：仅正 gap 产生奖励；平级不发。
+// 可释放部分进 usdt_reward 并计入出局，超出进 overflow_reward，待本人下次认购释放。
 func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, sourceOrder *OrderPO) error {
 	if sourceUser == nil || sourceOrder == nil || sourceUser.InviterID == nil || !sourceOrder.Principal.IsPositive() {
 		return nil
@@ -602,6 +521,7 @@ func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, so
 		}
 		rate := decimal.NewFromFloat(biz.MgmtRateForLevel(ancestor.MgmtLevel))
 		gap := rate.Sub(highestLowerRate)
+
 		if gap.IsPositive() {
 			total := sourceOrder.Principal.Mul(gap).Round(8)
 			if total.IsPositive() {
@@ -646,7 +566,8 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 	}
 	var logCount int64
 	if err := tx.Model(&RewardLogPO{}).
-		Where("user_id = ? AND order_id = ? AND type = ?", userID, reward.SourceOrderID, biz.RewardTypeMgmt).
+		Where("user_id = ? AND order_id = ? AND type IN ?", userID, reward.SourceOrderID,
+			[]string{biz.RewardTypeMgmt, biz.RewardTypeMgmtOverflow}).
 		Count(&logCount).Error; err != nil {
 		return err
 	}
@@ -711,6 +632,24 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 	if overflow.IsPositive() {
 		user.OverflowReward = user.OverflowReward.Add(overflow)
 		user.PendingMgmtReward = user.OverflowReward
+		// 溢出部分也留流水：出局额度用尽时管理奖同样要在后台可查
+		fromID := reward.FromUserID
+		sourceOrderID := reward.SourceOrderID
+		base := reward.BaseAmount
+		rate := reward.Rate
+		if err := tx.Create(&RewardLogPO{
+			UserID:      userID,
+			FromUserID:  &fromID,
+			OrderID:     &sourceOrderID,
+			Type:        biz.RewardTypeMgmtOverflow,
+			Asset:       biz.TokenUSDT,
+			Amount:      overflow,
+			BaseAmount:  &base,
+			Rate:        &rate,
+			ExitApplied: decimal.Zero,
+		}).Error; err != nil {
+			return err
+		}
 	}
 	// 应得已拆入「已入账 + 溢出」；标记 ReleasedAmount=Total，避免同一来源重复结算。
 	reward.ReleasedAmount = want
@@ -1191,34 +1130,40 @@ func (r *walletRepo) MoveRechargeToReward(ctx context.Context, userID int64, amo
 }
 
 func (r *walletRepo) CreateAixWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*biz.Withdrawal, string, error) {
-	return nil, "", fmt.Errorf("AIX withdraw disabled; use ExchangeAixToWin then withdraw WIN")
+	return nil, "", fmt.Errorf("AIX withdraw disabled; exchange AIX to USDT withdrawable balance first")
 }
 
-// ExchangeAixToWin AIX → WIN 兑换。返回兑换记录、AIX 剩余余额、WIN 新余额。
-// 兑换公式：按当前 WIN 价格（USDT/枚）折算。AIX 1 枚 = 1 USDT（金本位），
-// 故 WIN 毛量 = AIX 数量 / WIN 价格，扣除手续费后 WIN 净量 = WIN 毛量 × (1 - 手续费率)。
-func (r *walletRepo) ExchangeAixToWin(ctx context.Context, userID int64, aixAmount string) (*biz.ExchangeRecord, string, string, error) {
+// ExchangeAixToWin AIX → 可提 U（USDT）兑换。
+// needReview 为 true 时只扣 AIX、不入可提 U，状态 review，待后台审核通过后入账。
+func (r *walletRepo) ExchangeAixToWin(ctx context.Context, userID int64, aixAmount string, needReview bool) (*biz.ExchangeRecord, string, string, error) {
 	amt, err := decimal.NewFromString(aixAmount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", "", fmt.Errorf("invalid amount")
 	}
-	price := decimal.NewFromFloat(biz.GetWinPrice())
+	price := decimal.NewFromFloat(biz.AixPriceInitial)
 	if !price.IsPositive() {
-		return nil, "", "", fmt.Errorf("win price not configured")
+		return nil, "", "", fmt.Errorf("aix price not configured")
 	}
 	feeRate := decimal.NewFromFloat(biz.GetExchangeFeeRate())
-	winGross := amt.Div(price).Round(8)
-	if !winGross.IsPositive() {
-		return nil, "", "", fmt.Errorf("win amount too small")
+	usdtGross := amt.Mul(price).Round(8)
+	if !usdtGross.IsPositive() {
+		return nil, "", "", fmt.Errorf("usdt amount too small")
 	}
-	feeAmount := winGross.Mul(feeRate).Round(8)
-	winNet := winGross.Sub(feeAmount).Round(8)
-	if !winNet.IsPositive() {
-		return nil, "", "", fmt.Errorf("win net amount too small after fee")
+	feeAmount := usdtGross.Mul(feeRate).Round(8)
+	usdtNet := usdtGross.Sub(feeAmount).Round(8)
+	if !usdtNet.IsPositive() {
+		return nil, "", "", fmt.Errorf("usdt net amount too small after fee")
+	}
+
+	status := biz.ExchangeStatusCompleted
+	remark := fmt.Sprintf("AIX→USDT exchange at price %s USDT/AIX, fee %s%%", price.String(), feeRate.Mul(decimal.NewFromInt(100)).Round(2).String())
+	if needReview {
+		status = biz.ExchangeStatusReview
+		remark = remark + "; pending admin review (daily AIX exchange quota exceeded)"
 	}
 
 	var rec *biz.ExchangeRecord
-	var aixLeft, winBal string
+	var aixLeft, usdtWithdrawable string
 	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var u UserPO
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
@@ -1228,40 +1173,119 @@ func (r *walletRepo) ExchangeAixToWin(ctx context.Context, userID int64, aixAmou
 			return fmt.Errorf("insufficient aix_balance")
 		}
 		u.AixBalance = u.AixBalance.Sub(amt)
-		u.WinBalance = u.WinBalance.Add(winNet)
-		if err := tx.Model(&u).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"aix_balance": u.AixBalance,
-			"win_balance": u.WinBalance,
-		}).Error; err != nil {
+		}
+		if !needReview {
+			u.UsdtWithdrawable = u.UsdtWithdrawable.Add(usdtNet)
+			updates["usdt_withdrawable"] = u.UsdtWithdrawable
+		}
+		if err := tx.Model(&u).Updates(updates).Error; err != nil {
 			return err
 		}
 		po := &ExchangeRecordPO{
 			UserID:        userID,
 			FromAsset:     biz.TokenAIX,
 			FromAmount:    amt,
-			ToAsset:       biz.TokenWIN,
-			ToAmount:      winNet,
+			ToAsset:       biz.TokenUSDT,
+			ToAmount:      usdtNet,
 			FeeAmount:     feeAmount,
 			ExchangePrice: price,
 			FeeRate:       feeRate.Round(6),
-			Status:        "completed",
-			Remark:        fmt.Sprintf("AIX→WIN exchange at price %s, fee %s%%", price.String(), feeRate.Mul(decimal.NewFromInt(100)).Round(2).String()),
+			Status:        status,
+			Remark:        remark,
 		}
 		if err := tx.Create(po).Error; err != nil {
 			return err
 		}
 		aixLeft = u.AixBalance.String()
-		winBal = u.WinBalance.String()
+		usdtWithdrawable = u.UsdtWithdrawable.String()
 		rec = &biz.ExchangeRecord{
 			ID: po.ID, UserID: po.UserID, UserAddress: u.Address,
 			FromAsset: po.FromAsset, FromAmount: po.FromAmount.String(),
 			ToAsset: po.ToAsset, ToAmount: po.ToAmount.String(),
+			FeeAmount: po.FeeAmount.String(), FeeRate: po.FeeRate.String(),
 			ExchangePrice: po.ExchangePrice.String(),
 			Status:        po.Status, Remark: po.Remark, CreatedTime: po.CreatedTime,
 		}
 		return nil
 	})
-	return rec, aixLeft, winBal, err
+	return rec, aixLeft, usdtWithdrawable, err
+}
+
+func (r *walletRepo) ApproveExchangeReview(ctx context.Context, id int64) error {
+	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var po ExchangeRecordPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&po, id).Error; err != nil {
+			return err
+		}
+		if po.Status != biz.ExchangeStatusReview {
+			return fmt.Errorf("exchange %d not in review status", id)
+		}
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, po.UserID).Error; err != nil {
+			return err
+		}
+		u.UsdtWithdrawable = u.UsdtWithdrawable.Add(po.ToAmount)
+		if err := tx.Model(&u).Update("usdt_withdrawable", u.UsdtWithdrawable).Error; err != nil {
+			return err
+		}
+		return tx.Model(&po).Updates(map[string]interface{}{
+			"status": biz.ExchangeStatusCompleted,
+			"remark": po.Remark + "; admin approved",
+		}).Error
+	})
+}
+
+func (r *walletRepo) RejectExchangeReview(ctx context.Context, id int64, remark string) error {
+	return r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var po ExchangeRecordPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&po, id).Error; err != nil {
+			return err
+		}
+		if po.Status != biz.ExchangeStatusReview {
+			return fmt.Errorf("exchange %d not in review status", id)
+		}
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, po.UserID).Error; err != nil {
+			return err
+		}
+		u.AixBalance = u.AixBalance.Add(po.FromAmount)
+		if err := tx.Model(&u).Update("aix_balance", u.AixBalance).Error; err != nil {
+			return err
+		}
+		if strings.TrimSpace(remark) == "" {
+			remark = "admin rejected"
+		}
+		return tx.Model(&po).Updates(map[string]interface{}{
+			"status": biz.ExchangeStatusRejected,
+			"remark": remark,
+		}).Error
+	})
+}
+
+func (r *walletRepo) SumStaticAixBySettlementDate(ctx context.Context, settlementDate string) (string, error) {
+	var total decimal.Decimal
+	err := r.data.db.WithContext(ctx).Model(&RewardLogPO{}).
+		Where("type = ? AND settlement_date = ?", biz.RewardTypeStaticAix, settlementDate).
+		Select("COALESCE(SUM(amount),0)").Scan(&total).Error
+	if err != nil {
+		return "0", err
+	}
+	return total.String(), nil
+}
+
+func (r *walletRepo) SumExchangedAixSince(ctx context.Context, since time.Time) (string, error) {
+	var total decimal.Decimal
+	// 仅 completed 计入当日配额；待审核/已拒绝都不计入，隔日也不会占用新一天的阈值。
+	err := r.data.db.WithContext(ctx).Model(&ExchangeRecordPO{}).
+		Where("UPPER(from_asset) = ? AND created_time >= ? AND status = ?",
+			biz.TokenAIX, since, biz.ExchangeStatusCompleted).
+		Select("COALESCE(SUM(from_amount),0)").Scan(&total).Error
+	if err != nil {
+		return "0", err
+	}
+	return total.String(), nil
 }
 
 func (r *walletRepo) ListExchangeRecordsByUser(ctx context.Context, userID int64) ([]*biz.ExchangeRecord, error) {
@@ -1307,53 +1331,9 @@ func (r *walletRepo) ListAllExchangeRecords(ctx context.Context) ([]*biz.Exchang
 	return out, nil
 }
 
-// CreateWinWithdrawal WIN 代币提现：扣 WinBalance，创建 WithdrawalPO
+// CreateWinWithdrawal WIN 提现已关闭（保留接口供历史查询）。
 func (r *walletRepo) CreateWinWithdrawal(ctx context.Context, userID int64, amount, toAddress, status string) (*biz.Withdrawal, string, error) {
-	amt, err := decimal.NewFromString(amount)
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return nil, "", fmt.Errorf("invalid amount")
-	}
-	var created *biz.Withdrawal
-	var left string
-	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var u UserPO
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
-			return err
-		}
-		if u.WinBalance.LessThan(amt) {
-			return fmt.Errorf("insufficient win_balance")
-		}
-		u.WinBalance = u.WinBalance.Sub(amt)
-		if err := tx.Model(&u).Update("win_balance", u.WinBalance).Error; err != nil {
-			return err
-		}
-		if strings.TrimSpace(status) == "" {
-			status = biz.WithdrawStatusPending
-		}
-		po := &WithdrawalPO{
-			UserID:    userID,
-			Asset:     biz.TokenWIN,
-			Amount:    amt,
-			Fee:       decimal.Zero,
-			PayAmount: amt,
-			ToAddress: toAddress,
-			Status:    status,
-			Remark:    "WIN token withdraw; chain payout pending",
-		}
-		if err := tx.Create(po).Error; err != nil {
-			return err
-		}
-		left = u.WinBalance.String()
-		created = &biz.Withdrawal{
-			ID: po.ID, UserID: po.UserID, Address: u.Address,
-			ToAddress: po.ToAddress, Amount: po.Amount.String(),
-			Fee: po.Fee.String(), NetAmount: po.PayAmount.String(),
-			Status: po.Status, TxHash: po.TxHash, Asset: po.Asset,
-			CreatedAt: po.CreatedTime,
-		}
-		return nil
-	})
-	return created, left, err
+	return nil, "", fmt.Errorf("win withdraw disabled")
 }
 
 // CreateSdtWithdrawal AIX-USDT 提现：扣 points，创建 WithdrawalPO
@@ -1417,9 +1397,6 @@ func (r *walletRepo) CreateUsdtWithdrawal(ctx context.Context, userID int64, amo
 		var u UserPO
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
 			return err
-		}
-		if !u.IsZeroAccount && !u.IsCommunitySubsidy {
-			return fmt.Errorf("usdt withdraw not allowed")
 		}
 		if u.UsdtWithdrawable.LessThan(amt) {
 			return fmt.Errorf("insufficient usdt_withdrawable")
@@ -1821,14 +1798,14 @@ func withdrawalPOToBiz(po *WithdrawalPO, userAddr string) *biz.Withdrawal {
 	}
 }
 
-// ClaimNextPendingWinWithdrawal 原子领取一条待打款提现（pending → doing，WIN 或 SDT）。
+// ClaimNextPendingWinWithdrawal 原子领取一条待打款提现（pending → doing，SDT / USDT）。
 func (r *walletRepo) ClaimNextPendingWinWithdrawal(ctx context.Context) (*biz.Withdrawal, error) {
 	var claimed *biz.Withdrawal
 	err := r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var po WithdrawalPO
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("asset IN ? AND status = ? AND (tx_hash IS NULL OR tx_hash = '')",
-				[]string{biz.TokenWIN, biz.TokenSDT, biz.TokenUSDT}, biz.WithdrawStatusPending).
+				[]string{biz.TokenSDT, biz.TokenUSDT}, biz.WithdrawStatusPending).
 			Order("id asc").
 			First(&po).Error
 		if err == gorm.ErrRecordNotFound {
@@ -2107,7 +2084,8 @@ func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrde
 // payUSDTRechargeRoleRewards 下级 USDT 充值时，向上查找首个开通对应角色的上级并发放奖励（入账可提 U 余额）。
 // 仅 USDT 充值触发；WIN / WIN-A 充值不发放零号账户与社区补贴奖励。
 // 0号账户与社区补贴分别独立向上查找：各自找到最近一位开通者后发放并停止，互不影响。
-func (r *walletRepo) payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
+// 注册赠送入充值钱包同样走这里，因此不绑定在 walletRepo 上。
+func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
 	if !amount.GreaterThan(decimal.Zero) {
 		return nil
 	}

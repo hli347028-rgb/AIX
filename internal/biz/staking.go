@@ -29,6 +29,13 @@ var (
 	UsdtWithdrawReviewThreshold   = "0"
 	MinWinRecharge       = conf.DefaultMinWinRecharge
 	MinWinARecharge      = conf.DefaultMinWinARecharge
+	// RegisterBonus 新用户注册赠送金额，入 USDT 充值钱包
+	RegisterBonus = conf.DefaultRegisterBonus
+	// 交易所划转（合作方加款接口）限额，管理端可配
+	PartnerMinAmount  = conf.DefaultPartnerMinAmount
+	PartnerMaxAmount  = conf.DefaultPartnerMaxAmount
+	PartnerDailyLimit = conf.DefaultPartnerDailyLimit
+	ExchangeReviewThresholdPercent = conf.DefaultExchangeReviewThresholdPercent
 )
 
 // AixPriceDecimals AIX 价格对外展示与落库统一保留的小数位数。
@@ -90,6 +97,9 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	if snap.MinWinARecharge != "" {
 		MinWinARecharge = snap.MinWinARecharge
 	}
+	if snap.RegisterBonus != "" {
+		RegisterBonus = snap.RegisterBonus
+	}
 	if snap.WinWithdrawReviewThreshold != "" {
 		WinWithdrawReviewThreshold = snap.WinWithdrawReviewThreshold
 	}
@@ -98,6 +108,18 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	}
 	if snap.UsdtWithdrawReviewThreshold != "" {
 		UsdtWithdrawReviewThreshold = snap.UsdtWithdrawReviewThreshold
+	}
+	if snap.PartnerMinAmount != "" {
+		PartnerMinAmount = snap.PartnerMinAmount
+	}
+	if snap.PartnerMaxAmount != "" {
+		PartnerMaxAmount = snap.PartnerMaxAmount
+	}
+	if snap.PartnerDailyLimit != "" {
+		PartnerDailyLimit = snap.PartnerDailyLimit
+	}
+	if snap.ExchangeReviewThresholdPercent != "" {
+		ExchangeReviewThresholdPercent = snap.ExchangeReviewThresholdPercent
 	}
 }
 

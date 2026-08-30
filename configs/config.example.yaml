@@ -25,6 +25,16 @@ auth:
     - "0x0000000000000000000000000000000000000000"
   admin_account: admin
   admin_password: "replace-with-a-strong-admin-password"
+  admin_sub_accounts:
+    - account: user1
+      password: user1
+      modules: []  # 留空=全部常规模块；示例: ["/home", "/member"]
+    - account: user2
+      password: user2
+      modules: []
+    - account: user3
+      password: user3
+      modules: []
   challenge_ttl: 5m
   # 第三方 Open API 密钥（可配置多个）；请求头 X-API-Key: <key>
   open_api_keys:

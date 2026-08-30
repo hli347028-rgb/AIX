@@ -38,6 +38,8 @@ type UserPO struct {
 	ZeroAccountRewardTotal decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`
 	CommunitySubsidyTotal  decimal.Decimal `gorm:"column:community_subsidy_total;type:decimal(36,18);default:0;not null"`
 	Status            int32           `gorm:"default:1;not null"`
+	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结后禁止登录/充值/报单/提现
+	FrozenAt          *time.Time      `gorm:"column:frozen_at"`
 	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
 	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime       time.Time       `gorm:"column:updated_time;autoUpdateTime"`
@@ -252,3 +254,33 @@ type AnnouncementPO struct {
 }
 
 func (AnnouncementPO) TableName() string { return "announcements" }
+
+// AdminOperationLogPO 管理后台操作审计日志。
+type AdminOperationLogPO struct {
+	ID           int64     `gorm:"primaryKey;autoIncrement"`
+	Operator     string    `gorm:"column:operator;size:64;not null;index"`     // 主账户名或子账户名
+	OperatorType string    `gorm:"column:operator_type;size:16;not null"`      // main | sub
+	Action       string    `gorm:"column:action;size:128;not null;index"`      // 请求路径
+	ActionLabel  string    `gorm:"column:action_label;size:128;not null"`      // 操作说明
+	Method       string    `gorm:"column:method;size:16;not null"`
+	Params       string    `gorm:"column:params;size:2048"`                    // 请求参数摘要
+	ClientIP     string    `gorm:"column:client_ip;size:64"`
+	CreatedTime  time.Time `gorm:"column:created_time;autoCreateTime;index"`
+}
+
+func (AdminOperationLogPO) TableName() string { return "admin_operation_logs" }
+
+// PartnerNoncePO 合作方转账加款接口的 nonce 去重记录。
+//
+// 唯一索引 (partner_id, nonce) 就是防重放的原子操作本身：插入成功=首次出现，
+// 插入冲突=重放。等价于文档 §5 建议的 Redis SET NX EX 300，但不引入新的运行时依赖。
+// 过期行由定时清理删除，保留窗口不得小于时间戳允许偏差，否则会出现
+// 「nonce 已被清理但时间戳仍在有效期内」的重放空档。
+type PartnerNoncePO struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement"`
+	PartnerID   string    `gorm:"column:partner_id;size:64;not null;uniqueIndex:uniq_partner_nonce,priority:1"`
+	Nonce       string    `gorm:"column:nonce;size:64;not null;uniqueIndex:uniq_partner_nonce,priority:2"`
+	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime;index"`
+}
+
+func (PartnerNoncePO) TableName() string { return "partner_nonces" }

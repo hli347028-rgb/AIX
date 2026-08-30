@@ -128,6 +128,11 @@ export default {
                     }
                 },
                 {
+                    title: '账户状态',
+                    dataIndex: 'is_frozen',
+                    customRender: (v) => v ? '已冻结' : '正常',
+                },
+                {
                     title: '0号账户',
                     dataIndex: 'is_zero_account',
                     customRender: (v) => v ? '是' : '否',
@@ -214,6 +219,14 @@ export default {
 
                                             <a-menu-item onClick={() => this.set_inviter(v.userId || v.id, v.address, v.myRecommendAddress)}>
                                                 更改上级地址
+                                            </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.change_address(v.userId || v.id, v.address)}>
+                                                更换钱包地址
+                                            </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.set_frozen(v.userId || v.id, v.is_frozen)}>
+                                                {v.is_frozen ? '解冻账户' : '冻结账户'}
                                             </a-menu-item>
                                         </a-menu>
                                     </a-dropdown>
@@ -361,6 +374,22 @@ export default {
                 }
             })
         },
+        set_frozen(user_id, current) {
+            const willFreeze = !current
+            this.$confirm({
+                title: willFreeze ? '冻结账户' : '解冻账户',
+                content: willFreeze
+                    ? '冻结后该账户将无法登录、充值、报单和提现，确认冻结？'
+                    : '解冻后该账户恢复正常使用，确认解冻？',
+                centered: true,
+                onOk: () => {
+                    return Gai.set_frozen({ user_id, enabled: willFreeze ? '1' : '0' }).then(() => {
+                        this.$message.success(willFreeze ? '账户已冻结' : '账户已解冻')
+                        this.getList()
+                    })
+                }
+            })
+        },
         set_community_subsidy(user_id, current) {
             let enabled = current ? '1' : '0'
             this.$confirm({
@@ -402,6 +431,41 @@ export default {
                     }
                     return Gai.set_inviter({ user_id, inviter_address: addr }).then(() => {
                         this.$message.success('上级地址已更新')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        change_address(user_id, oldAddress) {
+            let new_address = ''
+            this.$confirm({
+                title: '更换钱包地址',
+                content: (
+                    <div>
+                        <div style="margin-bottom:8px;color:#888;font-size:12px;">当前地址：{oldAddress}</div>
+                        <div style="margin-bottom:8px;color:#888;font-size:12px;">请输入未在系统注册过的新钱包地址，原账户资产与关系将保留到新地址</div>
+                        <a-input style="margin-top:8px;" placeholder="0x..." onInput={(val) => {
+                            new_address = val.target.value
+                        }} />
+                    </div>
+                ),
+                centered: true,
+                onOk: () => {
+                    const addr = String(new_address || '').trim()
+                    if (!addr) {
+                        this.$message.warning('请填写新钱包地址')
+                        return Promise.reject()
+                    }
+                    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+                        this.$message.warning('钱包地址格式无效')
+                        return Promise.reject()
+                    }
+                    if (String(oldAddress || '').toLowerCase() === addr.toLowerCase()) {
+                        this.$message.warning('新地址与当前地址相同')
+                        return Promise.reject()
+                    }
+                    return Gai.change_address({ user_id, new_address: addr }).then(() => {
+                        this.$message.success('钱包地址已更换')
                         this.getList()
                     })
                 }

@@ -127,6 +127,20 @@ func (s *AdminLegacyService) sumStaticRelease(ctx context.Context, settlementDat
 	return total, nil
 }
 
+// sumStaticAixAmount 某结算日静态发放的 AIX 枚数（reward_logs.amount，不是 exit_applied 的 USDT）。
+func (s *AdminLegacyService) sumStaticAixAmount(ctx context.Context, settlementDate string) (decimal.Decimal, error) {
+	db := s.data.DB().WithContext(ctx).Table("reward_logs").
+		Where("type = ?", biz.RewardTypeStaticAix)
+	if settlementDate != "" {
+		db = db.Where("settlement_date = ?", settlementDate)
+	}
+	var total decimal.Decimal
+	if err := db.Select("COALESCE(SUM(amount),0)").Scan(&total).Error; err != nil {
+		return decimal.Zero, err
+	}
+	return total, nil
+}
+
 func (s *AdminLegacyService) sumOrderPrincipal(ctx context.Context, fundSource string, since *time.Time) (decimal.Decimal, error) {
 	db := s.data.DB().WithContext(ctx).Table("orders").
 		Where("status IN ?", []string{biz.OrderStatusActive, biz.OrderStatusExited})
@@ -281,6 +295,41 @@ func withdrawalWithinTime(w *biz.Withdrawal, start, end *time.Time) bool {
 		return false
 	}
 	return true
+}
+
+func orderWithinTime(o *biz.AdminOrderDetail, start, end *time.Time) bool {
+	if o == nil || o.Order == nil {
+		return false
+	}
+	t := o.Order.CreatedAt
+	if t.IsZero() {
+		t = o.Order.CreatedTime
+	}
+	if start != nil && t.Before(*start) {
+		return false
+	}
+	if end != nil && t.After(*end) {
+		return false
+	}
+	return true
+}
+
+func sumBuyOrderStats(list []*biz.AdminOrderDetail) map[string]interface{} {
+	total := decimal.Zero
+	for _, o := range list {
+		if o == nil || o.Order == nil {
+			continue
+		}
+		principal, err := decimal.NewFromString(strings.TrimSpace(o.Order.Principal))
+		if err != nil {
+			continue
+		}
+		total = total.Add(principal)
+	}
+	return map[string]interface{}{
+		"totalCount":     len(list),
+		"principalTotal": total.String(),
+	}
 }
 
 func sumWithdrawalStats(list []*biz.Withdrawal) map[string]interface{} {

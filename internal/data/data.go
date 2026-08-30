@@ -15,7 +15,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewUserRepo, NewChallengeRepo, NewWalletRepo, NewStakingRepo, NewSettingsRepo)
+var ProviderSet = wire.NewSet(NewData, NewUserRepo, NewChallengeRepo, NewWalletRepo, NewStakingRepo, NewSettingsRepo, NewPartnerNonceRepo)
 
 // Data .
 type Data struct {
@@ -31,7 +31,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	if err := db.AutoMigrate(
 		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
-		&ExchangeRecordPO{}, &AnnouncementPO{},
+		&ExchangeRecordPO{}, &AnnouncementPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
 	); err != nil {
 		return nil, nil, err
 	}
@@ -221,6 +221,14 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 		{
 			name: "win_a_recharge_balance",
 			ddl:  "ALTER TABLE users ADD COLUMN win_a_recharge_balance decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "is_frozen",
+			ddl:  "ALTER TABLE users ADD COLUMN is_frozen tinyint(1) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "frozen_at",
+			ddl:  "ALTER TABLE users ADD COLUMN frozen_at datetime(3) DEFAULT NULL",
 		},
 	}
 	for _, col := range columns {

@@ -30,6 +30,36 @@ func TestCalcAreaPerformance(t *testing.T) {
 	}
 }
 
+func TestIsInSmallAreaBranch(t *testing.T) {
+	stakes := map[int64]decimal.Decimal{
+		10: decimal.NewFromInt(2500), // 大区
+		20: decimal.NewFromInt(1000),
+		30: decimal.NewFromInt(500),
+	}
+	if IsInSmallAreaBranch(stakes, 10) {
+		t.Fatal("large-area branch should not count as small area")
+	}
+	if !IsInSmallAreaBranch(stakes, 20) || !IsInSmallAreaBranch(stakes, 30) {
+		t.Fatal("non-large branches should count as small area")
+	}
+	// 单线全部算大区
+	one := map[int64]decimal.Decimal{10: decimal.NewFromInt(100)}
+	if IsInSmallAreaBranch(one, 10) {
+		t.Fatal("sole branch is large area")
+	}
+	// 并列业绩：更小 id 为大区
+	tie := map[int64]decimal.Decimal{
+		5:  decimal.NewFromInt(100),
+		8:  decimal.NewFromInt(100),
+	}
+	if IsInSmallAreaBranch(tie, 5) {
+		t.Fatal("smaller id should be large area on tie")
+	}
+	if !IsInSmallAreaBranch(tie, 8) {
+		t.Fatal("larger id should be small area on tie")
+	}
+}
+
 func TestIsLinealRelation(t *testing.T) {
 	// 1 -> 2 -> 4, 1 -> 3 -> 5, and 6 is unrelated.
 	parents := map[int64]int64{2: 1, 3: 1, 4: 2, 5: 3}

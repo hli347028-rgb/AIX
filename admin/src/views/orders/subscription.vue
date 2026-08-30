@@ -13,11 +13,32 @@
                     </a-select>
                 </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
+                    <a-select allowClear v-model="searchData.fund_source" style="width:100%" placeholder="资金来源"
+                        @change="getListTwo">
+                        <a-select-option v-for="opt in fundSourceOptions" :key="opt.value" :value="opt.value">
+                            {{ opt.label }}
+                        </a-select-option>
+                    </a-select>
+                </a-col>
+                <a-col :xs="24" :md="12" :lg="10" :xl="8">
+                    <a-range-picker
+                        v-model="searchData.dateRange"
+                        show-time
+                        format="YYYY-MM-DD HH:mm:ss"
+                        style="width:100%"
+                        :placeholder="['开始时间', '结束时间']"
+                    />
+                </a-col>
+                <a-col :xs="24" :md="12" :lg="12" :xl="8">
                     <a-button-group>
                         <a-button type="primary" :loading="loading" @click="getListTwo">确定筛选</a-button>
                     </a-button-group>
                 </a-col>
             </a-row>
+            <div class="stats-bar" v-if="stats">
+                <span>筛选笔数：<b>{{ stats.totalCount || 0 }}</b></span>
+                <span>报单总额：<b>{{ stats.principalTotal || 0 }}</b> USDT</span>
+            </div>
             <a-table
                 rowKey="id"
                 :loading="loading"
@@ -35,6 +56,7 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import moment from 'moment'
 
 const statusText = {
     active: '进行中',
@@ -45,13 +67,28 @@ const statusText = {
 const fundSourceText = {
     recharge: '充值账本',
     reward: '奖励账本',
+    win: 'WIN',
+    win_a: 'WIN-A',
+    'recharge+win': '充值+WIN',
+    'recharge+win_a': '充值+WIN-A',
+    'win+win_a': 'WIN+WIN-A',
+    'win+recharge': 'WIN+充值',
+    'win_a+recharge': 'WIN-A+充值',
+    'win_a+win': 'WIN-A+WIN',
 }
+
+const fundSourceOptions = Object.keys(fundSourceText).map((value) => ({
+    value,
+    label: fundSourceText[value],
+}))
 
 export default {
     name: 'subscription',
     mixins: [listMixin],
     data() {
         return {
+            stats: null,
+            fundSourceOptions,
             columns: [
                 {
                     title: '时间',
@@ -100,6 +137,8 @@ export default {
             searchData: {
                 address: '',
                 status: undefined,
+                fund_source: undefined,
+                dateRange: [],
             },
             pageSize: 50,
         }
@@ -108,8 +147,7 @@ export default {
         this.getList()
     },
     methods: {
-        getList() {
-            this.loading = true
+        buildParams() {
             const params = {
                 page: this.current || 1,
                 pageSize: this.pageSize || 50,
@@ -118,8 +156,17 @@ export default {
             if (address) params.address = address
             const status = this.searchData.status
             if (status) params.status = status
-
-            Gai.buy_list(params).then((res) => {
+            const fundSource = this.searchData.fund_source
+            if (fundSource) params.fund_source = fundSource
+            if (this.searchData.dateRange && this.searchData.dateRange.length === 2) {
+                params.startTime = moment(this.searchData.dateRange[0]).format('YYYY-MM-DD HH:mm:ss')
+                params.endTime = moment(this.searchData.dateRange[1]).format('YYYY-MM-DD HH:mm:ss')
+            }
+            return params
+        },
+        getList() {
+            this.loading = true
+            Gai.buy_list(this.buildParams()).then((res) => {
                 const list = (res && res.rewards) ? res.rewards : []
                 this.data = list.map((value, key) => ({
                     ...value,
@@ -127,9 +174,11 @@ export default {
                     key: value.id != null ? value.id : key,
                 }))
                 this.total = parseInt((res && res.count) || 0, 10) || 0
+                this.stats = (res && res.stats) || null
             }).catch(() => {
                 this.data = []
                 this.total = 0
+                this.stats = null
             }).finally(() => {
                 this.loading = false
             })
@@ -142,6 +191,22 @@ export default {
 .inputGroup {
     >div {
         margin-bottom: 20px;
+    }
+}
+
+.stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    border-radius: 4px;
+    color: #333;
+
+    b {
+        color: #389e0d;
     }
 }
 </style>

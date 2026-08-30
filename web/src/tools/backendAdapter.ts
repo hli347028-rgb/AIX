@@ -153,7 +153,10 @@ function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
     if (exitTarget <= 0) exitTarget = principal * mul
     exitTotal += exitTarget
     releasedTotal += released
-    unexitedTotal += Math.max(0, exitTarget - released)
+    // 追缴作废的订单不再释放，剩余额度不计入出局剩余（与后端 SummarizeOrders 一致）
+    if (o.status !== 'cancelled') {
+      unexitedTotal += Math.max(0, exitTarget - released)
+    }
     dailyReleaseTotal += calcOrderDailyRelease(o, withdrawReset)
     if (o.status === 'completed' || o.status === '2') exitCount += 1
   }
@@ -824,13 +827,7 @@ export async function adaptRequest(
       return { count: list.length, list }
     }
     case 'app_server/withdraw': {
-      const profile = await authGet('/v1/auth/profile')
-      const toAddress = data?.to_address || data?.address || profile.data?.address || ''
-      const res = await authPost('/v1/wallet/withdraw-win', {
-        amount: String(data?.amount || ''),
-        to_address: toAddress,
-      })
-      return { status: 'ok', ...res.data }
+      return { status: 'error', message: 'WIN 提现已关闭' }
     }
     case 'app_server/deposit_list': {
       const res = await authGet('/v1/wallet/recharges')
@@ -949,9 +946,11 @@ export async function adaptRequest(
       return { count: total, list: records.slice(start, start + pageSize) }
     }
     case 'app_server/recommend_list': {
-      const targetAddress = mergedParams.address || ''
+      const targetAddress = String(mergedParams.address || '').trim()
       const res = await authGet('/v1/auth/invitees', targetAddress ? { address: targetAddress } : {})
-      return { recommends: mapInvitees(res.data?.invitees || []) }
+      const body = apiBody(res)
+      const invitees = body.invitees || body.data?.invitees || []
+      return { recommends: mapInvitees(Array.isArray(invitees) ? invitees : []) }
     }
     case 'app_server/downline_recharges': {
       const page = Math.max(1, Number(mergedParams.page) || 1)
@@ -989,9 +988,7 @@ export async function adaptRequest(
       if (!amount) return { status: 'fail', message: '请输入认购金额' }
       const payFrom = data?.pay_from === 'reward' || data?.payFrom === 'reward'
         ? 'reward'
-        : (data?.pay_from === 'win_a' || data?.payFrom === 'win_a'
-          ? 'win_a'
-          : (data?.pay_from === 'win' || data?.payFrom === 'win' ? 'win' : 'recharge'))
+        : (data?.pay_from === 'win' || data?.payFrom === 'win' ? 'win' : 'recharge')
       const res = await authPost('/v1/wallet/subscribe-aix', {
         amount,
         pay_from: payFrom,
@@ -1019,9 +1016,7 @@ export async function adaptRequest(
       return { status: 'ok', ...pageData }
     }
     case 'app_server/deposit_win_a_list': {
-      const res = await authGet('/v1/wallet/recharges-win-a')
-      const list = mapRecharges(res.data?.recharges || [])
-      const pageData = paginateList(list, mergedParams.page)
+      const pageData = paginateList([], mergedParams.page)
       return { status: 'ok', ...pageData }
     }
     case 'app_server/exchange':

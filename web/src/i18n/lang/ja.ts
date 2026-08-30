@@ -29,7 +29,7 @@ export default {
     operationFailed: '操作に失敗しました',
     close: '閉じる',
     protocol: 'プロトコル', gotIt: 'わかりました', languageSwitch: '言語切替', switchWallet: 'ウォレット切替', back: '戻る',
-    days: '{count} 日', retry: '再試行'
+    days: '{count} 日', retry: '再試行', loadFailed: '読み込みに失敗しました。しばらくしてから再試行してください'
   },
   index: {
     welcomeSubtitle: '世界初のAIトレースアプリチェーン',
@@ -177,7 +177,7 @@ export default {
     pageTitle: 'ステーキング資産運用',
     pageSubtitle: '適した資産運用レンジを選択してください',
     balance: '口座残高',
-    reportOrder: '申込',
+    reportOrder: 'USDT',
     reinvest: '再投資',
     rechargeWallet: '入金ウォレット',
     rewardWallet: '報酬ウォレット',
@@ -190,7 +190,7 @@ export default {
     rechargeWalletBalance: '入金ウォレット残高',
     rewardWalletBalance: '報酬ウォレット残高',
     winWalletBalance: 'WIN 残高',
-    winPay: 'WIN 支払',
+    winPay: 'WIN',
     winPayNow: 'WIN で支払う',
     winPaySuccess: 'WIN 申込成功',
     winPayFailed: 'WIN 申込失敗',
@@ -213,6 +213,7 @@ export default {
     statusComing: '間もなく公開',
     subscribeNow: '今すぐ参加',
     customAmountHint: 'カスタム金額（≥ {amount} USDT）',
+    all: 'すべて',
     minPlaceholder: '最低 {amount}',
     subscribeSuccess: '認購成功',
     subscribeFailed: '認購失敗',
@@ -226,6 +227,7 @@ export default {
     statusCompleted: '完了',
     statusPending: '保留中',
     minSubscribeAmount: '認購金額は {amount} 以上である必要があります',
+    subscribeStep: '認購金額は {step} の倍数である必要があります',
     enterSubscribeAmount: '認購金額を入力してください'
   },
   withdraw: {
@@ -321,7 +323,7 @@ export default {
     globalLaunch: 'グローバルローンチ',
     networkHashrate: 'ネットワークハッシュレート',
     walletDownload: 'ウォレットダウンロード',
-    orderZone: '申込エリア',
+    orderZone: '鋳造エリア',
     hashrateMall: 'ハッシュレートモール',
     rechargeZone: 'チャージエリア',
     crossChain: 'クロスチェーン',
@@ -367,7 +369,7 @@ export default {
     noDirectReferral: '直紹介なし',
     income: '収益',
     exitProgress: '出局進捗', rechargeBalance: 'チャージ残高', rewardBalance: '報酬残高',
-    withdrawableAix: '出金可能 AIX', aixBalance: 'AIX残高', winBalance: 'WIN残高', rawNewBalance: 'トークン残高', exchange: '交換', directReferralReward: '直接紹介報酬', managementReward: '管理報酬', releasedManagementReward: '支払済み管理報酬', pendingManagementReward: '保留中の管理報酬', overflowReward: 'オーバーフロー報酬', totalIncome: '累計収益',
+    withdrawableAix: '出金可能 AIX', aixBalance: 'AIX残高', winBalance: 'WIN残高', winRechargeBalance: 'WIN入金残高', rawNewBalance: 'トークン残高', exchange: '交換', directReferralReward: '直接紹介報酬', managementReward: '管理報酬', releasedManagementReward: '支払済み管理報酬', pendingManagementReward: '保留中の管理報酬', overflowReward: 'オーバーフロー報酬', totalIncome: '累計収益',
     points: '現在のポイント', pointsAll: '累計ポイント', aixUsdt: 'AIX-USDT',
     pointsRecords: 'AIX-USDT', noPointsRecords: 'AIX-USDT記録なし'
   },

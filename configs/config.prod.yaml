@@ -68,3 +68,18 @@ wallet:
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10
   withdraw_payout_query_interval_seconds: 5
+
+# 合作方转账加款接口 POST /v1/transfer/credit（HMAC-SHA256 双向签名）
+# 与 auth.open_api_keys 是两套独立认证，不可混用。
+transfer_partners:
+  timestamp_skew: 300s
+  ip_rate_limit_per_sec: 20
+  partners:
+    - partner_id: "AIX10001"
+      enabled: true
+      secret_keys_file: "/opt/aix/secrets/partner-AIX10001.prod.key"
+      # 三个限额留空 = 使用管理端「配置项」里的全局值（可热改）
+      min_amount: ""
+      max_amount: ""
+      daily_limit: ""
+      rate_limit_per_sec: 10

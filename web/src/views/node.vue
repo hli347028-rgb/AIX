@@ -17,18 +17,6 @@
             <span class="radio-dot" aria-hidden="true"></span>
             <strong>{{ $t('node.reportOrder') }}</strong>
           </label>
-          <label class="mode-option" :class="{ active: activeMode === 'reward', disabled: submitting }">
-            <input
-              type="radio"
-              name="subscribe-mode"
-              value="reward"
-              :checked="activeMode === 'reward'"
-              :disabled="submitting"
-              @change="switchMode('reward')"
-            />
-            <span class="radio-dot" aria-hidden="true"></span>
-            <strong>{{ $t('node.reinvest') }}</strong>
-          </label>
           <label class="mode-option" :class="{ active: activeMode === 'win', disabled: submitting }">
             <input
               type="radio"
@@ -41,17 +29,17 @@
             <span class="radio-dot" aria-hidden="true"></span>
             <strong>{{ $t('node.winPay') }}</strong>
           </label>
-          <label class="mode-option" :class="{ active: activeMode === 'win_a', disabled: submitting }">
+          <label class="mode-option" :class="{ active: activeMode === 'reward', disabled: submitting }">
             <input
               type="radio"
               name="subscribe-mode"
-              value="win_a"
-              :checked="activeMode === 'win_a'"
+              value="reward"
+              :checked="activeMode === 'reward'"
               :disabled="submitting"
-              @change="switchMode('win_a')"
+              @change="switchMode('reward')"
             />
             <span class="radio-dot" aria-hidden="true"></span>
-            <strong>{{ $t('node.winAPay') }}</strong>
+            <strong>{{ $t('node.reinvest') }}</strong>
           </label>
         </div>
 
@@ -65,12 +53,6 @@
         <p v-if="activeMode === 'win' && customWinCost" class="mode-tip win-cost-tip">
           {{ $t('node.customWinCostHint', { cost: customWinCost }) }}
         </p>
-        <p v-if="activeMode === 'win_a' && winAPrice > 0" class="mode-tip win-cost-tip">
-          {{ $t('node.winAPayHint', { price: winAPrice, cost: estimatedWinACost }) }}
-        </p>
-        <p v-if="activeMode === 'win_a' && customWinACost" class="mode-tip win-cost-tip">
-          {{ $t('node.customWinACostHint', { cost: customWinACost }) }}
-        </p>
         <p class="mode-tip">{{ modeTip }}</p>
       </div>
 
@@ -80,26 +62,32 @@
           :key="tier.price"
           class="tier-card"
           :class="{ active: selectedTier === tier.price }"
+          @click="selectedTier = tier.price"
         >
           <div class="tier-header">
             <div class="tier-price">{{ tier.price }}</div>
             <div class="tier-unit">USDT</div>
           </div>
-          <button class="subscribe-btn" :disabled="submitting" @click="handleSubscribe(tier.price)">
+          <button class="subscribe-btn" :disabled="submitting" @click.stop="handleSubscribe(tier.price)">
             {{ actionText }}
           </button>
         </div>
       </div>
 
       <div class="custom-amount">
-        <p class="custom-hint">{{ $t('node.customAmountHint', { amount: minSubscribe }) }}</p>
+        <div class="custom-heading">
+          <p class="custom-hint">{{ $t('node.customAmountHint', { amount: minSubscribe }) }}</p>
+          <button type="button" class="all-btn" :disabled="submitting" @click="fillAll">
+            {{ $t('node.all') }}
+          </button>
+        </div>
         <div class="custom-row">
           <input
             v-model="customAmount"
             class="custom-input"
             type="number"
             :min="minSubscribe"
-            step="1"
+            step="any"
             :placeholder="$t('node.minPlaceholder', { amount: minSubscribe })"
           />
           <button class="subscribe-btn custom-btn" :disabled="submitting" @click="handleCustomSubscribe">
@@ -123,11 +111,7 @@
           </div>
           <div class="order-list" v-for="(item, index) in orderList" :key="item.id || index">
             <div class="table-row">
-              <span>
-                {{ item.total_amount ?? item.amount }} USDT
-                <small v-if="item.from_win" class="win-deduct">-{{ displayAmount(item.from_win) }} WIN</small>
-                <small v-if="item.from_win_a" class="win-deduct">-{{ displayAmount(item.from_win_a) }} WIN-A</small>
-              </span>
+              <span>{{ displayAmount(item.total_amount ?? item.amount) }} USDT</span>
               <span>{{ orderStatusText(item.status) }}</span>
               <span>{{ fundingSourceText(item.fund_source || item.product_name) }}</span>
               <span>{{ item.created_at ?? item.createdAt }}</span>
@@ -150,39 +134,36 @@ import request from '@/tools/request'
 import { showSuccessToast, showFailToast, showLoadingToast, closeToast, showConfirmDialog } from 'vant'
 import userPerson from '@/pinia/person'
 import { errMsg, listAixOrders, subscribeAix } from '@/api/aix'
-import { compareDecimals, displayDecimal, divDecimal, isPositiveDecimal } from '@/tools/decimal'
+import { compareDecimals, displayDecimal, divDecimal, isPositiveDecimal, mulDecimal } from '@/tools/decimal'
 
 const { t: $t } = useI18n()
 const person = userPerson()
 
-type SubscribeMode = 'recharge' | 'reward' | 'win' | 'win_a'
+type SubscribeMode = 'recharge' | 'reward' | 'win'
 
 const activeMode = ref<SubscribeMode>('recharge')
+
 const winPrice = computed(() => Number(person.profile?.win_price || 0))
-const winAPrice = computed(() => Number(person.profile?.win_a_price || 0))
 const accountBalance = computed(() => {
   const profile = person.profile
   if (activeMode.value === 'win') return profile?.win_recharge_balance || '0.00'
-  if (activeMode.value === 'win_a') return profile?.win_a_recharge_balance || '0.00'
   if (activeMode.value === 'recharge') return profile?.usdt_recharge || '0.00'
   return profile?.usdt_reward || '0.00'
 })
 const balanceLabel = computed(() => {
   if (activeMode.value === 'win') return $t('node.winWalletBalance')
-  if (activeMode.value === 'win_a') return $t('node.winAWalletBalance')
   if (activeMode.value === 'recharge') return $t('node.rechargeWalletBalance')
   return $t('node.rewardWalletBalance')
 })
 const balanceUnit = computed(() => {
   if (activeMode.value === 'win') return 'WIN'
-  if (activeMode.value === 'win_a') return 'WIN-A'
   return 'USDT'
 })
 const modeTip = computed(() => {
   if (activeMode.value === 'win') return $t('node.winReferralTip')
-  if (activeMode.value === 'win_a') return $t('node.winAReferralTip')
   return $t('node.referralRewardTip')
 })
+
 const estimatedWinCost = computed(() => calcWinCost(selectedTier.value || minSubscribe.value))
 const customWinCost = computed(() => {
   if (activeMode.value !== 'win' || !customAmount.value) return ''
@@ -190,22 +171,10 @@ const customWinCost = computed(() => {
   if (!Number.isFinite(amount) || amount <= 0) return ''
   return calcWinCost(amount)
 })
-const estimatedWinACost = computed(() => calcWinACost(selectedTier.value || minSubscribe.value))
-const customWinACost = computed(() => {
-  if (activeMode.value !== 'win_a' || !customAmount.value) return ''
-  const amount = Number(customAmount.value)
-  if (!Number.isFinite(amount) || amount <= 0) return ''
-  return calcWinACost(amount)
-})
 
 function calcWinCost(usdtAmount: number) {
   if (!winPrice.value || winPrice.value <= 0 || !usdtAmount) return '-'
   return displayAmount(divDecimal(String(usdtAmount), String(winPrice.value)))
-}
-
-function calcWinACost(usdtAmount: number) {
-  if (!winAPrice.value || winAPrice.value <= 0 || !usdtAmount) return '-'
-  return displayAmount(divDecimal(String(usdtAmount), String(winAPrice.value)))
 }
 
 function displayAmount(value: unknown) {
@@ -216,15 +185,9 @@ function calcNeedWin(usdtAmount: number) {
   if (!winPrice.value || winPrice.value <= 0) return null
   return divDecimal(String(usdtAmount), String(winPrice.value))
 }
-
-function calcNeedWinA(usdtAmount: number) {
-  if (!winAPrice.value || winAPrice.value <= 0) return null
-  return divDecimal(String(usdtAmount), String(winAPrice.value))
-}
 const actionText = computed(() => {
   if (activeMode.value === 'reward') return $t('node.reinvestNow')
   if (activeMode.value === 'win') return $t('node.winPayNow')
-  if (activeMode.value === 'win_a') return $t('node.winAPayNow')
   return $t('node.reportNow')
 })
 
@@ -274,10 +237,19 @@ const getOrderList = async () => {
 }
 
 const fundingSourceText = (source: string) => {
-  if (source === 'reward') return $t('node.rewardSource')
-  if (source === 'win') return $t('node.winSource')
-  if (source === 'win_a') return $t('node.winASource')
-  return $t('node.rechargeSource')
+  const map: Record<string, string> = {
+    reward: $t('node.rewardSource'),
+    win: $t('node.winSource'),
+    win_a: $t('node.winASource'),
+    recharge: $t('node.rechargeSource'),
+    'recharge+win': $t('node.mixSourceRechargeWin'),
+    'recharge+win_a': $t('node.mixSourceRechargeWinA'),
+    'win+win_a': $t('node.mixSourceWinWinA'),
+    'win+recharge': $t('node.mixSourceWinRecharge'),
+    'win_a+recharge': $t('node.mixSourceWinARecharge'),
+    'win_a+win': $t('node.mixSourceWinAWin'),
+  }
+  return map[source] || source || $t('node.rechargeSource')
 }
 
 const orderStatusText = (status: string | number) => {
@@ -295,6 +267,7 @@ const handleSubscribe = async (amount: number) => {
     return
   }
   const mode = activeMode.value
+
   if (mode === 'win') {
     if (!winPrice.value || winPrice.value <= 0) {
       showFailToast($t('node.winPriceMissing'))
@@ -309,20 +282,6 @@ const handleSubscribe = async (amount: number) => {
       showFailToast($t('node.insufficientWin'))
       return
     }
-  } else if (mode === 'win_a') {
-    if (!winAPrice.value || winAPrice.value <= 0) {
-      showFailToast($t('node.winAPriceMissing'))
-      return
-    }
-    const needWinA = calcNeedWinA(amount)
-    if (!needWinA || !isPositiveDecimal(needWinA)) {
-      showFailToast($t('node.winAPriceMissing'))
-      return
-    }
-    if (compareDecimals(needWinA, accountBalance.value) > 0) {
-      showFailToast($t('node.insufficientWinA'))
-      return
-    }
   } else if (compareDecimals(String(amount), accountBalance.value) > 0) {
     showFailToast($t('common.insufficientBalance'))
     return
@@ -332,9 +291,7 @@ const handleSubscribe = async (amount: number) => {
     ? $t('node.confirmReinvest', { amount })
     : mode === 'win'
       ? $t('node.confirmWinPay', { amount, cost: calcWinCost(amount) })
-      : mode === 'win_a'
-        ? $t('node.confirmWinAPay', { amount, cost: calcWinACost(amount) })
-        : $t('node.confirmReport', { amount })
+      : $t('node.confirmReport', { amount })
   try {
     await showConfirmDialog({
       title: $t('common.prompt'),
@@ -356,9 +313,7 @@ const handleSubscribe = async (amount: number) => {
       ? $t('node.reinvestSuccess')
       : mode === 'win'
         ? $t('node.winPaySuccess')
-        : mode === 'win_a'
-          ? $t('node.winAPaySuccess')
-          : $t('node.reportSuccess')
+        : $t('node.reportSuccess')
     showSuccessToast(okMsg)
     customAmount.value = ''
     selectedTier.value = null
@@ -369,9 +324,7 @@ const handleSubscribe = async (amount: number) => {
     const messageKey: Record<string, string> = {
       MIN_SUBSCRIBE_LIMIT: 'node.minSubscribeAmount',
       WIN_PRICE_NOT_CONFIGURED: 'node.winPriceMissing',
-      WIN_A_PRICE_NOT_CONFIGURED: 'node.winAPriceMissing',
       INSUFFICIENT_WIN: 'node.insufficientWin',
-      INSUFFICIENT_WIN_A: 'node.insufficientWinA',
       INSUFFICIENT_BALANCE: 'common.insufficientBalance',
       INVALID_AMOUNT: 'node.enterSubscribeAmount',
     }
@@ -379,14 +332,37 @@ const handleSubscribe = async (amount: number) => {
       ? $t('node.reinvestFailed')
       : mode === 'win'
         ? $t('node.winPayFailed')
-        : mode === 'win_a'
-          ? $t('node.winAPayFailed')
-          : $t('node.reportFailed')
-    const mapped = messageKey[code] ? $t(messageKey[code], { amount: minSubscribe.value }) : ''
+        : $t('node.reportFailed')
+    const mapped = messageKey[code]
+      ? $t(messageKey[code], { amount: minSubscribe.value })
+      : ''
     showFailToast(mapped || errMsg(error, failMsg))
   } finally {
     submitting.value = false
   }
+}
+
+const fillAll = () => {
+  if (submitting.value) return
+  const mode = activeMode.value
+  if (mode === 'win') {
+    if (!winPrice.value || winPrice.value <= 0) {
+      showFailToast($t('node.winPriceMissing'))
+      return
+    }
+    if (!isPositiveDecimal(accountBalance.value)) {
+      showFailToast($t('node.insufficientWin'))
+      return
+    }
+    // 报单金额按 USDT 计，用全部 WIN 充值余额折算可报 USDT
+    customAmount.value = displayDecimal(mulDecimal(accountBalance.value, winPrice.value))
+    return
+  }
+  if (!isPositiveDecimal(accountBalance.value)) {
+    showFailToast($t('common.insufficientBalance'))
+    return
+  }
+  customAmount.value = displayDecimal(accountBalance.value)
 }
 
 const handleCustomSubscribe = () => {
@@ -426,15 +402,74 @@ onMounted(async () => {
 
   .mode-tabs {
     width: 100%;
-    height: 40px;
+    height: 44px;
     box-sizing: border-box;
     margin: 0 auto 18px;
-    padding: 3px;
+    padding: 4px;
     border: 1px solid $border-color;
     border-radius: $radius-md;
     background: rgba(3, 10, 17, 0.72);
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .mix-balances {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .mix-panel {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid $border-color;
+    border-radius: $radius-md;
+    background: rgba(3, 10, 17, 0.55);
+    display: grid;
+    gap: 12px;
+
+    .mix-row {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 10px;
+      align-items: center;
+
+      label {
+        color: $text-muted;
+        font-size: 13px;
+      }
+
+      select,
+      input {
+        width: 100%;
+        height: 36px;
+        box-sizing: border-box;
+        padding: 0 10px;
+        border: 1px solid $border-color;
+        border-radius: $radius-sm;
+        background: rgba(0, 0, 0, 0.35);
+        color: $text-primary;
+        font-size: 13px;
+      }
+
+      &.mix-row-fixed {
+        grid-template-columns: 88px 1fr;
+      }
+
+      .mix-auto-value {
+        display: flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid rgba(21, 151, 229, 0.25);
+        border-radius: $radius-sm;
+        background: rgba(21, 151, 229, 0.08);
+        color: $brand-primary-light;
+        font-size: 13px;
+        font-weight: 600;
+      }
+    }
   }
 
   .mode-option {
@@ -445,7 +480,7 @@ onMounted(async () => {
     justify-content: center;
     height: 100%;
     box-sizing: border-box;
-    padding: 0 10px;
+    padding: 0 6px;
     background: transparent;
     border: 0;
     border-radius: $radius-sm;
@@ -463,8 +498,8 @@ onMounted(async () => {
 
     strong {
       min-width: 0;
-      font-size: 13px;
-      font-weight: 400;
+      font-size: 14px;
+      font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -535,10 +570,33 @@ onMounted(async () => {
 .custom-amount {
   margin-bottom: 40px;
 
+  .custom-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
   .custom-hint {
     font-size: 13px;
     color: rgba(255, 255, 255, 0.7);
-    margin-bottom: 10px;
+    margin: 0;
+  }
+
+  .all-btn {
+    flex-shrink: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: $brand-primary;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   }
 
   .custom-row {
@@ -669,13 +727,6 @@ onMounted(async () => {
         text-align: center;
         font-size: 14px;
         color: $text-primary;
-
-        .win-deduct {
-          display: block;
-          margin-top: 2px;
-          font-size: 11px;
-          color: $text-muted;
-        }
       }
     }
   }

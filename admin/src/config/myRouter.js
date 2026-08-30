@@ -62,10 +62,22 @@ export const asyncRouterMap = [
                 meta: { title: '划转记录', keepAlive: true, icon: "swap", permission: ['dashboard'] },
             },
             {
+                path: '/exchangeTransfer',
+                name: 'exchangeTransfer',
+                component: () => import('@/views/orders/exchangeTransfer'),
+                meta: { title: '交易所划转', keepAlive: true, icon: "transaction", permission: ['dashboard'] },
+            },
+            {
                 path: '/settlement',
                 name: 'settlement',
                 component: () => import('@/views/orders/settlement'),
                 meta: { title: '每日结算', keepAlive: true, icon: "setting", permission: ['dashboard'] },
+            },
+            {
+                path: '/operationLog',
+                name: 'operationLog',
+                component: () => import('@/views/orders/operationLog'),
+                meta: { title: '操作记录', keepAlive: true, icon: "file-text", permission: ['dashboard'] },
             },
             {
                 path: '/news',

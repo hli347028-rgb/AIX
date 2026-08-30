@@ -50,8 +50,13 @@ async function dispatch(
     return response.data
   } catch (error: any) {
     const message = error?.response?.data?.message || error?.message
+    const reason = error?.response?.data?.reason || ''
     const status = error?.response?.status
-    if (!data?.noMsg && !config?.params?.noMsg && !config?.silent) {
+    const isFrozen =
+      reason === 'ACCOUNT_FROZEN' ||
+      /账户已被冻结|ACCOUNT_FROZEN/i.test(String(message || ''))
+    // 冻结账户不弹前端提示，仍抛出错误让调用方停止后续流程
+    if (!isFrozen && !data?.noMsg && !config?.params?.noMsg && !config?.silent) {
       showFailToast(message || error?.response?.statusText || lang('操作失败'))
     }
     if (status === 401) {

@@ -123,11 +123,6 @@ func (j *ChainRechargeJob) runOnce(ctx context.Context) {
 	} else if res != nil && res.Scanned > 0 {
 		j.log.Infof("WIN depositOnly: credited=%d skipped=%d scanned=%d", res.Credited, res.Skipped, res.Scanned)
 	}
-	if res, err := j.DepositOnlyWinA(ctx); err != nil {
-		j.log.Errorf("WIN-A depositOnly failed: %v", err)
-	} else if res != nil && res.Scanned > 0 {
-		j.log.Infof("WIN-A depositOnly: credited=%d skipped=%d scanned=%d", res.Credited, res.Skipped, res.Scanned)
-	}
 }
 
 // DepositOnly syncs the USDT BuySomething ledger on EOEO → usdt_recharge.
@@ -151,21 +146,9 @@ func (j *ChainRechargeJob) DepositOnlyWin(ctx context.Context) (*DepositOnlyResu
 	})
 }
 
-// DepositOnlyWinA syncs the WIN-A BuySomething ledger on EOEO → win_a_recharge_balance.
+// DepositOnlyWinA WIN-A 充值已关闭。
 func (j *ChainRechargeJob) DepositOnlyWinA(ctx context.Context) (*DepositOnlyResult, error) {
-	if j.cfg != nil && !j.cfg.IsWinARechargeEnabled() {
-		return &DepositOnlyResult{}, nil
-	}
-	return j.syncDepositLedger(ctx, "WIN-A", j.cfg.GetWinADepositContract(), j.cfg.GetRPCURL(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
-		credited, _, err := j.walletRepo.AutoCreditWinARecharge(ctx, recordHash, fromAddress, contractAddress, amount)
-		if err != nil {
-			if strings.Contains(strings.ToLower(err.Error()), "user not found") {
-				return false, nil
-			}
-			return false, err
-		}
-		return credited, nil
-	})
+	return &DepositOnlyResult{Asset: "WIN-A"}, nil
 }
 
 func (j *ChainRechargeJob) depositCycleParams() (queries int, gap time.Duration) {
@@ -246,37 +229,12 @@ func (j *ChainRechargeJob) TriggerDepositOnlyWinCycle() *CycleTriggerResult {
 	return res
 }
 
-// TriggerDepositOnlyWinACycle starts a background WIN-A deposit cycle.
+// TriggerDepositOnlyWinACycle WIN-A 充值已关闭。
 func (j *ChainRechargeJob) TriggerDepositOnlyWinACycle() *CycleTriggerResult {
-	queries, gap := j.depositCycleParams()
-	res := &CycleTriggerResult{
-		Asset: "WIN-A", Queries: queries, IntervalSeconds: int64(gap / time.Second),
+	return &CycleTriggerResult{
+		Asset:  "WIN-A",
+		Reason: "win-a recharge disabled",
 	}
-	if !j.winACycling.CompareAndSwap(false, true) {
-		res.Accepted = false
-		res.Reason = "cycle already running"
-		return res
-	}
-	res.Accepted = true
-	go func() {
-		defer j.winACycling.Store(false)
-		j.log.Infof("WIN-A depositOnly cycle started: queries=%d interval=%s", queries, gap)
-		for i := 0; i < queries; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			if _, err := j.DepositOnlyWinA(ctx); err != nil {
-				j.log.Errorf("WIN-A depositOnly cycle #%d/%d failed: %v", i+1, queries, err)
-			} else {
-				j.log.Infof("WIN-A depositOnly cycle #%d/%d ok", i+1, queries)
-			}
-			cancel()
-			if i >= queries-1 {
-				break
-			}
-			time.Sleep(gap)
-		}
-		j.log.Info("WIN-A depositOnly cycle finished")
-	}()
-	return res
 }
 
 func (j *ChainRechargeJob) syncDepositLedger(ctx context.Context, asset, contractRaw, rpcURL string, credit creditFn) (*DepositOnlyResult, error) {

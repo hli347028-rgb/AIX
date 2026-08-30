@@ -49,6 +49,11 @@ func (uc *WalletUsecase) resolveUser(ctx context.Context, tokenString string) (*
 	if user == nil {
 		return nil, errors.NotFound("USER_NOT_FOUND", "用户不存在")
 	}
+	// 冻结在此统一拦截：签发在冻结之前的 token 仍然有效，若只在资金操作处校验，
+	// 被冻结的账户依旧能读取全部数据直到 token 过期。
+	if user.IsFrozen {
+		return nil, errors.Forbidden(AccountFrozenReason, AccountFrozenMessage)
+	}
 	return user, nil
 }
 
@@ -86,7 +91,8 @@ func SummarizeOrders(orders []*Order) OrderReleaseSummary {
 		exitTotal = exitTotal.Add(cap)
 		earnedTotal = earnedTotal.Add(earned)
 		remain := cap.Sub(earned)
-		if remain.IsPositive() {
+		// 追缴作废的订单结算时已被排除，剩余额度永远不会释放，不计入出局剩余
+		if remain.IsPositive() && o.Status != OrderStatusCancelled {
 			unexited = unexited.Add(remain)
 		}
 		if o.Status == OrderStatusActive {
@@ -309,7 +315,7 @@ func (uc *WalletUsecase) ListRecharges(ctx context.Context, tokenString string) 
 	return uc.walletRepo.ListRechargesByUserAsset(ctx, user.ID, TokenUSDT)
 }
 
-// ListDownlineUSDTRecharges 当前用户所有下级 USDT/WIN 充值记录（已确认）。
+// ListDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录（已确认；不含 WIN）。
 func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 	ctx context.Context, tokenString string, page, pageSize int,
 ) ([]*Recharge, int64, error) {
@@ -340,10 +346,12 @@ func (uc *WalletUsecase) CreateWithdraw(ctx context.Context, tokenString, amount
 
 // CreateAixWithdraw AIX 代币当前禁止提现，需先兑换为 WIN 后再提现
 func (uc *WalletUsecase) CreateAixWithdraw(ctx context.Context, tokenString, amount, toAddress string) (*Withdrawal, string, error) {
-	return nil, "", errors.BadRequest("AIX_WITHDRAW_FORBIDDEN", "AIX 不可直接提现，请先兑换为 WIN")
+	return nil, "", errors.BadRequest("AIX_WITHDRAW_FORBIDDEN", "AIX 不可直接提现，请先兑换为可提 U 余额")
 }
 
-// ExchangeAixToWin AIX → WIN 兑换：按当前 WIN 价格折算
+// ExchangeAixToWin AIX → 可提 U（USDT）兑换。
+// 当全网当日已兑换 AIX（含待审）加上本笔后，超过「今日AIX数量 × 审核阈值%」时进入待审核：
+// 先扣 AIX，审核通过后再入可提 U；拒绝则退回 AIX。
 func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixAmount string) (*ExchangeRecord, string, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
@@ -353,43 +361,57 @@ func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixA
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", "", errors.BadRequest("INVALID_AMOUNT", "兑换金额必须大于0")
 	}
-	rec, aixLeft, winBal, err := uc.walletRepo.ExchangeAixToWin(ctx, user.ID, amt.String())
+	needReview, err := uc.exchangeNeedsReview(ctx, amt)
+	if err != nil {
+		return nil, "", "", err
+	}
+	rec, aixLeft, usdtWithdrawable, err := uc.walletRepo.ExchangeAixToWin(ctx, user.ID, amt.String(), needReview)
 	if err != nil {
 		if strings.Contains(err.Error(), "insufficient") {
 			return nil, "", "", errors.BadRequest("INSUFFICIENT_AIX", "AIX 代币余额不足")
 		}
+		if strings.Contains(err.Error(), "aix price") {
+			return nil, "", "", errors.BadRequest("AIX_PRICE_NOT_CONFIGURED", "AIX 价格未配置")
+		}
+		if strings.Contains(err.Error(), "net amount too small") {
+			return nil, "", "", errors.BadRequest("USDT_NET_AMOUNT_TOO_SMALL", "兑换金额过小，扣除手续费后 USDT 净量为 0")
+		}
 		return nil, "", "", err
 	}
-	return rec, aixLeft, winBal, nil
+	return rec, aixLeft, usdtWithdrawable, nil
 }
 
-// CreateWinWithdraw 提现 WIN 代币
+// exchangeNeedsReview 判断本笔兑换是否需进审核。
+// 今日AIX数量 = 今天 0 点结算任务对应结算日（昨日）发放的静态 AIX 总量。
+// 已兑换量只计当日已完成（completed）；待审核不占配额，也不会计入次日阈值。
+// 今日尚无结算产量时不触发审核（避免 0 基数下任意兑换都被拦）。
+func (uc *WalletUsecase) exchangeNeedsReview(ctx context.Context, amt decimal.Decimal) (bool, error) {
+	pct, err := decimal.NewFromString(strings.TrimSpace(GetExchangeReviewThresholdPercent()))
+	if err != nil || pct.IsNegative() {
+		pct, _ = decimal.NewFromString(conf.DefaultExchangeReviewThresholdPercent)
+	}
+	todayAixStr, err := uc.walletRepo.SumStaticAixBySettlementDate(ctx, TodaySettlementDate(time.Now()))
+	if err != nil {
+		return false, err
+	}
+	todayAix, _ := ParseAmount(todayAixStr)
+	if !todayAix.IsPositive() {
+		return false, nil
+	}
+	limit := todayAix.Mul(pct).Div(decimal.NewFromInt(100))
+	now := time.Now().In(token.ChinaLocation())
+	since := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	exchangedStr, err := uc.walletRepo.SumExchangedAixSince(ctx, since)
+	if err != nil {
+		return false, err
+	}
+	exchanged, _ := ParseAmount(exchangedStr)
+	return exchanged.Add(amt).GreaterThan(limit), nil
+}
+
+// CreateWinWithdraw WIN 提现已关闭
 func (uc *WalletUsecase) CreateWinWithdraw(ctx context.Context, tokenString, amount, toAddress string) (*Withdrawal, string, error) {
-	user, err := uc.resolveUser(ctx, tokenString)
-	if err != nil {
-		return nil, "", err
-	}
-	amt, err := ParseAmount(amount)
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额必须大于0")
-	}
-	toNorm := strings.TrimSpace(toAddress)
-	if toNorm == "" {
-		toNorm = user.Address
-	} else {
-		toNorm, err = eth.NormalizeAddress(toNorm)
-		if err != nil {
-			return nil, "", errors.BadRequest("INVALID_ADDRESS", "提现地址无效")
-		}
-	}
-	w, left, err := uc.walletRepo.CreateWinWithdrawal(ctx, user.ID, amt.String(), toNorm, initialWithdrawStatus(TokenWIN, amt))
-	if err != nil {
-		if strings.Contains(err.Error(), "insufficient") {
-			return nil, "", errors.BadRequest("INSUFFICIENT_WIN", "WIN 代币余额不足")
-		}
-		return nil, "", err
-	}
-	return w, left, nil
+	return nil, "", errors.BadRequest("WIN_WITHDRAW_DISABLED", "WIN 提现已关闭")
 }
 
 // CreateSdtWithdraw 提现 AIX-USDT（链上 ERC20）
@@ -431,9 +453,6 @@ func (uc *WalletUsecase) CreateUsdtWithdraw(ctx context.Context, tokenString, am
 	if err != nil {
 		return nil, "", err
 	}
-	if !user.IsZeroAccount && !user.IsCommunitySubsidy {
-		return nil, "", errors.BadRequest("FORBIDDEN", "仅零号账户或社区补贴用户可提现 USDT")
-	}
 	amt, err := ParseAmount(amount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额必须大于0")
@@ -453,9 +472,6 @@ func (uc *WalletUsecase) CreateUsdtWithdraw(ctx context.Context, tokenString, am
 	}
 	w, left, err := uc.walletRepo.CreateUsdtWithdrawal(ctx, user.ID, amt.String(), toNorm, initialWithdrawStatus(TokenUSDT, amt))
 	if err != nil {
-		if strings.Contains(err.Error(), "not allowed") {
-			return nil, "", errors.BadRequest("FORBIDDEN", "仅零号账户或社区补贴用户可提现 USDT")
-		}
 		if strings.Contains(err.Error(), "insufficient") {
 			return nil, "", errors.BadRequest("INSUFFICIENT_USDT", "可提 U 余额不足")
 		}
@@ -539,16 +555,20 @@ func (uc *WalletUsecase) Subscribe(ctx context.Context, tokenString string, prod
 	return nil, "", errors.BadRequest("PAY_FROM_REQUIRED", "请使用 /v1/wallet/subscribe-aix 并传 pay_from=recharge|reward|win")
 }
 
-// SubscribeAIX 报单 / 复投 / WIN / WIN-A 替代充值钱包认购
+// SubscribeAIX 单源认购：recharge（USDT 充值钱包）/ reward（复投）/ win
 func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountStr, payFrom string) (*Order, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
 		return nil, "", err
 	}
 	payFrom = strings.ToLower(strings.TrimSpace(payFrom))
-	if payFrom != PayFromRecharge && payFrom != PayFromReward && payFrom != PayFromWin && payFrom != PayFromWinA {
-		return nil, "", errors.BadRequest("INVALID_PAY_FROM", "pay_from 必须为 recharge、reward、win 或 win_a")
+	if payFrom == PayFromWinA {
+		return nil, "", errors.BadRequest("WIN_A_SUBSCRIBE_DISABLED", "WIN-A 认购已关闭")
 	}
+	if payFrom != PayFromRecharge && payFrom != PayFromReward && payFrom != PayFromWin {
+		return nil, "", errors.BadRequest("INVALID_PAY_FROM", "pay_from 必须为 recharge、reward 或 win")
+	}
+
 	minSubscribe, err := ParseAmount(uc.walletCfg.GetMinSubscribe())
 	if err != nil {
 		minSubscribe = decimal.NewFromInt(100)
@@ -560,19 +580,20 @@ func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountSt
 	if total.LessThan(minSubscribe) {
 		return nil, "", errors.BadRequest("MIN_SUBSCRIBE_LIMIT", fmt.Sprintf("认购金额不能低于 %s USDT", minSubscribe.String()))
 	}
+
 	if payFrom == PayFromWin {
 		winPrice := decimal.NewFromFloat(GetWinPrice())
 		if !winPrice.IsPositive() {
 			return nil, "", errors.BadRequest("WIN_PRICE_NOT_CONFIGURED", "WIN 价格未配置")
 		}
 	}
-	if payFrom == PayFromWinA {
-		winAPrice := decimal.NewFromFloat(GetWinAPrice())
-		if !winAPrice.IsPositive() {
-			return nil, "", errors.BadRequest("WIN_A_PRICE_NOT_CONFIGURED", "WIN-A 价格未配置")
-		}
-	}
-	order, bal, err := uc.walletRepo.Subscribe(ctx, user.ID, total.String(), payFrom, ExitMultiplier, DirectRate)
+
+	order, bal, err := uc.walletRepo.Subscribe(ctx, user.ID, SubscribeInput{
+		Amount:     total.String(),
+		PayFrom:    payFrom,
+		ExitMul:    ExitMultiplier,
+		DirectRate: DirectRate,
+	})
 	if err != nil {
 		if strings.Contains(err.Error(), "insufficient usdt_recharge") || strings.Contains(err.Error(), "insufficient usdt_reward") {
 			return nil, "", errors.BadRequest("INSUFFICIENT_BALANCE", "账户余额不足")
@@ -580,14 +601,11 @@ func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountSt
 		if strings.Contains(err.Error(), "insufficient win_recharge_balance") {
 			return nil, "", errors.BadRequest("INSUFFICIENT_WIN", "WIN 充值余额不足")
 		}
-		if strings.Contains(err.Error(), "insufficient win_a_recharge_balance") {
-			return nil, "", errors.BadRequest("INSUFFICIENT_WIN_A", "WIN-A 充值余额不足")
-		}
 		if strings.Contains(err.Error(), "win price not configured") {
 			return nil, "", errors.BadRequest("WIN_PRICE_NOT_CONFIGURED", "WIN 价格未配置")
 		}
-		if strings.Contains(err.Error(), "win-a price not configured") {
-			return nil, "", errors.BadRequest("WIN_A_PRICE_NOT_CONFIGURED", "WIN-A 价格未配置")
+		if strings.Contains(err.Error(), "win amount too small") {
+			return nil, "", errors.BadRequest("INVALID_AMOUNT", "WIN 数量过小")
 		}
 		return nil, "", err
 	}
@@ -733,7 +751,7 @@ func (uc *WalletUsecase) WinADepositContract() string {
 }
 
 func (uc *WalletUsecase) WinARechargeEnabled() bool {
-	return uc.walletCfg.IsWinARechargeEnabled()
+	return false
 }
 
 func (uc *WalletUsecase) WinAContract() string {

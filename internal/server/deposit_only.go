@@ -17,9 +17,6 @@ func RegisterDepositOnlyRoute(srv *http.Server, recharge *job.ChainRechargeJob, 
 	r.GET("/api/admin_dhb/deposit_only_win", func(ctx http.Context) error {
 		return ctx.JSON(200, recharge.TriggerDepositOnlyWinCycle())
 	})
-	r.GET("/api/admin_dhb/deposit_only_win_a", func(ctx http.Context) error {
-		return ctx.JSON(200, recharge.TriggerDepositOnlyWinACycle())
-	})
 	r.GET("/api/admin_dhb/win_price_oracle", func(ctx http.Context) error {
 		return ctx.JSON(200, oracle.TriggerCycle())
 	})

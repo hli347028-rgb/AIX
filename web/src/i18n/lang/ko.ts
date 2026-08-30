@@ -29,7 +29,7 @@ export default {
     operationFailed: '작업 실패',
     close: '닫기',
     protocol: '프로토콜', gotIt: '알겠습니다', languageSwitch: '언어 변경', switchWallet: '지갑 전환', back: '뒤로',
-    days: '{count}일', retry: '다시 시도'
+    days: '{count}일', retry: '다시 시도', loadFailed: '불러오기에 실패했습니다. 잠시 후 다시 시도해 주세요'
   },
   index: {
     welcomeSubtitle: '세계 최초 AI 추적 앱 체인',
@@ -177,7 +177,7 @@ export default {
     pageTitle: '스테이킹 재테크',
     pageSubtitle: '적합한 재테크 구간을 선택하세요',
     balance: '계정 잔액',
-    reportOrder: '청약',
+    reportOrder: 'USDT',
     reinvest: '재투자',
     rechargeWallet: '충전 지갑',
     rewardWallet: '보상 지갑',
@@ -190,7 +190,7 @@ export default {
     rechargeWalletBalance: '충전 지갑 잔액',
     rewardWalletBalance: '보상 지갑 잔액',
     winWalletBalance: 'WIN 잔액',
-    winPay: 'WIN 결제',
+    winPay: 'WIN',
     winPayNow: 'WIN로 결제',
     winPaySuccess: 'WIN 청약 성공',
     winPayFailed: 'WIN 청약 실패',
@@ -213,6 +213,7 @@ export default {
     statusComing: '곧 공개',
     subscribeNow: '지금 참여',
     customAmountHint: '사용자 지정 금액（≥ {amount} USDT）',
+    all: '전체',
     minPlaceholder: '최소 {amount}',
     subscribeSuccess: '인수 성공',
     subscribeFailed: '인수 실패',
@@ -226,6 +227,7 @@ export default {
     statusCompleted: '완료',
     statusPending: '대기 중',
     minSubscribeAmount: '인수 금액은 {amount} 이상이어야 합니다',
+    subscribeStep: '인수 금액은 {step}의 배수여야 합니다',
     enterSubscribeAmount: '인수 금액을 입력하세요'
   },
   withdraw: {
@@ -321,7 +323,7 @@ export default {
     globalLaunch: '글로벌 출시',
     networkHashrate: '네트워크 해시레이트',
     walletDownload: '지갑 다운로드',
-    orderZone: '청약 전용',
+    orderZone: '주조 전용',
     hashrateMall: '해시레이트 몰',
     rechargeZone: '충전 존',
     crossChain: '크로스체인',
@@ -367,7 +369,7 @@ export default {
     noDirectReferral: '직추가 없습니다',
     income: '수익',
     exitProgress: '아웃 진행', rechargeBalance: '충전 잔액', rewardBalance: '보상 잔액',
-    withdrawableAix: '출금 가능 AIX', aixBalance: 'AIX 잔액', winBalance: 'WIN 잔액', rawNewBalance: '토큰 잔액', exchange: '교환', directReferralReward: '직접 추천 보상', managementReward: '관리 보상', releasedManagementReward: '지급된 관리 보상', pendingManagementReward: '대기 중인 관리 보상', overflowReward: '초과 보상', totalIncome: '누적 수익',
+    withdrawableAix: '출금 가능 AIX', aixBalance: 'AIX 잔액', winBalance: 'WIN 잔액', winRechargeBalance: 'WIN 충전 잔액', rawNewBalance: '토큰 잔액', exchange: '교환', directReferralReward: '직접 추천 보상', managementReward: '관리 보상', releasedManagementReward: '지급된 관리 보상', pendingManagementReward: '대기 중인 관리 보상', overflowReward: '초과 보상', totalIncome: '누적 수익',
     points: '현재 포인트', pointsAll: '누적 포인트', pointsRecords: 'AIX-USDT', noPointsRecords: 'AIX-USDT 기록이 없습니다'
   },
   exchange: {

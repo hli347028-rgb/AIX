@@ -12,12 +12,12 @@
       <section class="balance-card">
         <div>
           <span>{{ $t('exchange.availableAix') }}</span>
-          <strong>{{ displayAmount(aixBalance) }}</strong>
+          <strong>{{ displayAixBalance(aixBalance) }}</strong>
         </div>
         <van-icon name="arrow" />
-        <div class="win-balance">
-          <span>{{ $t('exchange.currentWin') }}</span>
-          <strong>{{ displayAmount(winBalance) }}</strong>
+        <div class="target-balance">
+          <span>{{ $t('exchange.currentUsdtWithdrawable') }}</span>
+          <strong>{{ displayAmount(usdtWithdrawable) }}</strong>
         </div>
       </section>
 
@@ -42,33 +42,21 @@
 
         <div class="rate-row">
           <span>{{ $t('exchange.currentRate') }}</span>
-          <strong v-if="unitRate">1 AIX = {{ displayAmount(unitRate.winNet) }} WIN</strong>
+          <strong v-if="unitRate">1 AIX = {{ displayAmount(unitRate.usdtNet) }} USDT</strong>
           <strong v-else>{{ $t('exchange.priceUnavailable') }}</strong>
         </div>
         <div v-if="hasRate" class="rate-row rate-sub">
           <span>{{ $t('exchange.aixPrice') }}</span>
           <strong>{{ displayPrice(aixPrice) }} USDT</strong>
         </div>
-        <div v-if="hasRate" class="rate-row rate-sub">
-          <span>{{ $t('exchange.winPrice') }}</span>
-          <strong>{{ displayAmount(winPrice) }} USDT</strong>
-        </div>
-        <!-- <div v-if="unitRate" class="rate-row rate-sub">
-          <span>{{ $t('exchange.rateDetail') }}</span>
-          <strong>{{ $t('exchange.rateBreakdown', {
-            gross: displayAmount(unitRate.winGross),
-            fee: feeRateText,
-            net: displayAmount(unitRate.winNet),
-          }) }}</strong>
-        </div> -->
         <div class="rate-row">
           <span>{{ $t('exchange.feeRate') }}</span>
           <strong>{{ feeRateText }}</strong>
         </div>
         <p v-if="preview" class="estimate-box">
           {{ $t('exchange.estimate', {
-            gross: displayAmount(preview.winGross),
-            net: displayAmount(preview.winNet),
+            gross: displayAmount(preview.usdtGross),
+            net: displayAmount(preview.usdtNet),
             fee: displayAmount(preview.fee),
           }) }}
         </p>
@@ -94,11 +82,11 @@
               <div class="record-assets">
                 <strong>{{ displayAmount(item.from_amount) }} AIX</strong>
                 <van-icon name="arrow" />
-                <strong class="win-value">{{ displayAmount(item.to_amount) }} WIN</strong>
+                <strong class="usdt-value">{{ displayAmount(item.to_amount) }} {{ recordToAsset(item.to_asset) }}</strong>
               </div>
               <div class="record-meta">
                 <span>{{ formatTime(item.created_at) }}</span>
-                <span>{{ $t('exchange.rateShort') }} 1 AIX = {{ recordUnitRate(item) }} WIN</span>
+                <span>{{ $t('exchange.rateShort') }} 1 AIX = {{ recordUnitRate(item) }} {{ recordToAsset(item.to_asset) }}</span>
               </div>
               <div v-if="item.fee_amount" class="record-fee">
                 {{ $t('exchange.feeDeducted', { fee: displayAmount(item.fee_amount) }) }}
@@ -118,18 +106,17 @@ import { useI18n } from 'vue-i18n'
 import { showFailToast, showSuccessToast } from 'vant'
 import userPerson from '@/pinia/person'
 import { exchangeAixToWin, getAixWinExchangeRecords } from '@/api/aix'
-import type { AixWinExchangeRecord } from '@/api/aix'
+import type { AixExchangeRecord } from '@/api/aix'
 import emptyImage from '@/assets/images/custom-empty-image.png'
 import {
-  calcExchangePreview,
-  calcUnitExchangeRate,
+  calcAixToUsdtPreview,
+  calcUnitAixToUsdtRate,
   compareDecimals,
   displayDecimal,
   displayAixPrice,
   divDecimal,
   formatFeeRate,
   isPositiveDecimal,
-  resolveAixToWinRate,
 } from '@/tools/decimal'
 
 const router = useRouter()
@@ -138,32 +125,26 @@ const person = userPerson()
 const amount = ref('')
 const submitting = ref(false)
 const recordLoading = ref(false)
-const records = ref<AixWinExchangeRecord[]>([])
+const records = ref<AixExchangeRecord[]>([])
 
 const aixBalance = computed(() => String(person.profile?.aix_balance || person.userinfo?.amountGet || '0'))
-const winBalance = computed(() => String(person.profile?.win_balance || '0'))
+const usdtWithdrawable = computed(() => String(person.profile?.usdt_withdrawable || '0'))
 const aixPrice = computed(() => String(person.profile?.aix_price || '0'))
-const winPrice = computed(() => Number(person.profile?.win_price || 0))
 const exchangeFeeRate = computed(() => Number(person.profile?.exchange_fee_rate ?? 0.05))
-const aixToWinRate = computed(() => resolveAixToWinRate({
-  aix_to_win_rate: person.profile?.aix_to_win_rate,
-  aix_price: person.profile?.aix_price,
-  win_price: person.profile?.win_price,
-}))
 const feeRateText = computed(() => formatFeeRate(exchangeFeeRate.value))
-const hasRate = computed(() => Boolean(aixToWinRate.value))
+const hasRate = computed(() => isPositiveDecimal(aixPrice.value))
 const unitRate = computed(() => (
-  aixToWinRate.value ? calcUnitExchangeRate(aixToWinRate.value, exchangeFeeRate.value) : null
+  hasRate.value ? calcUnitAixToUsdtRate(aixPrice.value, exchangeFeeRate.value) : null
 ))
 const preview = computed(() => {
-  if (!amount.value || !aixToWinRate.value) return null
-  return calcExchangePreview(amount.value, aixToWinRate.value, exchangeFeeRate.value)
+  if (!amount.value || !hasRate.value) return null
+  return calcAixToUsdtPreview(amount.value, aixPrice.value, exchangeFeeRate.value)
 })
 const amountError = computed(() => {
   if (!amount.value) return ''
   if (!isPositiveDecimal(amount.value)) return $t('exchange.positiveAmount')
   if (compareDecimals(amount.value, aixBalance.value) > 0) return $t('exchange.insufficientAix')
-  if (preview.value && !isPositiveDecimal(preview.value.winNet)) return $t('exchange.netAmountTooSmall')
+  if (preview.value && !isPositiveDecimal(preview.value.usdtNet)) return $t('exchange.netAmountTooSmall')
   return ''
 })
 const canSubmit = computed(() => Boolean(amount.value) && !amountError.value && hasRate.value)
@@ -186,11 +167,20 @@ function displayAmount(value: unknown) {
   return displayDecimal(value)
 }
 
+function displayAixBalance(value: unknown) {
+  return displayDecimal(value, 4)
+}
+
 function displayPrice(value: unknown) {
   return displayAixPrice(value)
 }
 
-function recordUnitRate(item: AixWinExchangeRecord) {
+function recordToAsset(asset?: string) {
+  const a = String(asset || 'USDT').toUpperCase()
+  return a === 'WIN' ? 'WIN' : 'USDT'
+}
+
+function recordUnitRate(item: AixExchangeRecord) {
   if (isPositiveDecimal(item.from_amount) && isPositiveDecimal(item.to_amount)) {
     return displayAmount(divDecimal(item.to_amount, item.from_amount))
   }
@@ -224,7 +214,7 @@ async function submitExchange() {
     person.profile = {
       ...person.profile,
       aix_balance: result.aix_balance,
-      win_balance: result.win_balance,
+      usdt_withdrawable: result.usdt_withdrawable,
     }
     amount.value = ''
     showSuccessToast($t('exchange.success', { amount: displayAmount(result.to_amount) }))
@@ -234,6 +224,8 @@ async function submitExchange() {
     const messageKey: Record<string, string> = {
       INVALID_AMOUNT: 'exchange.positiveAmount',
       INSUFFICIENT_AIX: 'exchange.insufficientAix',
+      AIX_PRICE_NOT_CONFIGURED: 'exchange.priceUnavailable',
+      USDT_NET_AMOUNT_TOO_SMALL: 'exchange.netAmountTooSmall',
       WIN_PRICE_NOT_CONFIGURED: 'exchange.priceUnavailable',
       WIN_NET_AMOUNT_TOO_SMALL: 'exchange.netAmountTooSmall',
     }
@@ -257,7 +249,7 @@ onMounted(async () => {
 .balance-card > .van-icon { color: #1597e5; font-size: 24px; }
 .balance-card div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .balance-card span { color: #91a7b7; font-size: 12px; }
-.balance-card .win-balance { text-align: right; }
+.balance-card .target-balance { text-align: right; }
 .exchange-form, .record-card { padding: 20px; border: 1px solid #183247; border-radius: 16px; background: #0b1824; }
 .amount-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #d9e5ed; font-size: 14px; }
 .amount-heading button { border: 0; color: #34aef7; background: transparent; font-size: 13px; }
@@ -284,7 +276,7 @@ onMounted(async () => {
 .record-list article:last-child { border-bottom: 0; }
 .record-assets { display: flex; align-items: center; gap: 10px; }
 .record-assets .van-icon { color: #617b8d; }
-.record-assets .win-value { color: #39b7ff; }
+.record-assets .usdt-value { color: #39b7ff; }
 .record-meta { margin-top: 8px; display: flex; justify-content: space-between; color: #70899a; font-size: 11px; }
 .record-fee { margin-top: 4px; color: #617b8d; font-size: 11px; }
 </style>

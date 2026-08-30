@@ -92,10 +92,7 @@ func (w *WalletConfig) GetWinADepositContract() string {
 }
 
 func (w *WalletConfig) IsWinARechargeEnabled() bool {
-	if w == nil || w.WinARechargeEnabled == nil {
-		return true
-	}
-	return *w.WinARechargeEnabled
+	return false // WIN-A 充值已关闭
 }
 
 func (w *WalletConfig) GetRechargeScanIntervalSeconds() int64 {

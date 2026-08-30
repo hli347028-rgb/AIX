@@ -18,7 +18,7 @@ const (
 	PayFromRecharge = "recharge"
 	PayFromReward   = "reward" // 奖励钱包复投：上级只增业绩，不产生直推/管理奖
 	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
-	PayFromWinA     = "win_a" // 用 WIN-A 充值钱包按 win_a_price 折算认购（产生直推/管理奖与积分）
+	PayFromWinA     = "win_a" // 认购已关闭；保留供历史订单 fund_source 识别
 
 	OrderStatusActive    = "active"
 	OrderStatusExited    = "exited"
@@ -32,6 +32,10 @@ const (
 	WithdrawStatusCompleted = "completed"
 	WithdrawStatusFailed    = "failed"
 	WithdrawStatusRejected  = "rejected"
+
+	ExchangeStatusCompleted = "completed"
+	ExchangeStatusReview    = "review"
+	ExchangeStatusRejected  = "rejected"
 
 	PayoutStatusSubmitted = "submitted"
 	PayoutStatusConfirmed = "confirmed"
@@ -52,6 +56,7 @@ const (
 	RewardTypeDirectPoolRelease = "direct_pool_release"
 	RewardTypeMgmt              = "mgmt"
 	RewardTypeMgmtPoolRelease   = "mgmt_pool_release"
+	RewardTypeMgmtOverflow      = "mgmt_overflow" // 管理奖溢出：应得但受出局额度限制未入账，留档待释放
 	RewardTypeExitAccel         = "exit_accel"
 	RewardTypeTransferIn        = "transfer_in"
 	RewardTypeTransferOut       = "transfer_out"
@@ -82,6 +87,47 @@ func GetMinUsdtRecharge() string {
 		return conf.DefaultMinUsdtRecharge
 	}
 	return MinUsdtRecharge
+}
+
+// GetPartnerMinAmount 返回交易所划转单笔下限（管理端可配）。
+func GetPartnerMinAmount() string {
+	if strings.TrimSpace(PartnerMinAmount) == "" {
+		return conf.DefaultPartnerMinAmount
+	}
+	return PartnerMinAmount
+}
+
+// GetPartnerMaxAmount 返回交易所划转单笔上限（管理端可配）。
+func GetPartnerMaxAmount() string {
+	if strings.TrimSpace(PartnerMaxAmount) == "" {
+		return conf.DefaultPartnerMaxAmount
+	}
+	return PartnerMaxAmount
+}
+
+// GetExchangeReviewThresholdPercent 兑换审核阈值百分比（管理端可配，默认 100）。
+func GetExchangeReviewThresholdPercent() string {
+	if strings.TrimSpace(ExchangeReviewThresholdPercent) == "" {
+		return conf.DefaultExchangeReviewThresholdPercent
+	}
+	return ExchangeReviewThresholdPercent
+}
+
+// GetPartnerDailyLimit 返回交易所划转单日累计上限（管理端可配）。
+func GetPartnerDailyLimit() string {
+	if strings.TrimSpace(PartnerDailyLimit) == "" {
+		return conf.DefaultPartnerDailyLimit
+	}
+	return PartnerDailyLimit
+}
+
+// GetRegisterBonus 返回注册赠送金额，非法或非正数一律视为不赠送。
+func GetRegisterBonus() decimal.Decimal {
+	amount, err := decimal.NewFromString(strings.TrimSpace(RegisterBonus))
+	if err != nil || amount.LessThanOrEqual(decimal.Zero) {
+		return decimal.Zero
+	}
+	return amount
 }
 
 // GetMinWinRecharge 返回 WIN 充值最小值（管理端可配，绝对下限 10）。
@@ -275,7 +321,7 @@ type WithdrawalPayoutAttempt struct {
 	CreatedAt   time.Time
 }
 
-// ExchangeRecord AIX → WIN 兑换记录
+// ExchangeRecord AIX → 可提 U（USDT）兑换记录
 type ExchangeRecord struct {
 	ID            int64
 	UserID        int64
@@ -290,6 +336,14 @@ type ExchangeRecord struct {
 	Status        string
 	Remark        string
 	CreatedTime   time.Time
+}
+
+// SubscribeInput 报单入参（单源：recharge / reward / win）。
+type SubscribeInput struct {
+	Amount     string  // 总本金 USDT
+	PayFrom    string  // recharge | reward | win
+	ExitMul    float64
+	DirectRate float64
 }
 
 // Order represents an AIX subscribe order.
@@ -354,11 +408,17 @@ type WalletRepo interface {
 	AutoCreditWinRecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinRechargeBalance string, err error)
 	// AutoCreditWinARecharge 链上入账 WIN-A → win_a_recharge_balance（按 tx_hash 幂等）
 	AutoCreditWinARecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinARechargeBalance string, err error)
+	// CreditPartnerWin 合作方转账加款：单事务完成「查用户 → 加 win_recharge_balance → 落流水」。
+	// txHash 传合成幂等键（partner:{partner_id}:{nonce}），复用 recharges.tx_hash 唯一索引。
+	CreditPartnerWin(ctx context.Context, in PartnerCreditInput) (*PartnerCreditResult, error)
+	// SumPartnerCreditedSince 统计某合作方自 since 起已成功加款的总额，用于单日限额。
+	SumPartnerCreditedSince(ctx context.Context, partnerID string, since time.Time) (string, error)
 	ListRechargesByUser(ctx context.Context, userID int64) ([]*Recharge, error)
 	ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*Recharge, error)
 	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
 
-	Subscribe(ctx context.Context, userID int64, amount, payFrom string, exitMul, directRate float64) (*Order, string, error)
+	// Subscribe 单源报单（recharge / reward / win）。
+	Subscribe(ctx context.Context, userID int64, in SubscribeInput) (*Order, string, error)
 	ListOrdersByUser(ctx context.Context, userID int64) ([]*Order, error)
 	ListAllOrders(ctx context.Context) ([]*AdminOrderDetail, error)
 	// ListSubscribeOrdersPaged 全平台认购订单分页（含用户地址），供第三方 Open API
@@ -383,8 +443,15 @@ type WalletRepo interface {
 	GetCurrentWinPrice(ctx context.Context) (string, error)
 	UpsertCurrentWinPrice(ctx context.Context, price, source string) error
 
-	// ExchangeAixToWin AIX → WIN 兑换：扣 AixBalance，加 WinBalance（提现钱包），记录 ExchangeRecord
-	ExchangeAixToWin(ctx context.Context, userID int64, aixAmount string) (*ExchangeRecord, string, string, error)
+	// ExchangeAixToWin AIX → 可提 U（USDT）：扣 AixBalance；needReview 时不入账 U，状态为 review。
+	ExchangeAixToWin(ctx context.Context, userID int64, aixAmount string, needReview bool) (*ExchangeRecord, string, string, error)
+	ApproveExchangeReview(ctx context.Context, id int64) error
+	RejectExchangeReview(ctx context.Context, id int64, remark string) error
+	// SumStaticAixBySettlementDate 某结算日静态发放的 AIX 枚数合计（reward_logs.amount）。
+	SumStaticAixBySettlementDate(ctx context.Context, settlementDate string) (string, error)
+	// SumExchangedAixSince 自 since 起已占用当日配额的兑换 AIX 量。
+	// 只计 completed：待审核不占配额，因此也不会带到次日阈值。
+	SumExchangedAixSince(ctx context.Context, since time.Time) (string, error)
 	ListExchangeRecordsByUser(ctx context.Context, userID int64) ([]*ExchangeRecord, error)
 	ListAllExchangeRecords(ctx context.Context) ([]*ExchangeRecord, error)
 

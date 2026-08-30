@@ -29,7 +29,7 @@ export default {
     operationFailed: 'Thao tác thất bại',
     close: 'Đóng',
     protocol: 'Giao thức', gotIt: 'Đã hiểu', languageSwitch: 'Chuyển ngôn ngữ', switchWallet: 'Đổi ví', back: 'Quay lại',
-    days: '{count} ngày', retry: 'Thử lại'
+    days: '{count} ngày', retry: 'Thử lại', loadFailed: 'Tải thất bại, vui lòng thử lại sau'
   },
   index: {
     welcomeSubtitle: 'Chuỗi ứng dụng truy xuất AI đầu tiên trên thế giới',
@@ -177,7 +177,7 @@ export default {
     pageTitle: 'Đầu tư Stake',
     pageSubtitle: 'Vui lòng chọn khoảng đầu tư phù hợp',
     balance: 'Số dư tài khoản',
-    reportOrder: 'Đăng ký',
+    reportOrder: 'USDT',
     reinvest: 'Tái đầu tư',
     rechargeWallet: 'Ví nạp tiền',
     rewardWallet: 'Ví thưởng',
@@ -190,7 +190,7 @@ export default {
     rechargeWalletBalance: 'Số dư ví nạp tiền',
     rewardWalletBalance: 'Số dư ví thưởng',
     winWalletBalance: 'Số dư WIN',
-    winPay: 'Thanh toán WIN',
+    winPay: 'WIN',
     winPayNow: 'Trả bằng WIN',
     winPaySuccess: 'Đăng ký WIN thành công',
     winPayFailed: 'Đăng ký WIN thất bại',
@@ -213,6 +213,7 @@ export default {
     statusComing: 'Sắp ra mắt',
     subscribeNow: 'Tham gia ngay',
     customAmountHint: 'Số tiền tùy chỉnh（≥ {amount} USDT）',
+    all: 'Tất cả',
     minPlaceholder: 'Tối thiểu {amount}',
     subscribeSuccess: 'Đăng ký thành công',
     subscribeFailed: 'Đăng ký thất bại',
@@ -226,6 +227,7 @@ export default {
     statusCompleted: 'Hoàn thành',
     statusPending: 'Đang chờ',
     minSubscribeAmount: 'Số tiền đăng ký không được thấp hơn {amount}',
+    subscribeStep: 'Số tiền đăng ký phải là bội số của {step}',
     enterSubscribeAmount: 'Vui lòng nhập số tiền đăng ký'
   },
   withdraw: {
@@ -321,7 +323,7 @@ export default {
     globalLaunch: 'Khởi động toàn cầu',
     networkHashrate: 'Sức mạnh tính toán toàn mạng',
     walletDownload: 'Tải xuống ví',
-    orderZone: 'Khu đăng ký',
+    orderZone: 'Khu đúc',
     hashrateMall: 'Cửa hàng sức mạnh tính toán',
     rechargeZone: 'Khu nạp tiền',
     crossChain: 'Cầu nối chuỗi',
@@ -367,7 +369,7 @@ export default {
     noDirectReferral: 'Chưa có giới thiệu trực tiếp',
     income: 'Thu nhập',
     exitProgress: 'Tiến độ thoát', rechargeBalance: 'Số dư nạp', rewardBalance: 'Số dư thưởng',
-    withdrawableAix: 'AIX có thể rút', aixBalance: 'Số dư AIX', winBalance: 'Số dư WIN', rawNewBalance: 'Số dư token', exchange: 'Đổi', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý', releasedManagementReward: 'Thưởng quản lý đã phát hành', pendingManagementReward: 'Thưởng quản lý đang chờ', overflowReward: 'Thưởng tràn', totalIncome: 'Tổng thu nhập',
+    withdrawableAix: 'AIX có thể rút', aixBalance: 'Số dư AIX', winBalance: 'Số dư WIN', winRechargeBalance: 'Số dư nạp WIN', rawNewBalance: 'Số dư token', exchange: 'Đổi', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý', releasedManagementReward: 'Thưởng quản lý đã phát hành', pendingManagementReward: 'Thưởng quản lý đang chờ', overflowReward: 'Thưởng tràn', totalIncome: 'Tổng thu nhập',
     points: 'Điểm hiện tại', pointsAll: 'Tổng điểm', pointsRecords: 'AIX-USDT', noPointsRecords: 'Chưa có lịch sử AIX-USDT'
   },
   exchange: {

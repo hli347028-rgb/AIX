@@ -29,7 +29,7 @@ export default {
     operationFailed: 'ดำเนินการไม่สำเร็จ',
     close: 'ปิด',
     protocol: 'โปรโตคอล', gotIt: 'เข้าใจแล้ว', languageSwitch: 'เปลี่ยนภาษา', switchWallet: 'สลับกระเป๋าเงิน', back: 'กลับ',
-    days: '{count} วัน', retry: 'ลองอีกครั้ง'
+    days: '{count} วัน', retry: 'ลองอีกครั้ง', loadFailed: 'โหลดไม่สำเร็จ กรุณาลองอีกครั้งภายหลัง'
   },
   index: {
     welcomeSubtitle: 'แอปเชนการตรวจสอบย้อนกลับ AI แห่งแรกของโลก',
@@ -177,7 +177,7 @@ export default {
     pageTitle: 'การเงิน Stake',
     pageSubtitle: 'กรุณาเลือกช่วงการลงทุนที่เหมาะสม',
     balance: 'ยอดบัญชี',
-    reportOrder: 'สมัคร',
+    reportOrder: 'USDT',
     reinvest: 'ลงทุนซ้ำ',
     rechargeWallet: 'กระเป๋าเติมเงิน',
     rewardWallet: 'กระเป๋ารางวัล',
@@ -190,7 +190,7 @@ export default {
     rechargeWalletBalance: 'ยอดกระเป๋าเติมเงิน',
     rewardWalletBalance: 'ยอดกระเป๋ารางวัล',
     winWalletBalance: 'ยอดเติม WIN',
-    winPay: 'ชำระด้วย WIN',
+    winPay: 'WIN',
     winPayNow: 'ชำระด้วย WIN',
     winPaySuccess: 'สมัคร WIN สำเร็จ',
     winPayFailed: 'สมัคร WIN ไม่สำเร็จ',
@@ -213,6 +213,7 @@ export default {
     statusComing: 'เร็วๆ นี้',
     subscribeNow: 'เข้าร่วมทันที',
     customAmountHint: 'จำนวนกำหนดเอง (≥ {amount} USDT)',
+    all: 'ทั้งหมด',
     minPlaceholder: 'ขั้นต่ำ {amount}',
     subscribeSuccess: 'สมัครสำเร็จ',
     subscribeFailed: 'สมัครไม่สำเร็จ',
@@ -226,6 +227,7 @@ export default {
     statusCompleted: 'เสร็จสมบูรณ์',
     statusPending: 'รอดำเนินการ',
     minSubscribeAmount: 'จำนวนสมัครต้องไม่ต่ำกว่า {amount}',
+    subscribeStep: 'จำนวนสมัครต้องเป็นจำนวนเท่าของ {step}',
     enterSubscribeAmount: 'กรุณากรอกจำนวนสมัคร'
   },
   withdraw: {
@@ -324,7 +326,7 @@ export default {
     globalLaunch: 'เปิดตัวทั่วโลก',
     networkHashrate: 'แฮชเรตเครือข่าย',
     walletDownload: 'ดาวน์โหลดกระเป๋าเงิน',
-    orderZone: 'โซนสมัคร',
+    orderZone: 'โซนหล่อ',
     hashrateMall: 'ห้างแฮชเรต',
     rechargeZone: 'โซนเติมเงิน',
     crossChain: 'โซนข้ามเชน',
@@ -370,7 +372,7 @@ export default {
     noDirectReferral: 'ไม่มีการแนะนำตรง',
     income: 'รายได้',
     exitProgress: 'ความคืบหน้าการออก', rechargeBalance: 'ยอดเติมเงิน', rewardBalance: 'ยอดรางวัล',
-    withdrawableAix: 'AIX ที่ถอนได้', aixBalance: 'ยอด AIX', winBalance: 'ยอด WIN', rawNewBalance: 'ยอดโทเคน', exchange: 'แลก', directReferralReward: 'รางวัลแนะนำตรง',
+    withdrawableAix: 'AIX ที่ถอนได้', aixBalance: 'ยอด AIX', winBalance: 'ยอด WIN', winRechargeBalance: 'ยอดเติม WIN', rawNewBalance: 'ยอดโทเคน', exchange: 'แลก', directReferralReward: 'รางวัลแนะนำตรง',
     managementReward: 'รางวัลการจัดการ', releasedManagementReward: 'รางวัลการจัดการที่ปล่อยแล้ว', pendingManagementReward: 'รางวัลการจัดการรอ', overflowReward: 'รางวัลล้น', totalIncome: 'รายได้รวม',
     points: 'คะแนน', pointsAll: 'คะแนนรวม', pointsRecords: 'AIX-USDT', noPointsRecords: 'ไม่มีบันทึก AIX-USDT'
   },

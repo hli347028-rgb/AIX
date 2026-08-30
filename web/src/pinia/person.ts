@@ -140,6 +140,9 @@ export default defineStore('person', {
         return sign
       }
 
+      const isFrozenMessage = (message?: string) =>
+        /账户已被冻结|ACCOUNT_FROZEN/i.test(String(message || ''))
+
       const mapAuthError = (message?: string) => {
         if (message === '用户已锁定') return lang('common.userLocked')
         if (message === '该用户未激活') return lang('common.inviterNotActivated')
@@ -153,8 +156,8 @@ export default defineStore('person', {
           // 判断是否直接进入系统
           await this.loginSuccess(await login({ address: ETH.account, code: '', sign, noMsg: true }))
         } catch (err: any) {
-          if (err.message === '用户已锁定') {
-            showFailToast(lang('common.userLocked'))
+          // 冻结账户：静默拦截，不弹前端提示
+          if (isFrozenMessage(err?.message) || err?.message === '用户已锁定') {
             return
           }
           if (canRetryChallenge && /签名挑战|challenge/i.test(err.message || '')) {
@@ -196,6 +199,14 @@ export default defineStore('person', {
           await this.loginSuccess()
         } catch (error: any) {
           const message = error?.response?.data?.message || error?.message || ''
+          const reason = error?.response?.data?.reason || ''
+          const isFrozen =
+            reason === 'ACCOUNT_FROZEN' || isFrozenMessage(message)
+          // 冻结账户：静默拦截，不弹前端提示
+          if (isFrozen) {
+            this.loadAccount = true
+            return
+          }
           const tokenInvalid = /登录过期|未登录|unauthorized|token/i.test(message)
           if (!tokenInvalid) {
             showFailToast(message || lang('common.operationFailed'))

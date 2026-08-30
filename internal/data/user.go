@@ -24,7 +24,10 @@ func NewUserRepo(data *Data) biz.UserRepo {
 
 func (r *userRepo) FindByAddress(ctx context.Context, address string) (*biz.User, error) {
 	var po UserPO
-	err := r.data.db.WithContext(ctx).Where("address = ?", address).First(&po).Error
+	addr := strings.TrimSpace(address)
+	err := r.data.db.WithContext(ctx).
+		Where("LOWER(address) = ?", strings.ToLower(addr)).
+		First(&po).Error
 	if err == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
@@ -58,7 +61,22 @@ func (r *userRepo) Create(ctx context.Context, user *biz.User) (*biz.User, error
 		Role:       biz.RoleUser,
 		Status:     1,
 	}
-	if err := r.data.db.WithContext(ctx).Create(po).Error; err != nil {
+	var bonus decimal.Decimal
+	if parsed, err := decimal.NewFromString(user.UsdtRecharge); err == nil && parsed.IsPositive() {
+		bonus = parsed
+		po.UsdtRecharge = parsed
+	}
+	// 注册赠送与上级的零号账户/社区补贴奖励必须同成同败
+	err := r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(po).Error; err != nil {
+			return err
+		}
+		if !bonus.IsPositive() {
+			return nil
+		}
+		return payUSDTRechargeRoleRewards(tx, po.ID, bonus)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return r.toBiz(ctx, po), nil
@@ -115,9 +133,53 @@ func (r *userRepo) ListUsersUnder(ctx context.Context, rootID int64) ([]*biz.Use
 	if err != nil {
 		return nil, err
 	}
+	// 逐行调用 toBiz 会为每个成员单独查一次上级地址，整棵树可达数千次往返。
+	inviterAddrs, err := r.inviterAddresses(ctx, pos)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]*biz.User, 0, len(pos))
 	for i := range pos {
-		out = append(out, r.toBiz(ctx, &pos[i]))
+		inviterAddress := ""
+		if pos[i].InviterID != nil {
+			inviterAddress = inviterAddrs[*pos[i].InviterID]
+		}
+		out = append(out, r.toBizWithInviter(&pos[i], inviterAddress))
+	}
+	return out, nil
+}
+
+// inviterAddresses 一次性取回给定成员集合所需的全部上级地址。
+func (r *userRepo) inviterAddresses(ctx context.Context, pos []UserPO) (map[int64]string, error) {
+	ids := make([]int64, 0, len(pos))
+	seen := make(map[int64]struct{}, len(pos))
+	for i := range pos {
+		if pos[i].InviterID == nil {
+			continue
+		}
+		if _, ok := seen[*pos[i].InviterID]; ok {
+			continue
+		}
+		seen[*pos[i].InviterID] = struct{}{}
+		ids = append(ids, *pos[i].InviterID)
+	}
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type row struct {
+		ID      int64
+		Address string
+	}
+	var rows []row
+	if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Select("id", "address").
+		Where("id IN ?", ids).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range rows {
+		out[item.ID] = item.Address
 	}
 	return out, nil
 }
@@ -134,46 +196,58 @@ func (r *userRepo) ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64,
 	return r.listUserIDsUnder(ctx, rootID)
 }
 
+// listUserIDsUnder 收集 rootID 之下的全部后代。
+// 推荐链最深可达 90 余层，按层查询会产生同样数量的串行往返并耗尽请求的
+// context deadline，因此这里一次性取回 id→inviter 关系再在内存中展开。
 func (r *userRepo) listUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error) {
+	type edge struct {
+		ID        int64
+		InviterID *int64
+	}
+	var edges []edge
+	if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Select("id", "inviter_id").
+		Where("inviter_id IS NOT NULL").
+		Order("id asc").
+		Find(&edges).Error; err != nil {
+		return nil, err
+	}
+	children := make(map[int64][]int64, len(edges))
+	for _, e := range edges {
+		children[*e.InviterID] = append(children[*e.InviterID], e.ID)
+	}
 	var all []int64
-	current := []int64{rootID}
-	for depth := 0; depth < 1000 && len(current) > 0; depth++ {
-		var ids []int64
-		if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
-			Where("inviter_id IN ?", current).
-			Order("id asc").
-			Pluck("id", &ids).Error; err != nil {
-			return nil, err
+	visited := map[int64]struct{}{rootID: {}}
+	queue := []int64{rootID}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, child := range children[cur] {
+			if _, seen := visited[child]; seen {
+				continue
+			}
+			visited[child] = struct{}{}
+			all = append(all, child)
+			queue = append(queue, child)
 		}
-		if len(ids) == 0 {
-			break
-		}
-		all = append(all, ids...)
-		current = ids
 	}
 	return all, nil
 }
 
 func (r *userRepo) listUsersUnder(ctx context.Context, rootID int64) ([]UserPO, error) {
+	ids, err := r.listUserIDsUnder(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	var all []UserPO
-	current := []int64{rootID}
-	for depth := 0; depth < 1000 && len(current) > 0; depth++ {
-		var pos []UserPO
-		if err := r.data.db.WithContext(ctx).
-			Where("inviter_id IN ?", current).
-			Order("id asc").
-			Find(&pos).Error; err != nil {
-			return nil, err
-		}
-		if len(pos) == 0 {
-			break
-		}
-		all = append(all, pos...)
-		next := make([]int64, 0, len(pos))
-		for _, po := range pos {
-			next = append(next, po.ID)
-		}
-		current = next
+	if err := r.data.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Order("id asc").
+		Find(&all).Error; err != nil {
+		return nil, err
 	}
 	return all, nil
 }
@@ -408,6 +482,19 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 		updates["is_community_subsidy"] = update.IsCommunitySubsidy
 		updates["community_subsidy_set_at"] = now
 	}
+	if update.SetIsFrozen {
+		updates["is_frozen"] = update.IsFrozen
+		if update.IsFrozen {
+			now := time.Now()
+			updates["frozen_at"] = now
+		} else {
+			updates["frozen_at"] = nil
+		}
+	}
+	if addr := strings.TrimSpace(update.Address); addr != "" {
+		updates["address"] = addr
+		updates["invite_code"] = addr // 注册时 invite_code=address，一并替换
+	}
 	if len(updates) == 0 {
 		return nil
 	}
@@ -580,6 +667,8 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		ZeroAccountRewardTotal: po.ZeroAccountRewardTotal.String(),
 		CommunitySubsidyTotal:  po.CommunitySubsidyTotal.String(),
 		Status:               po.Status,
+		IsFrozen:             po.IsFrozen,
+		FrozenAt:             po.FrozenAt,
 		InviterID:            po.InviterID,
 		Role:                 po.Role,
 		CreatedTime:          po.CreatedTime,

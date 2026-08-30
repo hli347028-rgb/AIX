@@ -8,29 +8,29 @@
     @click-left="handleBack"
   />
   <div class="page-main">
-    <div class="usdt-price" :class="{ 'is-compact': showUsdtWithdrawable }">
+    <div class="usdt-price is-compact">
       <div class="price-list">
         <div class="price-item">
           <p>{{ $t('wallet.rechargeBalance') }}</p>
-          <p>{{ rechargeBalance }}</p>
+          <p>{{ formatFour(rechargeBalance) }}</p>
         </div>
         <div class="price-item">
-          <p>{{ $t('wallet.rewardBalance') }}</p>
-          <p>{{ rewardBalance }}</p>
+          <p>{{ $t('wallet.winRechargeBalance') }}</p>
+          <p>{{ formatFour(winRechargeBalance) }}</p>
         </div>
         <div class="price-item price-item-action">
           <p>{{ $t('wallet.aixBalance') }}</p>
           <div class="price-value-action">
-            <p>{{ aixBalance }}</p>
+            <p>{{ formatFour(aixBalance) }}</p>
           </div>
         </div>
         <div class="price-item">
-          <p>{{ $t('wallet.winBalance') }}</p>
-          <p>{{ winBalance }}</p>
+          <p>{{ $t('wallet.rewardBalance') }}</p>
+          <p>{{ formatFour(rewardBalance) }}</p>
         </div>
-        <div v-if="showUsdtWithdrawable" class="price-item">
+        <div class="price-item">
           <p>{{ $t('wallet.usdtWithdrawable') }}</p>
-          <p>{{ usdtWithdrawable }}</p>
+          <p>{{ formatFour(usdtWithdrawable) }}</p>
         </div>
       </div>
     </div>
@@ -57,7 +57,7 @@
         <div class="pledge-info">
           <div class="pledge-item">
             <p>{{ $t('wallet.exitRemaining') }}</p>
-            <p>{{ userinfo.unexitedAmount || 0 }}</p>
+            <p>{{ formatFour(userinfo.unexitedAmount || 0) }}</p>
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.earnedIncome') }}</p>
@@ -65,11 +65,11 @@
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.overflowReward') }}</p>
-            <p>{{ userinfo.overflowReward || 0 }}</p>
+            <p>{{ formatFour(userinfo.overflowReward || 0) }}</p>
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.aixUsdt') }}</p>
-            <p>{{ profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0 }}</p>
+            <p>{{ formatFour(profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0) }}</p>
           </div>
         </div>
       </div>
@@ -115,7 +115,7 @@
               <span v-if="active === '1'" class="col-status" :class="item.exited ? 'is-exited' : 'is-active'">
                 <span class="status-text">{{ item.exited ? $t('node.statusExited') : $t('node.statusActive') }}</span>
                 <template v-if="item.progressAcc != null && item.progressTarget">
-                  <span class="progress-text">{{ item.progressAcc }} / {{ item.progressTarget }}</span>
+                  <span class="progress-text">{{ formatFour(item.progressAcc) }} / {{ formatFour(item.progressTarget) }}</span>
                   <span class="progress-bar">
                     <i :style="{ width: `${progressPercent(item)}%` }" />
                   </span>
@@ -147,11 +147,11 @@
                 <p>{{ item.name || $t('wallet.income') }}</p>
                 <p class="income-list-item-time">
                   <span>{{ item.createdAt }}</span>
-                  <span class="income-list-item-money">{{ item.reward }}</span>
+                  <span class="income-list-item-money">{{ formatFour(item.reward) }}</span>
                 </p>
                 <p v-if="item.address" style="font-size: 12px; opacity: .7;">{{ formatShortAddr(item.address) }}</p>
                 <p v-if="active === '5'" style="font-size: 12px; opacity: .7;">
-                  {{ $t('wallet.releasedManagementReward') }}: {{ item.released || 0 }} / {{ $t('wallet.pendingManagementReward') }}: {{ item.pending || 0 }}
+                  {{ $t('wallet.releasedManagementReward') }}: {{ formatFour(item.released || 0) }} / {{ $t('wallet.pendingManagementReward') }}: {{ formatFour(item.pending || 0) }}
                 </p>
               </div>
             </div>
@@ -166,14 +166,23 @@
         </div>
       </div>
     </div>
-    <div class="tab-content" v-if="tab === 2">
-      <van-empty v-if="treeData.length === 0" :description="$t('wallet.noDirectReferral')" :image="emptyImage" />
+    <div class="tab-content tab-content-tree" v-if="tab === 2">
+      <div v-if="treeLoading" class="tree-loading">
+        <van-loading type="spinner" color="#1597E5" />
+      </div>
+      <div v-else-if="treeError" class="tree-error">
+        <van-empty :description="treeError" :image="emptyImage" />
+        <van-button size="small" type="primary" @click="getUserArea">{{ $t('common.retry') }}</van-button>
+      </div>
+      <van-empty v-else-if="treeData.length === 0" :description="$t('wallet.noDirectReferral')" :image="emptyImage" />
       <a-tree
         v-else
         v-model:expandedKeys="expandedKeys"
         v-model:selectedKeys="selectedKeys"
         :load-data="onLoadData"
         :tree-data="treeData"
+        :virtual="false"
+        block-node
       />
     </div>
   </div>
@@ -209,18 +218,8 @@ const pickBalance = (vals) => {
 const rechargeBalance = $computed(() => pickBalance([userinfo.usdt, profile.usdt_recharge]))
 const rewardBalance = $computed(() => pickBalance([userinfo.reward, profile.usdt_reward]))
 const aixBalance = $computed(() => pickBalance([profile.aix_balance, userinfo.aix]))
-const winBalance = $computed(() => pickBalance([profile.win_balance, userinfo.win]))
+const winRechargeBalance = $computed(() => pickBalance([profile.win_recharge_balance]))
 const usdtWithdrawable = $computed(() => pickBalance([profile.usdt_withdrawable, userinfo.usdtWithdrawable]))
-const showUsdtWithdrawable = $computed(() => {
-  const u = profile || {}
-  const info = userinfo || {}
-  return !!(
-    u.is_zero_account || u.is_community_subsidy ||
-    u.isZeroAccount || u.isCommunitySubsidy ||
-    info.is_zero_account || info.is_community_subsidy ||
-    info.isZeroAccount || info.isCommunitySubsidy
-  )
-})
 
 let active = $ref('1')
 let page = $ref(1);
@@ -254,6 +253,9 @@ const emptyRecordsText = computed(() => {
 const expandedKeys = $ref([]);
 const selectedKeys = $ref([]);
 let treeData = $ref([]);
+let treeLoading = $ref(false)
+let treeError = $ref('')
+let treeRequestId = 0
 
 const formatShortAddr = (value) => {
   if (!value) return ''
@@ -395,13 +397,13 @@ const onLoadData = (treeNode) => {
     }
 
     try {
-      const res = await request.get(`app_server/recommend_list?address=${treeNode.dataRef.address}`);
+      const res = await request.get(`app_server/recommend_list?address=${encodeURIComponent(treeNode.dataRef.address)}`);
       treeNode.dataRef.children = (res.recommends || []).map((item, index) => {
         const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
         const tag = buildTreeTag(item)
         return {
           title: `${formatAddress(item.address)}（${tag}）`,
-          key: `${treeNode.eventKey}-${index}`,
+          key: `${treeNode.eventKey}-${index}-${item.address}`,
           amount: item.amount,
           address: item.address,
           isLeaf: !hasChildren
@@ -409,32 +411,41 @@ const onLoadData = (treeNode) => {
       })
       treeData = [...treeData];
     } catch {
-      treeNode.dataRef.children = []
+      // 不写入 children：否则该节点会被永久视为已加载，用户再点也无法重试
     }
     resolve();
   });
 };
 
 const getUserArea = async () => {
-  const addr = person.address || address
+  const addr = String(person.address || address || '').trim()
   if (!addr) {
     treeData = []
     return
   }
+  const requestId = ++treeRequestId
+  treeLoading = true
+  treeError = ''
   try {
-    const res = await request.get(`app_server/recommend_list?address=${addr}`);
+    const res = await request.get(`app_server/recommend_list?address=${encodeURIComponent(addr)}`, { silent: true });
+    if (requestId !== treeRequestId) return
     treeData = (res.recommends || []).map((item, index) => {
       const hasChildren = item.hasChildren != null ? !!item.hasChildren : Number(item.countLow || 0) > 0
       const tag = buildTreeTag(item)
       return {
         title: `${formatAddress(item.address)}（${tag}）`,
-        key: index,
+        key: `root-${index}-${item.address}`,
         address: item.address,
         isLeaf: !hasChildren
       }
     })
-  } catch {
+  } catch (e) {
+    if (requestId !== treeRequestId) return
+    // 接口失败必须和「确实没有下级」区分开，否则服务端异常会被渲染成空状态
+    treeError = e?.response?.data?.message || e?.message || $t('common.loadFailed')
     treeData = []
+  } finally {
+    if (requestId === treeRequestId) treeLoading = false
   }
 }
 
@@ -442,6 +453,13 @@ watch(locale, () => {
   getRewardList(page, active)
   getUserArea()
 })
+
+watch(
+  () => [String(person.address || ''), tab],
+  ([addr, currentTab]) => {
+    if (currentTab === 2 && addr) getUserArea()
+  }
+)
 
 onMounted(async () => {
   await Promise.allSettled([person.getUser?.(), person.refreshProfile()])
@@ -692,6 +710,37 @@ const handleBack = () => {
       display: flex;
       flex-direction: column;
       gap: 20px;
+      &.tab-content-tree {
+        min-height: 240px;
+        :deep(.ant-tree) {
+          color: #fff;
+          background: transparent;
+        }
+        :deep(.ant-tree-treenode) {
+          padding: 4px 0;
+        }
+        :deep(.ant-tree-title) {
+          color: #fff;
+          word-break: break-all;
+        }
+        :deep(.ant-tree-switcher) {
+          color: #9ec9e8;
+        }
+        .tree-loading {
+          min-height: 200px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tree-error {
+          min-height: 200px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding-bottom: 16px;
+        }
+      }
       :deep(.van-tabs__wrap) {
         overflow: visible;
       }

@@ -36,6 +36,7 @@ const typeLabel = {
     direct_pool_release: '直推奖(USDT)',
     mgmt: '管理奖(USDT)',
     mgmt_pool_release: '管理奖(USDT)',
+    mgmt_overflow: '管理奖(USDT)',
     exit_accel: '出局加速',
     transfer_in: '转入',
     transfer_out: '转出',

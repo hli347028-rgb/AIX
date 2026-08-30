@@ -110,6 +110,9 @@ func (uc *AuthUsecase) Login(ctx context.Context, address, signature, inviteCode
 		}
 	} else {
 		user = existing
+		if user.IsFrozen {
+			return nil, "", time.Time{}, false, errors.Forbidden(AccountFrozenReason, AccountFrozenMessage)
+		}
 	}
 	if !isZeroAdminLogin {
 		_ = uc.challengeRepo.Delete(ctx, normalized)
@@ -182,6 +185,12 @@ func (uc *AuthUsecase) registerNewUser(ctx context.Context, address, inviteCode 
 		}
 	}
 	user := &User{Address: address, InviteCode: address}
+	// 注册赠送只给真实用户，零地址（后台入口）与创世引导地址不参与
+	if address != ZeroAddress && !uc.isBootstrapAddress(address) {
+		if bonus := GetRegisterBonus(); bonus.IsPositive() {
+			user.UsdtRecharge = bonus.String()
+		}
+	}
 	if inviter != nil {
 		user.InviterID = &inviter.ID
 		user.InviterAddress = inviter.Address
@@ -189,17 +198,30 @@ func (uc *AuthUsecase) registerNewUser(ctx context.Context, address, inviteCode 
 	return uc.userRepo.Create(ctx, user)
 }
 
-func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*User, int32, int32, error) {
+// resolveCaller 解析 token 所属账户并拒绝已冻结账户。
+// 冻结只写数据库，签发在冻结之前的 token 仍然有效，因此每个已登录入口都要重新确认状态。
+func (uc *AuthUsecase) resolveCaller(ctx context.Context, tokenString string) (*User, error) {
 	address, err := token.Parse(tokenString, uc.jwtSecret())
 	if err != nil {
-		return nil, 0, 0, errors.Unauthorized(v1.ErrorReason_AUTH_UNSPECIFIED.String(), "token 无效或已过期")
+		return nil, errors.Unauthorized(v1.ErrorReason_AUTH_UNSPECIFIED.String(), "token 无效或已过期")
 	}
 	user, err := uc.userRepo.FindByAddress(ctx, address)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, err
 	}
 	if user == nil {
-		return nil, 0, 0, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
+		return nil, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
+	}
+	if user.IsFrozen {
+		return nil, errors.Forbidden(AccountFrozenReason, AccountFrozenMessage)
+	}
+	return user, nil
+}
+
+func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*User, int32, int32, error) {
+	user, err := uc.resolveCaller(ctx, tokenString)
+	if err != nil {
+		return nil, 0, 0, err
 	}
 	count, err := uc.userRepo.CountInvitees(ctx, user.ID)
 	if err != nil {
@@ -213,24 +235,28 @@ func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*Use
 }
 
 func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address string) ([]*DirectInvitee, error) {
-	selfAddress, err := token.Parse(tokenString, uc.jwtSecret())
+	// 冻结判定针对调用者本人；查看的目标可以是下级，不因下级被冻结而拒绝。
+	caller, err := uc.resolveCaller(ctx, tokenString)
 	if err != nil {
-		return nil, errors.Unauthorized(v1.ErrorReason_AUTH_UNSPECIFIED.String(), "token 无效或已过期")
+		return nil, err
 	}
 	targetAddress := strings.TrimSpace(address)
 	if targetAddress == "" {
-		targetAddress = selfAddress
+		targetAddress = caller.Address
 	}
 	normalized, err := eth.NormalizeAddress(targetAddress)
 	if err != nil {
 		return nil, errors.BadRequest(v1.ErrorReason_INVALID_ADDRESS.String(), "无效的钱包地址")
 	}
-	user, err := uc.userRepo.FindByAddress(ctx, normalized)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
+	user := caller
+	if normalized != caller.Address {
+		user, err = uc.userRepo.FindByAddress(ctx, normalized)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "用户不存在")
+		}
 	}
 	invitees, err := uc.userRepo.ListDirectInvitees(ctx, user.ID)
 	if err != nil {

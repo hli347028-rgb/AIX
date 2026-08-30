@@ -221,6 +221,8 @@ CREATE TABLE `users` (
   `community_subsidy_set_at` datetime(3) DEFAULT NULL,
   `zero_account_reward_total` decimal(36,18) NOT NULL DEFAULT 0.000000000000000000,
   `community_subsidy_total` decimal(36,18) NOT NULL DEFAULT 0.000000000000000000,
+  `is_frozen` tinyint(1) NOT NULL DEFAULT 0,
+  `frozen_at` datetime(3) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_users_address` (`address`),
   UNIQUE KEY `idx_users_invite_code` (`invite_code`),

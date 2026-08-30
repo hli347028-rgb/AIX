@@ -28,7 +28,8 @@ const statRows = [
     ['totalSdtWithdraw', 'todaySdtWithdraw', 'totalSdtAsset', 'totalWinAsset'],
     ['totalRewardWallet', 'totalOverflowWallet', 'totalAdminRecharge', 'todayAdminRecharge'],
     ['totalZeroAccountReward', 'todayZeroAccountReward', 'totalCommunitySubsidyReward', 'todayCommunitySubsidyReward'],
-    ['totalUsdtWithdrawable', 'totalUsdtWithdraw', 'todayUsdtWithdraw'],
+    ['totalUsdtWithdrawable', 'totalUsdtWithdraw', 'todayUsdtWithdraw', 'totalAixAsset'],
+    ['todayAixAmount', 'totalPartnerCreditWin'],
 ]
 
 const statMeta = {
@@ -67,6 +68,9 @@ const statMeta = {
     totalUsdtWithdrawable: { label: '全网可提U', icon: 'wallet' }, // 零号+社区补贴合计
     totalUsdtWithdraw: { label: '总提现U', icon: 'export' }, // 零号+社区补贴提现合计
     todayUsdtWithdraw: { label: '今日提现U', icon: 'export' }, // 今日零号+社区补贴提现
+    totalAixAsset: { label: '总AIX数量', icon: 'gold' }, // 全网用户 aix_balance 合计
+    todayAixAmount: { label: '今日AIX数量', icon: 'gold' }, // 今日0点结算发放的静态AIX
+    totalPartnerCreditWin: { label: '划转WIN数量', icon: 'swap' }, // 交易所划转累计转入的WIN，只增不减
 }
 
 export default {
