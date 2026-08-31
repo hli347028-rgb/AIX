@@ -1,6 +1,12 @@
 <template>
   <div class="withdrawal-page">
-    <Header />
+    <van-nav-bar
+      :title="$t('withdraw.title')"
+      left-arrow
+      :border="false"
+      fixed
+      @click-left="router.back()"
+    />
 
     <div class="content">
       <div class="asset-tabs">
@@ -110,18 +116,19 @@
 </template>
 
 <script setup lang="ts">
-import Header from '@/components/Header.vue'
 import userPerson from '@/pinia/person'
 import { getWinWithdrawRecords, withdrawSdt, withdrawUsdt } from '@/api/aix'
 import type { WinWithdrawRecord } from '@/api/aix'
 import { compareDecimals, displayDecimal, isPositiveDecimal } from '@/tools/decimal'
 import { showToast } from 'vant'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 type AssetType = 'SDT' | 'USDT'
 
 const { t: $t } = useI18n()
+const router = useRouter()
 const person = userPerson()
 
 const assetType = ref<AssetType>('SDT')
@@ -345,7 +352,7 @@ onUnmounted(() => {
 }
 
 .content {
-  padding: 90px 20px 40px;
+  padding: 76px 20px 40px;
   max-width: 1200px;
   margin: 0 auto;
 }

@@ -15,25 +15,28 @@
       </header>
 
       <p v-if="forced" :id="instructionId" class="notice-instruction">{{ $t('announcement.readBeforeConfirm') }}</p>
-      <div class="notice-body">
+      <div ref="bodyEl" class="notice-body" @scroll.passive="checkReadProgress">
         <img
           v-if="announcement.image_url"
           class="notice-image"
           :src="announcement.image_url"
           :alt="announcement.title || $t('announcement.imageAlt')"
+          @load="checkReadProgress"
         />
         <div v-if="announcement.content" class="notice-content" v-html="announcement.content"></div>
         <p v-else-if="announcement.summary" class="notice-summary">{{ announcement.summary }}</p>
       </div>
       <footer>
-        <button type="button" @click="acknowledge">{{ $t('announcement.gotIt') }}</button>
+        <button type="button" :disabled="!hasReadThrough" @click="acknowledge">
+          {{ $t(hasReadThrough ? 'announcement.acknowledged' : 'announcement.keepReading') }}
+        </button>
       </footer>
     </article>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AnnouncementItem } from '@/api/aix'
 
@@ -42,11 +45,49 @@ const props = withDefaults(defineProps<{ announcement: AnnouncementItem | null; 
 const emit = defineEmits<{ (event: 'close'): void; (event: 'acknowledge'): void }>()
 const titleId = 'announcement-detail-title'
 const instructionId = 'announcement-read-instruction'
+const bodyEl = ref<HTMLElement | null>(null)
+const hasReadThrough = ref(false)
 const noticeTime = computed(() => props.announcement?.published_at || props.announcement?.created_at || '')
 const requestClose = () => { if (!props.forced) emit('close') }
-const acknowledge = () => emit('acknowledge')
+const acknowledge = () => {
+  if (!hasReadThrough.value) return
+  emit('acknowledge')
+}
+
+const BOTTOM_THRESHOLD = 16
+
+const checkReadProgress = () => {
+  const el = bodyEl.value
+  if (!el) return
+  const overflow = el.scrollHeight - el.clientHeight
+  if (overflow <= BOTTOM_THRESHOLD) {
+    hasReadThrough.value = true
+    return
+  }
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD) {
+    hasReadThrough.value = true
+  }
+}
+
+const bindContentImages = () => {
+  bodyEl.value?.querySelectorAll('img').forEach((img) => {
+    if (img.complete) return
+    img.addEventListener('load', checkReadProgress, { once: true })
+    img.addEventListener('error', checkReadProgress, { once: true })
+  })
+}
+
+const resetReadProgress = async () => {
+  hasReadThrough.value = false
+  await nextTick()
+  bindContentImages()
+  checkReadProgress()
+  requestAnimationFrame(checkReadProgress)
+}
+
 watch(() => props.announcement, value => {
   document.body.style.overflow = value ? 'hidden' : ''
+  if (value) resetReadProgress()
 }, { immediate: true })
 onBeforeUnmount(() => { document.body.style.overflow = '' })
 </script>

@@ -12,42 +12,54 @@
 
       <div class="page-header">
         <div class="mode-tabs" role="radiogroup">
-          <label class="mode-option" :class="{ active: activeMode === 'recharge', disabled: submitting }">
+          <label class="mode-option" :class="{ active: tabMode === 'mint', disabled: submitting }">
             <input
               type="radio"
-              name="subscribe-mode"
-              value="recharge"
-              :checked="activeMode === 'recharge'"
+              name="subscribe-tab"
+              value="mint"
+              :checked="tabMode === 'mint'"
               :disabled="submitting"
-              @change="switchMode('recharge')"
+              @change="switchTab('mint')"
             />
             <span class="radio-dot" aria-hidden="true"></span>
             <strong>{{ $t('node.reportOrder') }}</strong>
           </label>
-          <label class="mode-option" :class="{ active: activeMode === 'win', disabled: submitting }">
+          <label class="mode-option" :class="{ active: tabMode === 'reward', disabled: submitting }">
             <input
               type="radio"
-              name="subscribe-mode"
-              value="win"
-              :checked="activeMode === 'win'"
-              :disabled="submitting"
-              @change="switchMode('win')"
-            />
-            <span class="radio-dot" aria-hidden="true"></span>
-            <strong>{{ $t('node.winPay') }}</strong>
-          </label>
-          <label class="mode-option" :class="{ active: activeMode === 'reward', disabled: submitting }">
-            <input
-              type="radio"
-              name="subscribe-mode"
+              name="subscribe-tab"
               value="reward"
-              :checked="activeMode === 'reward'"
+              :checked="tabMode === 'reward'"
               :disabled="submitting"
-              @change="switchMode('reward')"
+              @change="switchTab('reward')"
             />
             <span class="radio-dot" aria-hidden="true"></span>
             <strong>{{ $t('node.reinvest') }}</strong>
           </label>
+        </div>
+
+        <div v-if="tabMode === 'mint'" class="funding-switch">
+          <span class="funding-label">{{ $t('node.fundingSource') }}</span>
+          <div class="funding-options" role="radiogroup">
+            <button
+              type="button"
+              class="funding-option"
+              :class="{ active: mintFunding === 'recharge' }"
+              :disabled="submitting"
+              @click="switchMintFunding('recharge')"
+            >
+              {{ $t('node.rechargeWallet') }}
+            </button>
+            <button
+              type="button"
+              class="funding-option"
+              :class="{ active: mintFunding === 'win' }"
+              :disabled="submitting"
+              @click="switchMintFunding('win')"
+            >
+              {{ $t('node.winPay') }}
+            </button>
+          </div>
         </div>
 
         <div class="balance-card">
@@ -81,12 +93,12 @@
           </div>
         </div>
         <p v-if="activeMode === 'win' && winPrice > 0" class="mode-tip win-cost-tip">
-          {{ $t('node.winPayHint', { price: winPrice }) }}
+          {{ $t('node.winPayHint', { price: winPrice, cost: minAmountText }) }}
         </p>
         <p class="mode-tip">{{ modeTip }}</p>
       </div>
 
-      <div class="node-tiers">
+      <!-- <div class="node-tiers">
         <div
           v-for="tier in nodeTiers"
           :key="tier.price"
@@ -102,7 +114,7 @@
             {{ actionText }}
           </button>
         </div>
-      </div>
+      </div> -->
 
       <div class="record-section">
         <div class="section-title-wrap">
@@ -151,8 +163,14 @@ const { t: $t } = useI18n()
 const person = userPerson()
 
 type SubscribeMode = 'recharge' | 'reward' | 'win'
+type TabMode = 'mint' | 'reward'
+type MintFunding = 'recharge' | 'win'
 
-const activeMode = ref<SubscribeMode>('recharge')
+const tabMode = ref<TabMode>('mint')
+const mintFunding = ref<MintFunding>('recharge')
+const activeMode = computed<SubscribeMode>(() =>
+  tabMode.value === 'reward' ? 'reward' : mintFunding.value
+)
 const winPrice = computed(() => Number(person.profile?.win_price || 0))
 const accountBalance = computed(() => {
   const profile = person.profile
@@ -207,9 +225,16 @@ const minSubscribe = ref(100)
 const customAmount = ref('')
 const submitting = ref(false)
 
-const switchMode = (mode: SubscribeMode) => {
+const switchTab = (tab: TabMode) => {
   if (submitting.value) return
-  activeMode.value = mode
+  tabMode.value = tab
+  selectedTier.value = null
+  customAmount.value = ''
+}
+
+const switchMintFunding = (funding: MintFunding) => {
+  if (submitting.value) return
+  mintFunding.value = funding
   selectedTier.value = null
   customAmount.value = ''
 }
@@ -435,7 +460,7 @@ onMounted(async () => {
      Base 也没有任何 inset 拟���效果。改成纯浅灰底 + 全圆外框。 */
   background: var(--surface-2);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .funding-switch {
@@ -459,7 +484,9 @@ onMounted(async () => {
   .funding-options {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: min(100%, 360px);
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 360px;
     padding: 3px;
     border-radius: var(--r-pill);
     background: var(--surface-2);
@@ -768,15 +795,14 @@ onMounted(async () => {
   padding: 0 0 4px;
 
   .table-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+    display: flex;
     align-items: center;
     background: var(--ink-deep);
-    padding: 10px 8px;
+    padding: 10px 0;
     border-bottom: 1px solid var(--hair);
 
     span {
-      min-width: 0;
+      flex: 1;
       text-align: center;
       font-size: var(--fs-micro);
       letter-spacing: var(--ls-caps);
@@ -787,8 +813,7 @@ onMounted(async () => {
 
   .order-list {
     .table-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+      display: flex;
       align-items: center;
       padding: 12px 8px;
       border-bottom: 1px solid var(--hair);
@@ -803,6 +828,7 @@ onMounted(async () => {
       }
 
       span {
+        flex: 1;
         min-width: 0;
         text-align: center;
         font-size: var(--fs-sm);
@@ -821,6 +847,7 @@ onMounted(async () => {
          （截图里三行金额全是两行），把整张表撑得很松散。
          这一列信息量最大，理应分到更宽的份额。 */
       span:first-child {
+        flex: 1.5;
         white-space: nowrap;
         font-family: var(--aix-font-display);
         font-variant-numeric: tabular-nums;
@@ -878,3 +905,4 @@ onMounted(async () => {
    而其中那句"全页唯一的主操作"注释指向的 DOM 早就不存在了 ——
    过期注释比没有注释更误导人。 */
 </style>
+

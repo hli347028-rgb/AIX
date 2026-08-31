@@ -1490,6 +1490,30 @@ body::after {
 /* 此前这里有一个 560px 断点把列数改成 3 —— auto-fit 已经能
    按可用宽度自行决定列数，断点覆盖反而会重新引入空单元问题。 */
 
+/* /node、/community 保持 3d95832 时的发丝线与共享原语。
+   后续资产页把 --hair 加粗、标题底线改 hair-2、指标格改 hair-2，
+   这两页不跟，避免团队页和认购页被一起带过去。 */
+.node-page,
+.community-page {
+  --hair: rgba(0, 0, 0, 0.10);
+  --hair-2: rgba(0, 0, 0, 0.16);
+  --hair-3: rgba(0, 0, 0, 0.28);
+
+  .section-title-wrap {
+    margin: 32px 0 14px;
+    padding: 0 0 10px;
+    background: transparent !important;
+    border-bottom: 1px solid var(--hair);
+    box-shadow: none;
+  }
+
+  .aix-metrics {
+    background: var(--hair);
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+}
+
 /* 10d. 整幅主操作按钮。
    抽成原语的原因：mine / recharge / transfer 三页各有一个"页面唯一主操作"
    的通栏按钮，此前是各写一份、渐变和圆角还都不一致。

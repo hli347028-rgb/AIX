@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { showToast } from 'vant'
@@ -84,10 +84,29 @@ const router = useRouter()
 const route = useRoute()
 const { t: $t } = useI18n()
 
-defineProps({ visible: Boolean })
+const props = defineProps({ visible: Boolean })
 const emit = defineEmits(['close'])
 
+const unlockPage = () => {
+  document.body.style.removeProperty('overflow')
+  document.body.style.removeProperty('overscroll-behavior')
+  document.documentElement.style.removeProperty('overflow')
+}
+
+watch(() => props.visible, (open) => {
+  if (!open) {
+    unlockPage()
+    return
+  }
+  document.body.style.overflow = 'hidden'
+  document.body.style.overscrollBehavior = 'none'
+  document.documentElement.style.overflow = 'hidden'
+}, { immediate: true })
+
+onUnmounted(unlockPage)
+
 const BRIDGE_URL = 'https://bridge.winbit.win/'
+const BITWINEX_URL = 'https://bitwinex.cloud'
 
 const navItems = computed(() => [
   { key: 'home', label: $t('tab.home'), path: '/' },
@@ -98,6 +117,7 @@ const navItems = computed(() => [
   { key: 'order', label: $t('tab.orderZone'), path: '/node' },
   { key: 'rules', label: $t('index.rulesSummaryTitle'), path: '/rules' },
   { key: 'bridge', label: $t('tab.crossChain'), href: BRIDGE_URL },
+  { key: 'bitwinex', label: $t('tab.bitwinex'), href: BITWINEX_URL },
   { key: 'announcements', label: $t('announcement.title'), path: '/announcements' },
   { key: 'launch', label: $t('tab.globalLaunch'), upcoming: true },
   { key: 'bank', label: $t('tab.digitalBank'), upcoming: true },
@@ -137,6 +157,9 @@ const handleNav = (item, event) => {
   position: fixed;
   inset: 0;
   z-index: 2000;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
   background: rgba(10, 11, 13, 0.28);
   backdrop-filter: blur(12px) saturate(0.9);
   animation: overlay-in 0.35s ease both;
@@ -149,13 +172,17 @@ const handleNav = (item, event) => {
   --panel-blue: #0052ff;
   position: absolute;
   inset: 0 auto 0 max(0px, calc(50% - 207px));
-  width: min(94vw, 414px);
+  width: min(100%, 414px);
+  max-width: 100%;
   box-sizing: border-box;
   padding: 22px 24px 32px;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
   scrollbar-width: none;
   color: var(--panel-text);
   background: #f7f8fa;
@@ -167,7 +194,7 @@ const handleNav = (item, event) => {
     content: '';
     position: fixed;
     inset: 0 auto 0 max(0px, calc(50% - 207px));
-    width: min(94vw, 414px);
+    width: min(100%, 414px);
     pointer-events: none;
     opacity: 1;
     background: linear-gradient(to bottom, var(--panel-blue) 0 4px, transparent 4px);
@@ -179,8 +206,8 @@ const handleNav = (item, event) => {
 .ambient-logo {
   position: absolute;
   top: 86px;
-  right: -76px;
-  width: 260px;
+  right: 0;
+  width: 220px;
   pointer-events: none;
   opacity: 0.08;
   mix-blend-mode: multiply;
@@ -351,7 +378,7 @@ const handleNav = (item, event) => {
 @keyframes item-in { from { opacity: 0; transform: translateX(-10px); } }
 
 @media (max-width: 374px) {
-  .sidebar { width: 100vw; padding-inline: 18px; }
+  .sidebar { width: 100%; padding-inline: 18px; }
   .brand-name { max-width: 190px; font-size: 9px; }
 }
 
