@@ -11,7 +11,9 @@
   }
   .share-logo {
     text-align: center;
-    filter: brightness(200%);
+    /* 去掉 filter: brightness(200%)。那是为了让 logo 在近黑底上够亮
+       而加的补偿，翻成白底后 2 倍提亮会把浅色部分直接推到纯白、
+       在白底上"烧穿"不可见。 */
     img {
       width: 160px;
       margin: 20px 0;
@@ -39,7 +41,7 @@
       width: 180px;
       height: 180px;
       border-radius: 6px;
-      border: 1px solid #21B6EA;
+      border: 1px solid var(--accent-bright);
       padding: 10px;
       img {
         width: 180px;
@@ -49,25 +51,42 @@
     .share-btn {
       width: 100%;
       height: 40px;
-      background-color: #FFF;
-      color: #FFF;
+      /* 这里曾是"深底 + 白字"。批量把 color:#fff 换成 var(--text) 时，
+         正好和已经是 var(--text) 的背景撞成同一个色 —— 文字彻底不可见。
+         教训：背景色与前景色必须成对处理，只按"白字→深字"单向替换，
+         迟早会撞上某个已经是深色的背景。
+         改为 Base 的主按钮：实心纯蓝 + 白字 + 全圆。 */
+      background-color: var(--accent);
+      color: var(--on-accent);
       line-height: 40px;
-      border-radius: 6px;
+      border-radius: var(--r-pill);
+      font-weight: 600;
+      transition: background-color var(--t-fast) var(--ease);
+
+      &:active {
+        background-color: var(--accent-deep);
+      }
       margin-top: 20px;
       margin-bottom: 20px;
     }
   }
   .tab-menu {
     width: 90%;
-    border-radius: 40px;
+    border-radius: var(--r-pill);
     font-size: 15px;
-    background: #0D1B2A;
+    /* 以下 5 处 #0D1B2A（深蓝）都是初版深色主题的硬编码遗留，
+       不走令牌，所以整站两轮换色全部漏掉。
+       它们语义各不相同（容器 / 卡片 / 选中态 / 斑马纹），
+       不能统一替换成同一个值 —— 逐个按语义定档。
+       这里是分段控件的**容器槽**：浅灰底 + 发丝边。 */
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
     // box-shadow: @bs1;
     .tab-link {
-      color: #CCC;
+      color: var(--text-2);
     }
     .tab-link-active {
-      color: #21B6EA;
+      color: var(--accent-bright);
     }
   }
   .node-head {
@@ -89,17 +108,17 @@
       p {
         &:nth-child(1) {
           font-size: 12px;
-          color: #CCC;
+          color: var(--text-2);
         }
         &:nth-child(2) {
           font-size: 15px;
-          color: #FFF;
+          color: var(--text);
         }
       }
     }
   }
   .treeview {
-    color: rgba(255, 255, 255, .8);
+    color: var(--text);
     /deep/.treeview-item-label {
       font-size: 13px;
     }
@@ -107,8 +126,10 @@
   .node-list {
     width: calc(100% - 40px);
     padding: 20px;
-    background: #0D1B2A;
-    border-radius: 6px;
+    /* 卡片：纯白 + 发丝边（Base 的卡片配方） */
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--r-lg);
     text-align: center;
     ul {
       display: flex;
@@ -120,7 +141,7 @@
         text-align: left;
         word-wrap: break-word;
         word-break: break-all;
-        color: rgba(255, 255, 255, .6);
+        color: var(--text-2);
         font-size: 13px;
       }
     }
@@ -130,7 +151,7 @@
     background-size: 80px 80px;
     padding-top: 80px;
     text-align: center;
-    color: #FFF;
+    color: var(--text);
     opacity: .8;
     margin-top: 30px;
   }
@@ -154,16 +175,16 @@
         left: 0;
         width: 100%;
         height: 0.02564rem;
-        background: linear-gradient(90deg,rgba(179,179,179,0) 0%,rgba(255,255,255,.6) 50.45%,rgba(179,179,179,0) 100%);
+        background: linear-gradient(90deg, transparent 0%, var(--hair-2) 50%, transparent 100%);
       }
       p {
         &:nth-child(1) {
           font-size: 14px;
-          color: #CCC;
+          color: var(--text-2);
         }
         &:nth-child(2) {
           font-size: 26px;
-          color: #FFF;
+          color: var(--text);
         }
       }
     }
@@ -185,11 +206,11 @@
         p {
           &:nth-child(1) {
             font-size: 12px;
-            color: #CCC;
+            color: var(--text-2);
           }
           &:nth-child(2) {
             font-size: 12px;
-            color: #FFF;
+            color: var(--text);
             display: flex;
             gap: 4px;
             align-items: center;
@@ -227,9 +248,17 @@
           align-items: center;
           white-space: nowrap;
           padding: 0 15px;
-          border-radius: 6px;
+          border-radius: var(--r-sm);
+          color: var(--text-3);
+          transition: color var(--t-fast) var(--ease),
+            background-color var(--t-fast) var(--ease);
+          /* 选中的筛选标签：白底 + 蓝字 + 蓝框，与全站分段控件同一语言。
+             不用实心蓝，把实心蓝留给页面主 CTA。 */
           &.active {
-            background: #0D1B2A;
+            background: var(--surface-1);
+            border: 1.5px solid var(--accent);
+            color: var(--accent);
+            font-weight: 600;
           }
         }
       }
@@ -237,7 +266,11 @@
     .income-list-main {
       display: flex;
       flex-direction: column;
-      background: #0D1B2A;
+      /* 列表容器：纯白 + 发丝边 */
+      background: var(--surface-1);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      overflow: hidden;
       padding: 10px;
       .income-list-item {
         width: 100%;
@@ -245,7 +278,7 @@
         -moz-box-sizing:border-box;
         -webkit-box-sizing:border-box;
         padding: 10px;
-        border-bottom: 1px solid #0A1724;
+        border-bottom: 1px solid var(--surface-1);
         &:nth-child(2n) {
           background: #0D1B2A;
         }
@@ -257,7 +290,7 @@
           gap: 4px;
           p {
             width: 100%;
-            color: #CCC;
+            color: var(--text-2);
             display: flex;
             flex-grow: 1;
             justify-content: space-between;
@@ -270,7 +303,7 @@
           flex-shrink: 0;
           width: 100px;
           text-align: right;
-          color: #CCC;
+          color: var(--text-2);
           font-size: 15px;
           font-weight: 500;
           padding: 0 10px;
@@ -286,6 +319,6 @@
   text-align: center;
   font-size: 16px;
   margin-top: 100px;
-  color: #FFF;
+  color: var(--text);
   opacity: .6;
 }

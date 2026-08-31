@@ -19,10 +19,13 @@ const theme = {
 const person = userPerson();
 const system = userSystem();
 system.initTime();
+
 onMounted(async () => {
     await nextTick();
-    console.log('person', person)
-    person.init();
+    await person.init().catch((error) => {
+        // person store 已将错误转换为可重试状态，此处仅收口 Promise rejection。
+        console.error('[App:init]', error)
+    });
 })
 </script>
 <style>

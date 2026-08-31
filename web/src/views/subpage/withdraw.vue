@@ -122,11 +122,11 @@ const getAmountList = async (page = 1) => {
       align-items: flex-start;
       .withdraw-balance {
         font-size: 20px;
-        color: #fff;
+        color: var(--text);
       }
       .withdraw-name {
         font-size: 16px;
-        color: #fff;
+        color: var(--text);
       }
       .withdraw-btn {
         padding: 0 20px;
@@ -154,14 +154,14 @@ const getAmountList = async (page = 1) => {
         margin-top: 20px;
         border-top-left-radius: 20px;
         border-top-right-radius: 20px;
-        background: linear-gradient(0deg,rgba(35,40,44,0),#0B2135);
+        background: var(--surface-2);
         display: flex;
         align-items: center;
         justify-content: flex-start;
         padding: 0 20px;
         li {
           font-size: 14px;
-          color: #FFF;
+          color: var(--text);
           position: relative;
           &.active {
             &::before {
@@ -192,7 +192,7 @@ const getAmountList = async (page = 1) => {
       .empty-text {
         margin-top: 15px;
         font-size: 14px;
-        color: rgba(255, 255, 255, 0.3);
+        color: var(--text-3);
       }
     }
     .withdraw-tab-content {

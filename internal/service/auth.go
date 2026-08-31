@@ -63,7 +63,16 @@ func (s *AuthService) GetProfile(ctx context.Context, req *v1.GetProfileRequest)
 		ShareProfitTotal:   user.ShareProfitTotal,
 		EcoRewardTotal:     user.EcoRewardTotal,
 		IsAdmin:            s.uc.IsAdminUser(user),
+		Username:           user.Username,
 	}, nil
+}
+
+func (s *AuthService) UpdateProfile(ctx context.Context, req *v1.UpdateProfileRequest) (*v1.UpdateProfileReply, error) {
+	user, err := s.uc.UpdateProfile(ctx, resolveToken(ctx, req.Token), req.Username)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.UpdateProfileReply{Username: user.Username}, nil
 }
 
 func (s *AuthService) ListInvitees(ctx context.Context, req *v1.ListInviteesRequest) (*v1.ListInviteesReply, error) {
@@ -74,15 +83,18 @@ func (s *AuthService) ListInvitees(ctx context.Context, req *v1.ListInviteesRequ
 	items := make([]*v1.InviteeNode, 0, len(invitees))
 	for _, item := range invitees {
 		items = append(items, &v1.InviteeNode{
-			Address:          item.Address,
-			TeamStake:        item.TeamStake,
-			ReleasedBalance:  item.ReleasedBalance,
-			ShareProfitTotal: item.ShareProfitTotal,
-			EcoRewardTotal:   item.EcoRewardTotal,
-			ExitAmount:       item.ExitAmount,
-			CommunityLevel:   item.CommunityLevel,
-			DirectCount:      item.DirectCount,
-			CreatedAt:        item.CreatedAt.Unix(),
+			Address:           item.Address,
+			Username:          item.Username,
+			TeamStake:         item.TeamStake,
+			PersonalStake:     item.PersonalStake,
+			ReleasedBalance:   item.ReleasedBalance,
+			ShareProfitTotal:  item.ShareProfitTotal,
+			EcoRewardTotal:    item.EcoRewardTotal,
+			ExitAmount:        item.ExitAmount,
+			CommunityLevel:    item.CommunityLevel,
+			DirectCount:       item.DirectCount,
+			TeamDownlineCount: item.TeamDownlineCount,
+			CreatedAt:         item.CreatedAt.Unix(),
 		})
 	}
 	return &v1.ListInviteesReply{Invitees: items}, nil

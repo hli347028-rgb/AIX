@@ -2,58 +2,68 @@
   <div class="mine-page">
     <Header />
     <div class="container">
-      <div class="airdrop-card">
-        <div class="card-bg"></div>
-        <div class="card-content">
-          <div class="card-header">
-            <img src="/assets/logo.png" alt="logo" class="card-logo" />
-            <h2 class="card-title">{{ $t('mine.tokenAirdrop') }}</h2>
-          </div>
+      <!-- 空投面板。原先是「一个卡片 + 5 个各带底色圆角的数据行 + 一个描边胶囊按钮」，
+           5 行长得一模一样，可领取金额（唯一可操作的数字）完全没有被突出。
+           现在把可领取金额提为主角，其余作为账目行跟在后面。 -->
+      <section class="airdrop">
+        <p class="aix-label">{{ $t('mine.tokenAirdrop') }}</p>
 
-          <div class="stats-list">
-            <div class="stats-row">
-              <span class="stats-name">{{ $t('mine.claimableAmount') }}</span>
-              <span class="stats-value green">0</span>
-            </div>
-            <div class="stats-row">
-              <span class="stats-name">{{ $t('mine.pendingAmount') }}</span>
-              <span class="stats-value accent">0</span>
-            </div>
-            <div class="stats-row">
-              <span class="stats-name">{{ $t('mine.claimedAmount') }}</span>
-              <span class="stats-value green">0</span>
-            </div>
-            <div class="stats-row">
-              <span class="stats-name">{{ $t('mine.totalNodes') }}</span>
-              <span class="stats-value accent">0</span>
-            </div>
-            <div class="stats-row">
-              <span class="stats-name">{{ $t('mine.releaseCountdown') }}</span>
-              <span class="stats-value purple">--</span>
-            </div>
-          </div>
-
-          <button class="claim-btn">{{ $t('mine.claimAirdrop') }}</button>
+        <div class="claimable">
+          <span class="claimable-num aix-figure">{{ formatNum(airdrop.claimable) }}</span>
+          <span class="claimable-unit aix-figure-unit">AIX</span>
         </div>
-        <div class="deco-circle top"></div>
-        <div class="deco-circle bottom"></div>
+        <p class="claimable-cap">{{ $t('mine.claimableAmount') }}</p>
+
+        <div class="aix-ledger">
+          <div class="aix-ledger-row">
+            <span class="k">{{ $t('mine.pendingAmount') }}</span>
+            <span class="v">{{ formatNum(airdrop.pending) }}</span>
+          </div>
+          <div class="aix-ledger-row">
+            <span class="k">{{ $t('mine.claimedAmount') }}</span>
+            <span class="v">{{ formatNum(airdrop.claimed) }}</span>
+          </div>
+          <div class="aix-ledger-row">
+            <span class="k">{{ $t('mine.totalNodes') }}</span>
+            <span class="v">{{ airdrop.nodes }}</span>
+          </div>
+          <div class="aix-ledger-row">
+            <span class="k">{{ $t('mine.releaseCountdown') }}</span>
+            <!-- i18n 里已有 mine.none（'无'），比硬编码的 '--' 更合适，
+                 且 8 个语种都已翻译。 -->
+            <span class="v">{{ airdrop.countdown || $t('mine.none') }}</span>
+          </div>
+        </div>
+
+        <!-- 无可领取额度时按钮本就点不出结果，原先却仍是可点的样式。
+             现在显式禁用，状态一眼可见。 -->
+        <button
+          class="aix-btn claim-btn"
+          type="button"
+          :disabled="!canClaim"
+          @click="onClaim"
+        >
+          {{ $t('mine.claimAirdrop') }}
+        </button>
+      </section>
+
+      <div class="section-title-wrap">
+        <div class="title-bar"></div>
+        <h3 class="section-title">{{ $t('mine.claimRecord') }}</h3>
       </div>
 
-      <div class="record-section">
-        <div class="section-title-wrap">
-          <div class="title-bar"></div>
-          <h3 class="section-title">{{ $t('mine.claimRecord') }}</h3>
+      <div class="ledger">
+        <div class="ledger-head">
+          <span>{{ $t('mine.time') }}</span>
+          <span class="num">{{ $t('mine.amount') }}</span>
         </div>
-
-        <div class="table-card">
-          <div class="table-header">
-            <span>{{ $t('mine.time') }}</span>
-            <span>{{ $t('mine.amount') }}</span>
+        <template v-if="claimRecords.length > 0">
+          <div class="ledger-row" v-for="(item, index) in claimRecords" :key="index">
+            <span class="time">{{ item.createdAt }}</span>
+            <span class="num">{{ formatNum(item.amount) }}</span>
           </div>
-          <div class="empty-state">
-            <p>{{ $t('common.noData') }}</p>
-          </div>
-        </div>
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
       </div>
 
       <div class="safe-bottom"></div>
@@ -63,10 +73,35 @@
 
 <script setup lang="ts">
 import Header from '@/components/Header.vue'
+import { computed } from 'vue'
+
+// 空投数据目前尚无对应接口，先集中成一个对象，
+// 接上接口时只需替换这一处，而不用在模板里逐个改写死的 0。
+const airdrop = {
+  claimable: 0,
+  pending: 0,
+  claimed: 0,
+  nodes: 0,
+  countdown: '',
+}
+
+const claimRecords: Array<{ createdAt: string; amount: number }> = []
+
+const canClaim = computed(() => Number(airdrop.claimable) > 0)
+
+const formatNum = (value: any) => Number(value || 0).toFixed(2)
+
+const onClaim = () => {
+  if (!canClaim.value) return
+  // 领取接口待接入
+}
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
+/* 原先这里的 .stats-value 有三个颜色修饰类 .green / .accent / .purple，
+   但 .green 和 .purple 指向的是同一个变量，且都不是绿色或紫色 ——
+   三个类名、两种颜色、零语义。数值统一用前景色，
+   只把真正需要强调的"可领取金额"提亮。 */
 
 .mine-page {
   min-height: 100vh;
@@ -74,207 +109,95 @@ import Header from '@/components/Header.vue'
 }
 
 .container {
-  padding: 0 15px;
+  /* 不再设 max-width：polish.less 把 body > #app 限死在 414px，
+     这里写 760px 永远不会生效。 */
+  padding: 0 20px;
 }
 
-.airdrop-card {
-  position: relative;
-  margin-top: 25px;
-  overflow: hidden;
-  border-radius: 12px;
-
-  .card-bg {
-    position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    background: rgba(8, 19, 30, 0.6);
-    backdrop-filter: blur(10px);
-  }
-
-  .card-content {
-    position: relative;
-    z-index: 10;
-    padding: 20px;
-  }
-
-  .card-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-
-    .card-logo {
-      width: 25px;
-      height: 25px;
-      border-radius: 10px;
-    }
-
-    .card-title {
-      margin: 0 0 0 8px;
-      font-size: 16px;
-      font-weight: bold;
-      color: #fff;
-    }
-  }
-
-  .stats-list {
-    margin-bottom: 10px;
-
-    .stats-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding: 10px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.05);
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      .stats-name {
-        font-size: 14px;
-        color: #fff;
-      }
-
-      .stats-value {
-        font-size: 16px;
-        font-weight: bold;
-
-        &.green {
-          color: $brand-primary;
-        }
-
-        &.accent {
-          color: $brand-primary-light;
-        }
-
-        &.purple {
-          color: $brand-primary;
-        }
-      }
-    }
-  }
-
-  .claim-btn {
-    width: 100%;
-    margin-top: 10px;
-    padding: 11px 0;
-    background: transparent;
-    color: $brand-primary;
-    font-size: 16px;
-    font-weight: bold;
-    border: 1px solid $brand-primary;
-    border-radius: 24px;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.3s ease;
-
-    &:hover {
-      background: $gradient-primary;
-      color: $text-inverse;
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-  }
-
-  .deco-circle {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.05);
-
-    &.top {
-      top: 0;
-      right: 0;
-      width: 100px;
-      height: 100px;
-      transform: translate(50%, -50%);
-    }
-
-    &.bottom {
-      bottom: 0;
-      left: 0;
-      width: 75px;
-      height: 75px;
-      transform: translate(-50%, 50%);
-      background: rgba(255, 255, 255, 0.03);
-    }
-  }
+.airdrop {
+  padding: 28px 0 0;
 }
 
-.record-section {
-  margin-top: 20px;
-
-  .section-title-wrap {
-    position: relative;
-    margin-bottom: 10px;
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-
-    .title-bar {
-      position: absolute;
-      left: -10px;
-      top: 50%;
-      width: 4px;
-      height: 16px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #1597E5 0%, #075FB8 100%);
-      transform: translateY(-50%);
-    }
-
-    .section-title {
-      margin: 0 0 0 8px;
-      font-size: 16px;
-      font-weight: bold;
-      color: #fff;
-    }
-  }
-}
-
-.table-card {
+/* 可领取金额：这一页唯一可操作的数字，给它最大的字号。 */
+.claimable {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin-top: 10px;
-  min-height: 300px;
-  overflow: hidden;
-  border: 1px solid $border-color;
-  border-radius: 11px;
-  background: rgba(8, 19, 30, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 11px 0;
+}
 
-  .table-header {
-    display: flex;
-    align-items: center;
-    background: #030A11;
-    padding: 8px 0;
-    margin: -11px 0 0;
+/* 外观来自 .aix-figure / .aix-figure-unit 原语（见 polish.less 第 10a-2 节）。 */
 
-    span {
-      flex: 1;
-      text-align: center;
-      font-size: 10px;
-      color: $text-muted;
-    }
+.claimable-cap {
+  margin: 9px 0 22px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 外观（含禁用态）全部来自 .aix-btn 原语，这里只留本页需要的外边距。 */
+.claim-btn {
+  margin-top: 24px;
+}
+
+/* 领取记录表 */
+.ledger-head,
+.ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.ledger-head {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+
+  span {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+}
+
+.ledger-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hair);
+
+  &:last-of-type {
+    border-bottom: 0;
   }
 
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 250px;
-
-    p {
-      margin-top: 8px;
-      font-size: 12px;
-      color: $text-muted;
-    }
+  .time {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--text-2);
   }
+
+  .num {
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+  }
+}
+
+.ledger-head .num,
+.ledger-row .num {
+  text-align: right;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 60px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
 }
 
 .safe-bottom {
-  height: 50px;
+  height: 56px;
 }
 </style>

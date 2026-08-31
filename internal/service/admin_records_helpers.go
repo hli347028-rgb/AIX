@@ -241,6 +241,143 @@ func (s *AdminLegacyService) rechargeStats(ctx context.Context, q url.Values) (m
 	}, nil
 }
 
+// 管理端把释放/溢出归并到主类型展示，筛选与统计需按同样口径聚合原始 type
+var (
+	mgmtRewardTypes    = []string{biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease, biz.RewardTypeMgmtOverflow}
+	dynamicRewardTypes = []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease}
+)
+
+type rewardListRow struct {
+	ID             int64
+	Type           string
+	Asset          string
+	Amount         decimal.Decimal
+	Address        string
+	FromAddress    string
+	SettlementDate *string
+	CreatedTime    time.Time
+}
+
+func (s *AdminLegacyService) rewardListDB(ctx context.Context, q url.Values) *gorm.DB {
+	addressFilter := strings.TrimSpace(q.Get("address"))
+	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
+	db := s.data.DB().WithContext(ctx).
+		Table("reward_logs rl").
+		Joins("JOIN users u ON u.id = rl.user_id").
+		Joins("LEFT JOIN users fu ON fu.id = rl.from_user_id")
+	if addressFilter != "" {
+		db = db.Where("u.address LIKE ?", "%"+addressFilter+"%")
+	}
+	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
+		switch typeFilter {
+		case "mgmt", "mgmt_pool_release", "管理奖":
+			db = db.Where("rl.type IN ?", mgmtRewardTypes)
+		case "dynamic_usdt", "direct_pool_release", "直推奖":
+			db = db.Where("rl.type IN ?", dynamicRewardTypes)
+		default:
+			db = db.Where("rl.type = ?", typeFilter)
+		}
+	}
+	start, end := parseLegacyTimeRange(q)
+	if start != nil {
+		db = db.Where("rl.created_time >= ?", *start)
+	}
+	if end != nil {
+		db = db.Where("rl.created_time <= ?", *end)
+	}
+	return db
+}
+
+func (s *AdminLegacyService) rewardStats(ctx context.Context, q url.Values) (map[string]interface{}, error) {
+	type statRow struct {
+		TotalCount            int64
+		AixTotal              decimal.Decimal
+		UsdtTotal             decimal.Decimal
+		StaticAixTotal        decimal.Decimal
+		DynamicTotal          decimal.Decimal
+		MgmtTotal             decimal.Decimal
+		ZeroAccountTotal      decimal.Decimal
+		CommunitySubsidyTotal decimal.Decimal
+	}
+	var row statRow
+	err := s.rewardListDB(ctx, q).
+		Select(`COUNT(*) as total_count,
+			COALESCE(SUM(CASE WHEN UPPER(rl.asset) = ? THEN rl.amount ELSE 0 END),0) as aix_total,
+			COALESCE(SUM(CASE WHEN UPPER(rl.asset) = ? THEN rl.amount ELSE 0 END),0) as usdt_total,
+			COALESCE(SUM(CASE WHEN rl.type = ? THEN rl.amount ELSE 0 END),0) as static_aix_total,
+			COALESCE(SUM(CASE WHEN rl.type IN (?,?) THEN rl.amount ELSE 0 END),0) as dynamic_total,
+			COALESCE(SUM(CASE WHEN rl.type IN (?,?,?) THEN rl.amount ELSE 0 END),0) as mgmt_total,
+			COALESCE(SUM(CASE WHEN rl.type = ? THEN rl.amount ELSE 0 END),0) as zero_account_total,
+			COALESCE(SUM(CASE WHEN rl.type = ? THEN rl.amount ELSE 0 END),0) as community_subsidy_total`,
+			biz.TokenAIX, biz.TokenUSDT,
+			biz.RewardTypeStaticAix,
+			biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease,
+			biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease, biz.RewardTypeMgmtOverflow,
+			biz.RewardTypeZeroAccount, biz.RewardTypeCommunitySubsidy).
+		Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// AIX 与 USDT 混在同一张表，合计只能按资产分组，不能相加成一个数
+	type assetRow struct {
+		Asset string
+		Total decimal.Decimal
+		Cnt   int64
+	}
+	var assetRows []assetRow
+	if err := s.rewardListDB(ctx, q).
+		Select("UPPER(rl.asset) as asset, COALESCE(SUM(rl.amount),0) as total, COUNT(*) as cnt").
+		Group("UPPER(rl.asset)").
+		Order("total desc").
+		Scan(&assetRows).Error; err != nil {
+		return nil, err
+	}
+	assetTotals := make([]map[string]interface{}, 0, len(assetRows))
+	for _, a := range assetRows {
+		if strings.TrimSpace(a.Asset) == "" {
+			continue
+		}
+		assetTotals = append(assetTotals, map[string]interface{}{
+			"asset": a.Asset,
+			"total": a.Total.String(),
+			"count": a.Cnt,
+		})
+	}
+
+	return map[string]interface{}{
+		"assetTotals":           assetTotals,
+		"totalCount":            row.TotalCount,
+		"aixTotal":              row.AixTotal.String(),
+		"usdtTotal":             row.UsdtTotal.String(),
+		"staticAixTotal":        row.StaticAixTotal.String(),
+		"dynamicTotal":          row.DynamicTotal.String(),
+		"mgmtTotal":             row.MgmtTotal.String(),
+		"zeroAccountTotal":      row.ZeroAccountTotal.String(),
+		"communitySubsidyTotal": row.CommunitySubsidyTotal.String(),
+	}, nil
+}
+
+func rewardRowToItem(r rewardListRow) map[string]interface{} {
+	settle := ""
+	if r.SettlementDate != nil {
+		settle = *r.SettlementDate
+	}
+	return map[string]interface{}{
+		"id":             r.ID,
+		"type":           normalizeRewardType(r.Type),
+		"rawType":        r.Type,
+		"asset":          r.Asset,
+		"amount":         r.Amount.String(),
+		"address":        r.Address,
+		"addressTwo":     r.FromAddress,
+		"reason":         normalizeRewardType(r.Type),
+		"settlementDate": settle,
+		"createdAt":      formatLegacyTime(r.CreatedTime),
+		"date":           formatLegacyTime(r.CreatedTime),
+	}
+}
+
 func rechargeRowToItem(r rechargeListRow) map[string]interface{} {
 	remark, typeCode := classifyRechargeType(r.Asset, r.TxHash, r.Message)
 	return map[string]interface{}{

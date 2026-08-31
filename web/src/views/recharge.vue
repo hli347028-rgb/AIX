@@ -1,64 +1,97 @@
 <template>
 <div class='withdraw-page'>
   <Header />
+  <nav class="home-return-bar" :aria-label="$t('common.pageNavigation')">
+    <RouterLink to="/" class="home-return-link" :aria-label="$t('common.backHome')">
+      <span aria-hidden="true">‹</span>
+      {{ $t('common.backHome') }}
+    </RouterLink>
+  </nav>
   <div class="page-main">
-    <div class="withdraw-info">
-      <p class="withdraw-balance">{{ $t('recharge.balance') }}: {{ displayAmount(rechargeBalance) }}</p>
-      <p class="withdraw-balance">{{ $t('recharge.winBalance') }}: {{ displayAmount(winBalance) }}</p>
-      <!-- <p v-if="winPrice > 0" class="withdraw-balance withdraw-price">{{ $t('recharge.winPrice') }}: {{ winPrice }} USDT</p> -->
-      <div class="withdraw-actions">
-        <button class="withdraw-btn" @click="showRecharge"><van-icon name="balance-pay" />{{ $t('recharge.recharge') }}</button>
+    <!-- 页首。原先是一张带渐变、顶边高光和 34px 投影的"玻璃卡"，
+         里面塞三个余额 —— 卡片本身比数字更抢眼。
+         现在去掉卡面：主余额直接落在页面上，靠字号建立主次。 -->
+    <header class="balance-head">
+      <p class="aix-label">{{ $t('recharge.balance') }}</p>
+      <div class="balance-primary">
+        <span class="balance-value aix-figure">{{ displayAmount(rechargeBalance) }}</span>
+        <span class="balance-unit aix-figure-unit">USDT</span>
       </div>
-    </div>
-    <div class="withdraw-tab">
-      <div class="section-title-wrap">
-        <div class="title-bar"></div>
-        <h3 class="section-title">{{ $t('recharge.rechargeRecord') }}</h3>
-      </div>
-      <ul class="withdraw-tab-title">
-        <li :class="{ active: recordTab === 'usdt' }" @click="switchRecordTab('usdt')">USDT</li>
-        <li :class="{ active: recordTab === 'win' }" @click="switchRecordTab('win')">WIN</li>
-      </ul>
-      <div class="withdrawal-list">
-        <div class="withdrawal-list-content">
-          <div class="table">
-            <div class="table-header" v-if="currentRecords.length > 0">
-              <div class="table-row">
-                <div class="table-cell col-date">{{ $t('recharge.date') }}</div>
-                <div class="table-cell col-amount">{{ $t('recharge.amount') }}</div>
-                <div class="table-cell col-status">{{ $t('recharge.recordStatus') }}</div>
-              </div>
-            </div>
-            <div class="table-body">
-              <div class="table-row" v-for="(item, index) in currentRecords" :key="item.id ?? index">
-                <div class="table-cell col-date">
-                  <span class="date-text">{{ splitDateTime(item.createdAt).date }}</span>
-                  <span class="time-text">{{ splitDateTime(item.createdAt).time }}</span>
-                </div>
-                <div class="table-cell col-amount">
-                  <span class="amount-value">{{ displayAmount(item.amount) }}</span>
-                  <span class="amount-unit">{{ recordAssetUnit }}</span>
-                </div>
-                <div class="table-cell col-status" :class="statusClass(item.status)">
-                  {{ rechargeStatusText(item.status) }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="empty" v-if="currentRecords.length === 0">
-            <img :src="emptyImage" />
-            <div class="empty-text">{{ $t('common.noData') }}</div>
-          </div>
-          <Pagination
-            v-if="currentRecords.length > 0 && allPageCount > 1"
-            v-model="page"
-            :page-count="allPageCount"
-            mode="simple"
-            @change="onPageChange"
-          />
+
+      <div class="balance-secondary">
+        <p class="aix-label">{{ $t('recharge.winBalance') }}</p>
+        <div class="balance-primary">
+          <span class="balance-value aix-figure">{{ displayAmount(winBalance) }}</span>
+          <span class="balance-unit aix-figure-unit">WIN</span>
         </div>
       </div>
+
+      <!-- 这是本页唯一的主操作，给它实心填充；其余一切保持安静。 -->
+      <button class="aix-btn recharge-btn" type="button" @click="showRecharge">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 4v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          <path d="M7.8 10.2 12 14.4l4.2-4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4.6 17.2v1.2a1.6 1.6 0 0 0 1.6 1.6h11.6a1.6 1.6 0 0 0 1.6-1.6v-1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+        {{ $t('recharge.recharge') }}
+      </button>
+    </header>
+
+    <div class="section-title-wrap">
+      <div class="title-bar"></div>
+      <h3 class="section-title">{{ $t('recharge.rechargeRecord') }}</h3>
     </div>
+
+    <!-- 原先这排标签页有 20px 顶部圆角和一层渐变底色，像一张贴在
+         列表上的卡片头；选中态是一根悬在下方 10px 的短蓝条，
+         和任何基线都不对齐。现在改为共用一条发丝基线的文字标签。 -->
+    <div class="record-tabs" role="tablist">
+      <button
+        v-for="tab in recordTabs"
+        :key="tab.key"
+        class="record-tab"
+        :class="{ active: recordTab === tab.key }"
+        type="button"
+        role="tab"
+        :aria-selected="recordTab === tab.key"
+        @click="switchRecordTab(tab.key)"
+      >{{ tab.label }}</button>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-head" v-if="currentRecords.length > 0">
+        <span>{{ $t('recharge.date') }}</span>
+        <span class="num">{{ $t('recharge.amount') }}</span>
+        <span class="st">{{ $t('recharge.recordStatus') }}</span>
+      </div>
+      <div class="ledger-row" v-for="(item, index) in currentRecords" :key="item.id ?? index">
+        <span class="when">
+          <em>{{ splitDateTime(item.createdAt).date }}</em>
+          <i>{{ splitDateTime(item.createdAt).time }}</i>
+        </span>
+        <span class="num">
+          {{ displayAmount(item.amount) }}
+          <i>{{ recordAssetUnit }}</i>
+        </span>
+        <span class="st" :class="statusClass(item.status)">
+          {{ rechargeStatusText(item.status) }}
+        </span>
+      </div>
+
+      <!-- 原先空状态放了一张 50px 位图并压到 0.3 透明度 —— 一个看不清的
+           灰色图形不传达任何信息。改为一行文字。 -->
+      <p class="empty-state" v-if="currentRecords.length === 0">{{ $t('common.noData') }}</p>
+
+      <Pagination
+        v-if="currentRecords.length > 0 && allPageCount > 1"
+        v-model="page"
+        :page-count="allPageCount"
+        mode="simple"
+        @change="onPageChange"
+      />
+    </div>
+
+    <div class="safe-bottom"></div>
   </div>
   <RechargeDialog :getBalance="getBalance" :usdtBalance="usdtBalance" :onChange="handleRechargeChange" ref="rechargeDialogRef" />
 </div>
@@ -70,7 +103,6 @@ import { ref, computed } from 'vue'
 import request from "@/tools/request";
 import { closeToast, showLoadingToast } from "vant";
 import RechargeDialog from "./subpage/components/rechargeDialog.vue";
-import emptyImage from '../assets/images/custom-empty-image.png'
 import { Pagination } from "vant"
 import Header from '@/components/Header.vue'
 import { useI18n } from 'vue-i18n'
@@ -86,10 +118,16 @@ const userinfo = $computed(() => person.userinfo);
 const profile = $computed(() => person.profile);
 const rechargeBalance = $computed(() => String(profile.usdt_recharge || userinfo.usdt || '0'))
 const winBalance = $computed(() => String(profile.win_recharge_balance || '0'))
-const winPrice = $computed(() => Number(profile.win_price || 0))
+/* winPrice 已移除：它唯一的引用是模板里一行被注释掉的价格展示，
+   等于一个永远不会显示的计算属性。 */
 const displayAmount = (value) => displayDecimal(value)
 const rechargeDialogRef = ref(null)
 const recordTab = ref('usdt')
+
+const recordTabs = [
+  { key: 'usdt', label: 'USDT' },
+  { key: 'win', label: 'WIN' },
+]
 let usdtRecords = $ref([])
 let winRecords = $ref([])
 let page = $ref(1)
@@ -97,14 +135,8 @@ let allPageCount = $ref(1)
 let usdtBalance = $ref("0");
 let usdtApproved = $ref(false);
 
-const currentRecords = computed(() => {
-  if (recordTab.value === 'win') return winRecords
-  return usdtRecords
-})
-const recordAssetUnit = computed(() => {
-  if (recordTab.value === 'win') return 'WIN'
-  return 'USDT'
-})
+const currentRecords = computed(() => recordTab.value === 'win' ? winRecords : usdtRecords)
+const recordAssetUnit = computed(() => recordTab.value === 'win' ? 'WIN' : 'USDT')
 
 const rechargeStatusText = (status) => {
   switch (String(status || '').toLowerCase()) {
@@ -224,283 +256,216 @@ const handleRechargeChange = async (pageNum = 1) => {
 getUsdtRecords()
 
 </script>
-<style lang='scss' scoped>
-@use '@/style/variables.scss' as *;
+<style lang="scss" scoped>
+/* 本页原先 @use variables.scss，用的是 $brand-primary / $text-muted /
+   $bg-card / $border-color 等旧变量 —— 与全站新令牌体系并行存在两套颜色。
+   已全部改为 var(--*) 令牌，旧变量依赖移除。 */
 
-  .withdraw-page {
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
+/* 原先 .withdraw-page 是 100vh + overflow hidden，只让内层列表滚动。
+   这种嵌套滚动在移动端很别扭：列表区被压成一个小窗口，
+   且和本站其它页面（整页滚动）行为不一致。改为整页自然滚动。 */
+.withdraw-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #0648df;
+  --accent-dim: rgba(0, 82, 255, 0.1);
+  min-height: 100vh;
+  /* 顶栏是 fixed 定位，这里要留出它的高度，
+     与 community / mine 两页保持一致。 */
+  padding-top: 64px;
+}
+
+.page-main {
+  /* 不再设 max-width：polish.less 把 body > #app 限死在 414px，
+     这里写 760px 永远不会生效。 */
+  padding: 0 20px;
+}
+
+/* ------------------------------- 页首 ------------------------------- */
+.balance-head {
+  padding: 28px 0 0;
+}
+
+.balance-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 外观来自 .aix-figure / .aix-figure-unit 原语（见 polish.less 第 10a-2 节）， 
+   这里不再重复金属渐变的定义。 */
+
+.balance-secondary {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hair);
+}
+
+/* 外观全部来自 .aix-btn 原语，这里只留本页需要的外边距。 */
+.recharge-btn {
+  margin-top: 22px;
+}
+
+/* ----------------------------- 标签页 ----------------------------- */
+.record-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.record-tab {
+  position: relative;
+  padding: 0 0 11px;
+  background: transparent;
+  border: 0;
+  font-family: var(--aix-font);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease);
+
+  /* 选中标记压在基线上，与容器底边严格重合 —— 
+     原实现悬在下方 10px，视觉上无所依附。 */
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--accent-bright);
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease);
   }
 
-  .page-main {
-    height: 100%;
-    min-height: 0;
-    padding: 100px 15px 0 15px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
+  &:hover {
+    color: var(--text-2);
+  }
 
-    .withdraw-info {
-      flex: 0 0 auto;
-      width: 100%;
-      aspect-ratio: 694 / 310;
-      height: auto;
-      min-height: 0;
-      overflow: hidden;
-      background: url('@/assets/images/boxbg3.png') no-repeat center / 100% 100%;
-      box-sizing: border-box;
-      padding: 22px 20px;
-      display: flex;
-      margin-bottom: 20px;
-      flex-direction: column;
-      gap: 8px;
-      align-items: flex-start;
-      justify-content: center;
-      .withdraw-balance {
-        margin: 0;
-        line-height: 1.35;
-        font-size: 14px;
-        color: $text-primary;
-      }
-      .withdraw-price {
-        font-size: 12px;
-        color: $text-muted;
-      }
-      .withdraw-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        margin-top: 4px;
-      }
-      .withdraw-btn {
-        padding: 0 14px;
-        display: inline-flex;
-        height: 34px;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid $border-color;
-        border-radius: 22px;
-        gap: 5px;
-        align-items: center;
-        justify-content: center;
-        font-size: 13px;
-        color: $brand-primary;
-        transition: $transition-base;
+  &.active {
+    color: var(--text);
 
-        &:hover {
-          background: $gradient-primary;
-          color: $text-inverse;
-          border-color: transparent;
-        }
-
-        i {
-          font-size: 18px;
-        }
-      }
-    }
-    .withdraw-tab {
-      flex: 1 1 auto;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-
-      .section-title-wrap {
-        flex: 0 0 auto;
-        position: relative;
-        margin-bottom: 8px;
-        margin-left: 10px;
-        display: flex;
-        align-items: center;
-
-        .title-bar {
-          position: absolute;
-          left: -10px;
-          top: 50%;
-          width: 4px;
-          height: 16px;
-          border-radius: 2px;
-          background: linear-gradient(180deg, #1597E5 0%, #075FB8 100%);
-          transform: translateY(-50%);
-        }
-
-        .section-title {
-          margin: 0 0 0 8px;
-          font-size: 16px;
-          font-weight: bold;
-          color: #fff;
-        }
-      }
-
-      .withdraw-tab-title {
-        flex: 0 0 44px;
-        height: 44px;
-        display: flex;
-        gap: 20px;
-        margin-top: 0;
-        border-top-left-radius: 20px;
-        border-top-right-radius: 20px;
-        background: linear-gradient(0deg, rgba(5, 5, 5, 0), $bg-card);
-        align-items: center;
-        justify-content: flex-start;
-        padding: 0 20px;
-        li {
-          font-size: 14px;
-          color: $text-primary;
-          position: relative;
-          cursor: pointer;
-          &.active {
-            &::before {
-              width: 25px;
-              height: 2px;
-              background: $brand-primary;
-              content: '';
-              display: block;
-              position: absolute;
-              bottom: -10px;
-              left: 50%;
-              transform: translateX(-50%);
-              border-radius: 10px;
-            }
-          }
-        }
-      }
-    }
-    .empty {
-      text-align: center;
-      margin: 50px 0;
-      img {
-        width: 50px;
-        height: 50px;
-        margin: 0 auto;
-        opacity: 0.3;
-      }
-      .empty-text {
-        margin-top: 15px;
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.3);
-      }
-    }
-    .withdrawal-list {
-      flex: 1 1 auto;
-      min-height: 0;
-      padding: 20px;
-      box-sizing: border-box;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      -webkit-overflow-scrolling: touch;
-
-      .withdrawal-list-content {
-        min-height: 200px;
-
-        .table {
-          width: 100%;
-
-          .table-row {
-            display: grid;
-            grid-template-columns: 92px minmax(0, 1fr) 58px;
-            column-gap: 6px;
-            align-items: center;
-            min-height: 44px;
-          }
-
-          .table-header {
-            border-bottom: 0.5px dashed $border-color;
-            margin-bottom: 4px;
-
-            .table-cell {
-              padding: 8px 0;
-              font-size: 12px;
-              font-weight: 500;
-              color: $text-muted;
-            }
-          }
-
-          .table-body {
-            .table-row {
-              border-bottom: 1px solid $border-light;
-
-              &:last-child {
-                border-bottom: none;
-              }
-            }
-
-            .table-cell {
-              padding: 10px 0;
-              color: $text-primary;
-            }
-          }
-
-          .col-date {
-            min-width: 0;
-            max-width: 92px;
-
-            .date-text,
-            .time-text {
-              display: block;
-              line-height: 1.3;
-              white-space: nowrap;
-            }
-
-            .date-text {
-              font-size: 11px;
-            }
-
-            .time-text {
-              margin-top: 2px;
-              font-size: 10px;
-              color: $text-muted;
-            }
-          }
-
-          .col-amount {
-            text-align: center;
-            white-space: nowrap;
-
-            .amount-value {
-              display: block;
-              font-size: 13px;
-              font-weight: 600;
-              line-height: 1.3;
-            }
-
-            .amount-unit {
-              display: block;
-              margin-top: 2px;
-              font-size: 11px;
-              color: $text-muted;
-              line-height: 1.2;
-            }
-          }
-
-          .col-status {
-            text-align: right;
-            white-space: nowrap;
-            font-size: 12px;
-            line-height: 1.2;
-
-            &.is-confirmed {
-              color: #52c41a;
-            }
-
-            &.is-pending {
-              color: #faad14;
-            }
-
-            &.is-rejected {
-              color: #ff4d4f;
-            }
-          }
-
-          .table-header .col-amount {
-            text-align: center;
-          }
-
-          .table-header .col-status {
-            text-align: right;
-          }
-        }
-      }
+    &::after {
+      opacity: 1;
     }
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------ 记录表 ------------------------------ */
+.ledger {
+  margin-top: 2px;
+}
+
+.ledger-head,
+.ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.ledger-head {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hair);
+
+  span {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+}
+
+.ledger-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hair);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+
+  .when {
+    em {
+      display: block;
+      font-style: normal;
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    i {
+      display: block;
+      margin-top: 3px;
+      font-style: normal;
+      font-variant-numeric: tabular-nums;
+      font-size: 10px;
+      color: var(--text-3);
+    }
+  }
+
+  .num {
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+
+    i {
+      display: block;
+      margin-top: 3px;
+      font-style: normal;
+      font-family: var(--aix-font);
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--text-3);
+    }
+  }
+
+  /* 状态：原先用 #52c41a / #faad14 / #ff4d4f 三个饱和的原始 hex，
+     那是 Ant Design 的默认色，和本站的钢青体系不搭，且凭空多出三种颜色。
+     现在复用已有的 --up / --down 语义色；"待处理"本就是未定状态，
+     用中性灰而不是再引入一个橙色。 */
+  .st {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+
+    &.is-confirmed {
+      color: var(--up);
+    }
+
+    &.is-rejected {
+      color: var(--down);
+    }
+  }
+}
+
+.ledger-head .num,
+.ledger-head .st,
+.ledger-row .num,
+.ledger-row .st {
+  text-align: right;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 60px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.safe-bottom {
+  height: 56px;
+}
 </style>

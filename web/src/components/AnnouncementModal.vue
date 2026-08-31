@@ -70,13 +70,20 @@ const handleNoRemind = () => {
   width: 90%;
   max-width: 380px;
   max-height: 70vh;
-  background: linear-gradient(145deg, rgba(8, 19, 30, 0.98) 0%, rgba(13, 27, 42, 0.95) 100%);
-  border-radius: 20px;
+  /* 公告面板改为 Base 的浅色浮层：纯白 + 发丝边 + 轻投影。
+     原本三处都是深色专用写法：
+       145° 近黑渐变（rgba(8,19,30,.98)→rgba(13,27,42,.95)）
+       30% 白描边      —— 白底上完全不可见
+       24px 白色外发光 —— 白底上不可见，且 Base 全站零发光
+     注意外层遮罩 rgba(0,0,0,.8) 保持不动：
+     浅色主题的弹窗遮罩同样应该是深色，那一处本来就是对的。 */
+  background: var(--surface-1);
+  border-radius: var(--r-lg);
   padding: 28px 24px;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(21, 151, 229, 0.3);
-  box-shadow: 0 0 24px rgba(21, 151, 229, 0.2), 0 8px 32px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--hair);
+  box-shadow: var(--shadow-3);
   animation: modalSlideIn 0.3s ease;
 
   .modal-close {
@@ -88,29 +95,28 @@ const handleNoRemind = () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-2);
     border-radius: 50%;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--text-3);
     cursor: pointer;
     transition: all 0.2s ease;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
+      background: var(--surface-3);
+      color: var(--text);
     }
   }
 
+  /* 这里原本是 background-clip: text 的渐变文字 —— 和首页标题、资产数值
+     用的是同一种手法，我在那两处已经移除：它用材质掩盖排版，而且渐变的暗端
+     必然比纯白更接近背景，等于主动压低了标题对比度。改为实心近白。 */
   .modal-title {
     font-size: 20px;
-    font-weight: 700;
-    color: #fff;
+    font-weight: 600;
+    color: var(--text);
     text-align: center;
     margin: 0 0 20px;
-    letter-spacing: 0.5px;
-    background: linear-gradient(135deg, #fff 0%, $brand-primary 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    letter-spacing: -0.01em;
   }
 
   .modal-subtitle {
@@ -133,14 +139,14 @@ const handleNoRemind = () => {
     }
 
     &::-webkit-scrollbar-thumb {
-      background: rgba(21, 151, 229, 0.3);
+      background: var(--hair-3);
       border-radius: 2px;
     }
 
     p {
       margin: 0 0 12px;
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.85);
+      color: var(--text-2);
       line-height: 1.7;
       white-space: pre-wrap;
       text-align: center;
@@ -161,36 +167,44 @@ const handleNoRemind = () => {
     .confirm-btn {
       width: 100%;
       padding: 14px 0;
-      background: linear-gradient(135deg, $brand-primary 0%, #087BC1 100%);
-      color: #000;
+      background: var(--accent);
+      /* 又一处"蓝底配黑字"：--accent 现在是纯蓝 #0000FF，
+         压黑字只有约 2.4:1，基本读不出来。改用配对色 --on-accent（8.6:1）。
+         这个 bug 在 Modal.vue 里出现过同样一份 —— 说明"背景用令牌、
+         前景写死"的写法在项目里成对复制过。 */
+      color: var(--on-accent);
       font-size: 16px;
       font-weight: 600;
       letter-spacing: 0.5px;
       border: none;
-      border-radius: 12px;
+      border-radius: var(--r-pill);
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 16px rgba(21, 151, 229, 0.3);
+      /* transition: all 换成显式属性：all 会把 layout 属性也纳入动画，
+         是低端机掉帧的常见来源。时长对齐 Base 实测的 0.15s。 */
+      transition:
+        background-color var(--t-fast) var(--ease),
+        transform var(--t-fast) var(--ease);
 
       &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 24px rgba(21, 151, 229, 0.5);
+        /* 原本是"上浮 2px + 白色外发光"。白发光在白底不可见，
+           且 Base 的按钮 hover 只做颜色加深，不做位移。 */
+        background: var(--accent-deep);
       }
 
       &:active {
-        transform: translateY(0);
+        transform: scale(0.98);
       }
     }
 
     .no-remind {
       margin: 0;
       font-size: 13px;
-      color: rgba(255, 255, 255, 0.5);
+      color: var(--text-3);
       cursor: pointer;
       transition: color 0.2s ease;
 
       &:hover {
-        color: rgba(255, 255, 255, 0.8);
+        color: var(--text-2);
       }
     }
   }

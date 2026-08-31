@@ -23,8 +23,12 @@
       </div>
 
       <div class="page-header">
-        <h1 class="page-title">{{ pageSubtitle }}</h1>
-        <p class="page-balance">{{ balanceLabel }}: {{ displayAmount(currentBalance) }} {{ assetLabel }}</p>
+        <!-- 标签走小号，数字才放大：原先整行（含资产名称和“余额”）被一起放大，
+             标签和数字同样醒目，等于没有层级。 -->
+        <h1 class="page-title">{{ balanceLabel }}</h1>
+        <p class="page-balance">
+          {{ displayAmount(currentBalance) }}<span class="page-balance-unit">{{ assetLabel }}</span>
+        </p>
         <p v-if="assetType === 'USDT'" class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
         <p v-else class="page-hint">{{ $t('withdraw.sdtExchangeHint') }}</p>
       </div>
@@ -91,7 +95,7 @@
             <p>{{ $t('withdraw.noRecords') }}</p>
           </div>
           <div class="state-box" v-if="recordLoading">
-            <van-loading color="#1597e5" />
+            <van-loading color="#8A9096" />
           </div>
         </div>
       </div>
@@ -124,10 +128,6 @@ const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const assetLabel = computed(() => {
   if (assetType.value === 'USDT') return 'USDT'
   return 'AIX-USDT'
-})
-const pageSubtitle = computed(() => {
-  if (assetType.value === 'USDT') return $t('withdraw.usdtSubtitle')
-  return $t('withdraw.sdtSubtitle')
 })
 const balanceLabel = computed(() => {
   if (assetType.value === 'USDT') return $t('withdraw.usdtAvailableBalance')
@@ -167,7 +167,7 @@ const recordAssetLabel = (asset?: string) => {
   const a = String(asset || '').toUpperCase()
   if (a === 'SDT') return 'AIX-USDT'
   if (a === 'USDT') return 'USDT'
-  return asset || '-'
+  return a || '-'
 }
 
 const withdrawStatusText = (status: string) => {
@@ -272,10 +272,12 @@ const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
   loading.value = true
   try {
-    const result =
-      assetType.value === 'USDT'
-        ? await withdrawUsdt(amountInput.value)
-        : await withdrawSdt(amountInput.value)
+    let result: Awaited<ReturnType<typeof withdrawSdt>>
+    if (assetType.value === 'USDT') {
+      result = await withdrawUsdt(amountInput.value)
+    } else {
+      result = await withdrawSdt(amountInput.value)
+    }
     person.profile = {
       ...person.profile,
       ...(assetType.value === 'USDT'
@@ -331,7 +333,7 @@ onUnmounted(() => {
 
 .withdrawal-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #030A11 0%, #0D1B2A 100%);
+  background: var(--ink);
 }
 
 .content {
@@ -340,51 +342,83 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+/* 资产切换：原本是三个各自独立、彼此有 10px 间距的方块按钮，
+   和 node / wallet / transfer 里的分段控件是两种语言，同一个 App 里
+   出现两种切换器就显得没人统一收口。这里改成同一套"凹槽 + 抬起滑块"。 */
 .asset-tabs {
   display: flex;
-  gap: 10px;
+  gap: 4px;
   margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
 }
 
 .asset-tab {
   flex: 1;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.25);
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 14px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    color .18s var(--ease),
+    background-color .18s var(--ease);
 
   &.active {
-    border-color: $brand-primary;
-    background: rgba(21, 151, 229, 0.15);
-    color: #fff;
+    background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
+    border-color: var(--hair-2);
+    color: var(--text);
+    font-weight: 600;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.07);
   }
 }
 
+/* 原本标题/余额/说明三行全部居中且字号接近，读起来没有主次。
+   改成左对齐 + 余额放大：可提现余额是这一页唯一需要"一眼看到"的数字。 */
 .page-header {
-  text-align: center;
-  margin-bottom: 20px;
+  text-align: left;
+  margin-bottom: 24px;
 
   .page-title {
-    font-size: 16px;
-    font-weight: bold;
-    color: #fff;
-    margin-bottom: 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    color: var(--text-3);
+    margin-bottom: 6px;
   }
 
   .page-balance {
-    font-size: 14px;
-    color: $brand-primary;
-    margin-top: 8px;
+    font-family: var(--aix-font-display);
+    font-size: 30px;
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0;
+
+    /* 单位跟在大数字后面，但明显降一级，避免和数值抢注意力 */
+    .page-balance-unit {
+      margin-left: 7px;
+      font-family: var(--aix-font);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .02em;
+      color: var(--text-3);
+    }
   }
 
   .page-hint {
     margin: 10px 0 0;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--text-2);
     line-height: 1.6;
   }
 
@@ -411,7 +445,7 @@ onUnmounted(() => {
   .form-hint {
     margin: 0;
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--text);
   }
 
   .all-btn {
@@ -433,18 +467,22 @@ onUnmounted(() => {
     flex: 1;
     height: 44px;
     padding: 0 14px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.25);
-    color: #fff;
+    border: 1px solid var(--hair);
+    border-radius: var(--r-md);
+    /* 原为 rgba(0,0,0,.25) 配 color: var(--text)（近黑）——
+       25% 黑底压近黑字，这个提现金额输入框此前几乎读不出来。
+       提现是资金操作，输入内容必须清楚可读。
+       改为浅灰底（--surface-2）+ 近黑字，与全站输入框统一。 */
+    background: var(--surface-2);
+    color: var(--text);
     font-size: 15px;
     outline: none;
     caret-color: $brand-primary;
-    -webkit-text-fill-color: #fff;
+    -webkit-text-fill-color: var(--text);
 
     &::placeholder {
-      color: rgba(255, 255, 255, 0.4);
-      -webkit-text-fill-color: rgba(255, 255, 255, 0.4);
+      color: var(--text-2);
+      -webkit-text-fill-color: var(--text-2);
     }
 
     &:focus {
@@ -454,7 +492,7 @@ onUnmounted(() => {
 
   .asset-tag {
     flex-shrink: 0;
-    color: #8ed5ff;
+    color: var(--accent-bright);
     font-weight: 600;
   }
 
@@ -473,7 +511,7 @@ onUnmounted(() => {
     p {
       margin: 0;
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.5);
+      color: var(--text-2);
     }
   }
 }
@@ -494,14 +532,14 @@ onUnmounted(() => {
   &:hover:not(:disabled) {
     background: linear-gradient(135deg, $brand-primary-light 0%, $brand-primary 100%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(21, 151, 229, 0.3);
+    box-shadow: var(--shadow-1);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.5);
+    background: var(--surface-2);
+    color: var(--text-2);
   }
 }
 
@@ -522,7 +560,7 @@ onUnmounted(() => {
       width: 4px;
       height: 16px;
       border-radius: 2px;
-      background: linear-gradient(180deg, #1597E5 0%, #075FB8 100%);
+      background: linear-gradient(180deg, var(--accent) 0%, var(--text-3) 100%);
       transform: translateY(-50%);
     }
 
@@ -530,7 +568,7 @@ onUnmounted(() => {
       margin: 0 0 0 8px;
       font-size: 16px;
       font-weight: bold;
-      color: #fff;
+      color: var(--text);
     }
   }
 }
@@ -541,14 +579,14 @@ onUnmounted(() => {
   overflow: hidden;
   border: 1px solid $border-color;
   border-radius: 11px;
-  background: rgba(8, 19, 30, 0.6);
+  background: var(--surface-1);
   backdrop-filter: blur(10px);
   padding: 11px 0;
 
   .table-header {
     display: flex;
     align-items: center;
-    background: #030A11;
+    background: var(--ink-deep);
     padding: 8px 0;
     margin: -11px 0 0;
 

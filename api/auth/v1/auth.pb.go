@@ -75,6 +75,7 @@ type GetProfileReply struct {
 	ShareProfitTotal   string             `json:"share_profit_total"`
 	EcoRewardTotal     string             `json:"eco_reward_total"`
 	IsAdmin            bool               `json:"is_admin"`
+	Username           string             `json:"username"`
 }
 
 type DownlineInvitee struct {
@@ -89,17 +90,29 @@ type ListInviteesRequest struct {
 }
 
 type InviteeNode struct {
-	Address          string `json:"address"`
-	TeamStake        string `json:"team_stake"`
-	ReleasedBalance  string `json:"released_balance"`
-	ShareProfitTotal string `json:"share_profit_total"`
-	EcoRewardTotal   string `json:"eco_reward_total"`
-	ExitAmount       string `json:"exit_amount"`
-	CommunityLevel   string `json:"community_level"`
-	DirectCount      int32  `json:"direct_count"`
-	CreatedAt        int64  `json:"created_at"`
+	Address           string `json:"address"`
+	TeamStake         string `json:"team_stake"`
+	ReleasedBalance   string `json:"released_balance"`
+	ShareProfitTotal  string `json:"share_profit_total"`
+	EcoRewardTotal    string `json:"eco_reward_total"`
+	ExitAmount        string `json:"exit_amount"`
+	CommunityLevel    string `json:"community_level"`
+	DirectCount       int32  `json:"direct_count"`
+	CreatedAt         int64  `json:"created_at"`
+	Username          string `json:"username"`
+	PersonalStake     string `json:"personal_stake"`
+	TeamDownlineCount int32  `json:"team_downline_count"`
 }
 
 type ListInviteesReply struct {
 	Invitees []*InviteeNode `json:"invitees"`
+}
+
+type UpdateProfileRequest struct {
+	Token    string `json:"token"`
+	Username string `json:"username"`
+}
+
+type UpdateProfileReply struct {
+	Username string `json:"username"`
 }

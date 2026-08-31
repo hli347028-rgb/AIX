@@ -88,9 +88,9 @@ const handleBack = () => {
       }
       .box-1 {
         padding: 26px 20px;
-        color: #fff;
-        background: #0D1B2A;
-        border: 1px solid #075FB8;
+        color: var(--text);
+        background: var(--surface-2);
+        border: 1px solid var(--hair-3);
         border-radius: 12px;
         padding: 15px 30px 15px 15px;
         align-items: center;
@@ -111,7 +111,7 @@ const handleBack = () => {
         display: flex;
         justify-content: space-between;
         background: hsla(0, 0%, 100%, .05);
-        border: 1px solid #666;
+        border: 1px solid var(--hair);
         border-radius: 18px;
         margin-bottom: 20px;
         .box-2-item {
@@ -124,11 +124,11 @@ const handleBack = () => {
           gap: 5px;
           p {
             font-size: 14px;
-            color: #CCC;
+            color: var(--text-2);
             margin: 0;
             &:nth-child(1) {
               font-size: 20px;
-              color: #fff;
+              color: var(--text);
             }
           }
         }
@@ -140,15 +140,15 @@ const handleBack = () => {
         margin-bottom: 20px;
         .box-3-title {
           padding: 0 0 26px 0px;
-          color: #fff;
+          color: var(--text);
           text-align: center;
         }
         .box-3-list {
           background: hsla(0, 0%, 100%, .05);
-          border: 1px solid #666;
+          border: 1px solid var(--hair);
           border-radius: 18px;
           padding: 20px 26px;
-          color: #fff;
+          color: var(--text);
           font-size: 14px;
           font-weight: 400;
           display: flex;

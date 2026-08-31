@@ -969,12 +969,28 @@ func (uc *WalletUsecase) ListRewardLogs(ctx context.Context, tokenString string)
 	return uc.walletRepo.ListRewardLogsByUser(ctx, user.ID)
 }
 
+func (uc *WalletUsecase) GetTeamActiveSubscribePrincipal(ctx context.Context, tokenString string) (string, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return "0", err
+	}
+	return uc.userRepo.SumActivePrincipalUnder(ctx, user.ID)
+}
+
 func (uc *WalletUsecase) GetMgmtRewardSummary(ctx context.Context, tokenString string) (*MgmtRewardSummary, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
 		return nil, err
 	}
 	return uc.walletRepo.GetMgmtRewardSummary(ctx, user.ID)
+}
+
+func (uc *WalletUsecase) GetDirectRewardTotal(ctx context.Context, tokenString string) (string, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return "0", err
+	}
+	return uc.walletRepo.GetDirectRewardTotal(ctx, user.ID)
 }
 
 func (uc *WalletUsecase) ListMgmtRewards(ctx context.Context, tokenString string) ([]*MgmtReward, error) {

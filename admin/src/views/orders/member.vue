@@ -37,6 +37,11 @@ export default {
                     dataIndex: 'address',
                 },
                 {
+                    title: '用户名',
+                    dataIndex: 'username',
+                    customRender: (v) => v || '—',
+                },
+                {
                     title: '充值钱包',
                     dataIndex: 'usdt_recharge',
                 },

@@ -307,6 +307,26 @@ func (r *userRepo) ListDirectInvitees(ctx context.Context, userID int64) ([]*biz
 	return out, nil
 }
 
+func (r *userRepo) SumActivePrincipalUnder(ctx context.Context, rootID int64) (string, error) {
+	ids, err := r.listUserIDsUnder(ctx, rootID)
+	if err != nil {
+		return "0", err
+	}
+	allIDs := make([]int64, 0, len(ids)+1)
+	allIDs = append(allIDs, rootID)
+	allIDs = append(allIDs, ids...)
+	stakeMap, err := r.SumPrincipalByUserIDs(ctx, allIDs)
+	if err != nil {
+		return "0", err
+	}
+	total := decimal.Zero
+	for _, id := range allIDs {
+		v, _ := decimal.NewFromString(stakeMap[id])
+		total = total.Add(v)
+	}
+	return total.String(), nil
+}
+
 func (r *userRepo) SumPrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error) {
 	out := make(map[int64]string, len(userIDs))
 	for _, id := range userIDs {
@@ -326,6 +346,34 @@ func (r *userRepo) SumPrincipalByUserIDs(ctx context.Context, userIDs []int64) (
 		WHERE user_id IN ? AND status = ?
 		GROUP BY user_id
 	`, userIDs, biz.OrderStatusActive).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range rows {
+		out[item.UserID] = item.Total.String()
+	}
+	return out, nil
+}
+
+func (r *userRepo) SumCumulativePrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(userIDs))
+	for _, id := range userIDs {
+		out[id] = "0"
+	}
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		UserID int64
+		Total  decimal.Decimal
+	}
+	var rows []row
+	err := r.data.db.WithContext(ctx).Raw(`
+		SELECT user_id, COALESCE(SUM(principal), 0) AS total
+		FROM orders
+		WHERE user_id IN ? AND status IN ?
+		GROUP BY user_id
+	`, userIDs, []string{biz.OrderStatusActive, biz.OrderStatusExited}).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -505,6 +553,10 @@ func (r *userRepo) SetRole(ctx context.Context, userID int64, role string) error
 	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id = ?", userID).Update("role", role).Error
 }
 
+func (r *userRepo) UpdateUsername(ctx context.Context, userID int64, username string) error {
+	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id = ?", userID).Update("username", username).Error
+}
+
 func (r *userRepo) GetBalances(ctx context.Context, userID int64) (string, string, string, error) {
 	var po UserPO
 	if err := r.data.db.WithContext(ctx).Select("usdt_recharge", "usdt_reward", "aix_balance").First(&po, userID).Error; err != nil {
@@ -642,6 +694,7 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		ID:                   po.ID,
 		Address:              po.Address,
 		InviteCode:           po.InviteCode,
+		Username:             po.Username,
 		UsdtRecharge:         po.UsdtRecharge.String(),
 		UsdtReward:           po.UsdtReward.String(),
 		AixBalance:           po.AixBalance.String(),

@@ -47,9 +47,13 @@ const onChangeLanguage = () => {
   min-width: 132px;
   height: 34px;
   padding: 0 30px 0 10px;
-  border: 1px solid rgba(143, 223, 255, 0.24);
-  border-radius: 6px;
-  background: #0d1c29;
-  color: #fff;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  /* 原为 #0d1c29（近黑深蓝）配 color: var(--text)（近黑）——
+     深底压深字，这个语言下拉框此前**完全读不出来**。
+     成因与全站其它几处一致：背景写死硬编码色、前景已走令牌，
+     令牌翻白时背景没跟着走。改为浅灰底 + 近黑字。 */
+  background: var(--surface-2);
+  color: var(--text);
 }
 </style>

@@ -60,14 +60,12 @@ export interface AixProfile {
   min_win_recharge?: string
   min_win_a_recharge?: string
   min_usdt_recharge?: string
-  win_a_contract?: string
-  win_a_deposit_contract?: string
-  win_a_recharge_enabled?: boolean
   aix_to_win_rate?: number | string
   exchange_fee_rate?: number
   pending_mgmt_reward?: string
   overflow_reward?: string
   mgmt_reward_total?: string
+  direct_reward_total?: string
   usdt_recharge?: string
   usdt_reward?: string
   points?: string
@@ -161,10 +159,7 @@ export function getWinWithdrawRecords() {
   return get<{ records: WinWithdrawRecord[] }>('/v1/wallet/withdraw-records')
 }
 
-export function subscribeAix(
-  amount: string,
-  payFrom: 'recharge' | 'reward' | 'win',
-) {
+export function subscribeAix(amount: string, payFrom: 'recharge' | 'reward' | 'win') {
   return post('/v1/wallet/subscribe-aix', { amount, pay_from: payFrom })
 }
 
@@ -178,9 +173,10 @@ function formatUnixTime(value: unknown): string {
 
 export async function listAixOrders() {
   const result: any = await get('/v1/wallet/subscribe-orders')
+  const body = result?.data && typeof result.data === 'object' ? result.data : result
   return {
-    ...result,
-    orders: (result?.orders || []).map((order: any) => {
+    ...body,
+    orders: (body?.orders || []).map((order: any) => {
       const createdAt = formatUnixTime(order.created_at ?? order.createdAt)
       return { ...order, created_at: createdAt, createdAt }
     }),
@@ -207,18 +203,36 @@ export function listPointsRecords() {
   }>('/v1/wallet/points-records')
 }
 
+export type AnnouncementPriority = 'normal' | 'new' | 'important'
+
 export interface AnnouncementItem {
   id?: number
   title?: string
+  summary?: string
   content?: string
+  image_url?: string
+  priority?: AnnouncementPriority
+  status?: 'draft' | 'published' | 'archived'
+  published_at?: string
   created_at?: string
   add_time?: number
 }
 
 export function listAnnouncements(params?: { page?: number; page_size?: number }) {
-  return get<{ list: AnnouncementItem[]; count: number; page: number }>('/v1/announcements', params)
+  return get<any>('/v1/announcements', params).then((res) => {
+    const body = res?.list ? res : res?.data || res || {}
+    const list = Array.isArray(body.list) ? body.list : Array.isArray(body.data) ? body.data : []
+    return {
+      list: list as AnnouncementItem[],
+      count: Number(body.count || list.length || 0),
+      page: Number(body.page || params?.page || 1),
+    }
+  })
 }
 
 export function getAnnouncementDetail(id: number | string) {
-  return get<AnnouncementItem>('/v1/announcement/detail', { id })
+  return get<any>('/v1/announcement/detail', { id }).then((res) => {
+    const body = res?.id || res?.title ? res : res?.data || res
+    return body as AnnouncementItem
+  })
 }

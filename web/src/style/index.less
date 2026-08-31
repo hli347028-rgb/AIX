@@ -1,35 +1,61 @@
 /* 此文件为项目全局样式 */
+/* Vant 组件的主题变量。
+   原先这里写死了旧品牌电光蓝的三个色值。它们通过 vant 组件
+   （弹窗、标签页、单元格、选择器）渗进每一个页面，所以就算把各个页面的
+   样式都改成新令牌，共享组件仍然会漏出旧蓝色。
+   现统一引用 polish.less 的令牌。 */
 :root {
-    --van-primary-color: #1597E5;  /* AIX 电光蓝 */
-    --van-background-color: #03070B; /* 深空背景 */
-    --van-text-color: #FFF;
-    --van-background-2: #0D1B2A;
-    --van-cell-active-color: #12283A;
+    --van-primary-color: var(--accent);
+    --van-background-color: var(--ink);
+    --van-text-color: var(--text);
+    --van-background-2: var(--surface-2);
+    --van-cell-active-color: var(--surface-3);
     --van-picker-mask-color: none;
-    --van-border-color: rgba(21, 151, 229, .25);
+    --van-border-color: var(--hair-2);
     --van-cell-border-color: none;
-    --van-nav-bar-icon-color: #FFF;
+    --van-nav-bar-icon-color: var(--text);
+    /* 保持透明：下面 .van-nav-bar--fixed 会单独给固定顶栏补背景，
+       非固定的顶栏仍可透出页面背景。 */
     --van-nav-bar-background: none;
     --van-action-bar-height: 60px;
-    --van-action-bar-button-danger-color: #1597E5;
-    --van-button-danger-color: #03070B;
-    --van-tabs-bottom-bar-color: #21B6EA;
-    --van-tab-text-color: rgb(204, 204, 204);
+    --van-action-bar-button-danger-color: var(--accent);
+    --van-button-danger-color: var(--ink);
+    --van-tabs-bottom-bar-color: var(--accent-bright);
+    --van-tab-text-color: var(--text-2);
     --van-empty-image-size: 60px;
-    --van-nav-bar-text-color: rgb(204, 204, 204);
-    --van-dialog-confirm-button-text-color: #FFF;
+    --van-nav-bar-text-color: var(--text-2);
+    --van-dialog-confirm-button-text-color: var(--text);
     --van-dialog-message-font-size: 14px;
-    --van-dialog-has-title-message-text-color: #FFF;
+    --van-dialog-has-title-message-text-color: var(--text);
     --van-action-sheet-cancel-padding-color: rgba(0, 0, 0, .2);
     --van-gray-2: rgba(0, 0, 0, .1);
     --van-button-default-border-color: none;
-    // --van-text-color: #ffffff;      /* 文字颜色 */
+}
+
+/* 固定顶栏必须有不透明底色。
+   --van-nav-bar-background 是 none，而 announcements / exchange / transfer
+   三页都用 `van-nav-bar fixed`，于是页面内容会直接从标题文字下面穿过去
+   （滚动到中段时「划转」和余额数字叠在一起）。 */
+.van-nav-bar--fixed {
+    background: var(--ink);
+    border-bottom: 1px solid var(--hair);
 }
 
 body {
     font-size: 14px !important;
-    color: #FFF;
-    background: radial-gradient(circle at 50% -10%, #0D2A42 0%, #03070B 42%, #020508 100%);
+    color: var(--text);
+    /* 全站底色。这一条是整站色调的真正来源 —— 页面级的 background
+       盖不住它，所以它必须先改，否则各页面改成白底后，滚动到边缘、
+       或页面内容不满一屏时，依然会从缝隙里透出深色。
+
+       历史上它换过三轮硬编码：#0D2A42（蓝）→ #241C10（暖褐）
+       → #1C1F22（中性灰），三轮都没走令牌，因此两次整站改色都没能
+       带走它。这正是"硬编码色 + 复制多份"的代价：
+       同一份近黑径向渐变在项目里共有 4 个副本
+       （这里、exchange.vue、polish.less、wallet.vue）。
+
+       现在改为 Base 的纯白平底，并且走令牌 —— 以后再改色只需动令牌。 */
+    background: var(--ink);
     img {
         display: block;
     }
@@ -137,7 +163,7 @@ body {
       .address-copy-btn {
         width: 60%;
         height: 40px;
-        background: #21B6EA;
+        background: var(--accent-bright);
         border-radius: 6px;
         color: #000;
         font-weight: bold;
@@ -158,7 +184,7 @@ body {
             background: none;
         }
         .tab-link-active {
-            color: #21B6EA;
+            color: var(--accent-bright);
         }
     }
   }
@@ -244,3 +270,7 @@ body {
       color: #666;
     }
   }
+
+/* UI 精修层：只含视觉样式，必须放在最后以覆盖上面的规则。
+   如需完全还原旧外观，注释掉这一行即可。 */
+@import './polish.less';

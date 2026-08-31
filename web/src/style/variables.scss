@@ -1,28 +1,40 @@
-// ==================== AIX 冰蓝科技主题 ====================
+// ==================== AIX 中性石墨主题 ====================
+//
+// 这是与 polish.less 并存的第二套变量体系，被弹窗、顶栏、pledge 等页面引用。
+// 前几轮我在这里做的是"把电光蓝降饱和成钢青"—— 那是个半措施：
+// 只要它还是蓝的，就仍然是蓝色 LOGO 的一份褪色副本，两者在同屏必然打架。
+// 现在与主色板统一为彻底的无彩色：颜色只留给真实素材（品牌 logo）
+// 和涨跌语义色，界面本身不参与配色。
 
-// 品牌色：取自 Logo 的电光蓝、冰蓝高光和深蓝阴影
-$brand-primary: #1597E5;
-$brand-primary-light: #8FDFFF;
-$brand-primary-dark: #075FB8;
-$brand-accent: #21B6EA;
+// 品牌色 → 中性近白。
+// 命名保留（被 9 处引用），只换取值，避免逐处改名引入回归。
+$brand-primary: #F4F6F7;
+$brand-primary-light: #FFFFFF;
+$brand-primary-dark: #9DA3A8;
+$brand-accent: #C9CED2;
 
-// 背景色
-$bg-main: #03070B;
-$bg-card: #08131E;
-$bg-card-hover: #0D1B2A;
+// 背景色：与 polish.less 的 --ink / --surface-* 对齐（去掉残留冷调）
+$bg-main: #0A0B0C;
+$bg-card: #121315;
+$bg-card-hover: #1A1C1E;
 
 // 文字颜色
-$text-primary: #F4FAFF;
-$text-muted: #9FB3C8;
-$text-inverse: #02070C;
+$text-primary: #F4F6F7;
+$text-muted: #8A9096;
+// 主按钮上的深字：底色现在是近白，用近黑而非带蓝的深墨
+$text-inverse: #0A0B0C;
 
-// 边框颜色
-$border-color: rgba(21, 151, 229, 0.25);
-$border-light: rgba(143, 223, 255, 0.10);
+// 边框颜色：中性发丝线（原值带蓝，导致每个容器都镶一圈冷边）
+$border-color: rgba(255, 255, 255, 0.10);
+$border-light: rgba(255, 255, 255, 0.06);
 
 // 渐变
-$gradient-primary: linear-gradient(135deg, #8FDFFF 0%, #1597E5 52%, #075FB8 100%);
-$gradient-primary-vertical: linear-gradient(180deg, #8FDFFF 0%, #1597E5 52%, #075FB8 100%);
+// 主按钮不再用彩色渐变。近白实底 + 近黑字是最有分量的一种主按钮，
+// 也和首页「立即开始」的处理一致 —— 全站主操作只有一种长相。
+// 保留渐变变量名以兼容现有引用，但让它成为极轻的单色微渐变
+// （顶部略亮，模拟自上而下的单一光源），而不是一道彩色色带。
+$gradient-primary: linear-gradient(180deg, #FFFFFF 0%, #F4F6F7 100%);
+$gradient-primary-vertical: linear-gradient(180deg, #FFFFFF 0%, #F4F6F7 100%);
 
 // 字体大小
 $font-primary: 12px;

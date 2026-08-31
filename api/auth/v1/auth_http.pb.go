@@ -14,6 +14,7 @@ type AuthHTTPServer interface {
 	Login(context.Context, *LoginRequest) (*LoginReply, error)
 	GetProfile(context.Context, *GetProfileRequest) (*GetProfileReply, error)
 	ListInvitees(context.Context, *ListInviteesRequest) (*ListInviteesReply, error)
+	UpdateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileReply, error)
 }
 
 func RegisterAuthHTTPServer(s *http.Server, srv AuthHTTPServer) {
@@ -21,6 +22,7 @@ func RegisterAuthHTTPServer(s *http.Server, srv AuthHTTPServer) {
 	r.GET("/v1/auth/challenge", _Auth_GetChallenge0_HTTP_Handler(srv))
 	r.POST("/v1/auth/login", _Auth_Login0_HTTP_Handler(srv))
 	r.GET("/v1/auth/profile", _Auth_GetProfile0_HTTP_Handler(srv))
+	r.PATCH("/v1/auth/profile", _Auth_UpdateProfile0_HTTP_Handler(srv))
 	r.GET("/v1/auth/invitees", _Auth_ListInvitees0_HTTP_Handler(srv))
 }
 
@@ -93,6 +95,24 @@ func _Auth_ListInvitees0_HTTP_Handler(srv AuthHTTPServer) func(ctx http.Context)
 			return err
 		}
 		return ctx.Result(200, out.(*ListInviteesReply))
+	}
+}
+
+func _Auth_UpdateProfile0_HTTP_Handler(srv AuthHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateProfileRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, "/auth.v1.Auth/UpdateProfile")
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateProfile(ctx, req.(*UpdateProfileRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		return ctx.Result(200, out.(*UpdateProfileReply))
 	}
 }
 

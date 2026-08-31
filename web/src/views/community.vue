@@ -1,97 +1,170 @@
 <template>
   <div class="community-page">
     <Header />
+    <nav class="home-return-bar" :aria-label="$t('common.pageNavigation')">
+      <RouterLink to="/" class="home-return-link" :aria-label="$t('common.backHome')">
+        <span aria-hidden="true">‹</span>
+        {{ $t('common.backHome') }}
+      </RouterLink>
+    </nav>
     <div class="container">
 
-      <div class="my-level">
-        <span class="level-label">{{ $t('community.communityLevel') }}</span>
-        <span class="level-value">{{ levelLabel }}</span>
-      </div>
-      <div class="info-card">
-        <div class="info-box info-box--row">
-          <div class="info-title">{{ $t('community.superiorAddress') }}</div>
-          <div class="info-address">{{ formatAddress(userinfo.inviteUserAddress) || '-' }}</div>
-        </div>
-        <div class="info-box">
-          <div class="info-title">{{ $t('community.myInviteLink') }}</div>
-          <div class="info-link">
-            <span>{{ inviteUrl }}</span>
-            <i class="copy-button" @click="copyToClipboard(inviteUrl)"></i>
+      <!-- 页首：等级是这一页唯一的"身份"信息，让它成为主角。
+           原先是「16px 灰标签 + 20px 青色值」并排，两者体量接近，
+           谁都不突出。现在拉开落差：细排字标签在上，大字号数值在下。 -->
+      <header class="page-head">
+        <p class="aix-label">{{ $t('community.communityLevel') }}</p>
+        <p class="level-value aix-figure">{{ levelLabel }}</p>
+      </header>
+
+      <section class="team-dashboard" aria-labelledby="team-dashboard-title">
+        <div class="team-dashboard-head">
+          <div>
+            <p class="aix-label">{{ $t('community.teamDataCenter') }}</p>
+            <h2 id="team-dashboard-title">{{ $t('community.myTeam') }}</h2>
           </div>
+          <button type="button" class="refresh-btn" :disabled="refreshLocked || teamLoading" @click="refreshTeamPage">{{ $t('community.refresh') }}</button>
+        </div>
+
+        <div class="team-summary team-summary-single">
+          <div><span>{{ $t('community.teamTotalMembers') }}</span><strong>{{ teamTotal }}</strong></div>
+        </div>
+
+        <div class="username-setting">
+          <div class="username-setting-head">
+            <span>{{ $t('community.usernameSetting') }}</span>
+            <button v-if="!editingUsername" type="button" class="username-edit-btn" @click="startUsernameEdit">
+              {{ $t('community.editUsername') }}
+            </button>
+          </div>
+          <strong v-if="!editingUsername" class="username-current">{{ currentUsername }}</strong>
+          <form v-else class="username-form" @submit.prevent="saveUsername">
+            <label class="sr-only" for="team-username">{{ $t('community.username') }}</label>
+            <input
+              id="team-username"
+              v-model="usernameDraft"
+              type="text"
+              maxlength="24"
+              autocomplete="nickname"
+              :placeholder="$t('community.username')"
+              :disabled="savingUsername"
+            />
+            <div class="username-actions">
+              <button type="button" :disabled="savingUsername" @click="cancelUsernameEdit">{{ $t('community.cancelUsername') }}</button>
+              <button type="submit" class="primary" :disabled="savingUsername">{{ $t('community.saveUsername') }}</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="metrics-section" aria-labelledby="team-metrics-title">
+        <div class="section-title-wrap">
+          <div class="title-bar"></div>
+          <h3 id="team-metrics-title" class="section-title">{{ $t('community.teamDataOverview') }}</h3>
+        </div>
+
+        <div class="metric-group">
+          <h4>{{ $t('community.teamScale') }}</h4>
+          <div class="aix-metrics">
+            <div><span class="k">{{ $t('community.directReferralCount') }}</span><span class="v">{{ formatCount(userinfo.recommendNum) }}</span></div>
+            <div><span class="k">{{ $t('community.activeSubscription') }}</span><span class="v">{{ formatNum(teamActiveSubscribe) }}</span></div>
+          </div>
+        </div>
+
+        <div class="metric-group">
+          <h4>{{ $t('community.performanceBreakdown') }}</h4>
+          <div class="aix-metrics">
+            <div><span class="k">{{ $t('community.teamTotalPerformance') }}</span><span class="v">{{ formatNum(userinfo.total) }}</span></div>
+            <div><span class="k">{{ $t('community.regionalPerformance') }}</span><span class="v">{{ formatNum(userinfo.max) }}</span></div>
+            <div><span class="k">{{ $t('community.smallAreaPerformance') }}</span><span class="v">{{ formatNum(userinfo.min) }}</span></div>
+          </div>
+        </div>
+
+        <div class="metric-group">
+          <h4>{{ $t('community.incomeAndRewards') }}</h4>
+          <div class="aix-metrics">
+            <div><span class="k">{{ $t('community.directReferralReward') }}</span><span class="v">{{ formatNum(directReferralReward) }}</span></div>
+            <div><span class="k">{{ $t('community.staticIncomeTotal') }}</span><span class="v">{{ formatNum(userinfo.location) }}</span></div>
+            <div><span class="k">{{ $t('community.managementReward') }}</span><span class="v">{{ formatNum(managementReward) }}</span></div>
+            <div><span class="k">{{ $t('wallet.overflowReward') }}</span><span class="v">{{ formatNum(overflowReward) }}</span></div>
+            <div class="metric-total"><span class="k">{{ $t('community.incomeTotal') }}</span><span class="v">{{ formatNum(incomeTotal) }}</span></div>
+            <div v-if="showZeroAccount"><span class="k">{{ $t('community.zeroAccount') }}</span><span class="v">{{ formatNum(zeroAccountReward) }}</span></div>
+            <div v-if="showCommunitySubsidy"><span class="k">{{ $t('community.communitySubsidy') }}</span><span class="v">{{ formatNum(communitySubsidyReward) }}</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 地址区。原先标题是青色、地址值是普通白色 —— 层级正好倒置：
+           标签被强调，真正的数据反而退后。现在标签用次要色细排字，
+           值用等宽数字并提亮。 -->
+      <div class="addr-block">
+        <p class="aix-label">{{ $t('community.superiorAddress') }}</p>
+        <p class="addr-value aix-mono">{{ formatAddress(userinfo.inviteUserAddress) || '-' }}</p>
+      </div>
+
+      <div class="addr-block">
+        <p class="aix-label">{{ $t('community.myInviteLink') }}</p>
+        <div class="addr-row">
+          <p class="addr-value aix-mono">{{ inviteUrl }}</p>
+          <!-- 原先是一个 <i> 元素用 base64 PNG 做背景图：键盘无法聚焦、
+               读屏软件也不会识别为控件。改为真正的 button + 矢量图标。 -->
+          <button
+            class="copy-btn"
+            type="button"
+            :aria-label="$t('common.copy')"
+            @click="copyToClipboard(inviteUrl)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4" />
+              <path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      <div class="performance-list">
-        <div class="performance-info">
-          <div class="performance-info-item performance-info-item--first">
-            <p>{{ formatNum(userinfo.recommendNum) }}</p> 
-            <p>{{ $t('community.directReferralCount') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.recommendTeamNum) }}</p>
-            <p>{{ $t('community.teamTotalCount') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.buy) }}</p>
-            <p>{{ $t('community.activeSubscription') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.total) }}</p>
-            <p>{{ $t('community.teamTotalPerformance') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.max) }}</p>
-            <p>{{ $t('community.regionalPerformance') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.min) }}</p>
-            <p>{{ $t('community.smallAreaPerformance') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.recommend) }}</p>
-            <p>{{ $t('community.directReferralReward') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.location) }}</p>
-            <p>{{ $t('community.staticIncomeTotal') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(userinfo.team) }}</p>
-            <p>{{ $t('community.managementReward') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(overflowReward) }}</p>
-            <p>{{ $t('wallet.overflowReward') }}</p>
-          </div>
-          <div class="performance-info-item">
-            <p>{{ formatNum(incomeTotal) }}</p>
-            <p>{{ $t('community.incomeTotal') }}</p>
-          </div>
-          <div v-if="showZeroAccount" class="performance-info-item">
-            <p>{{ formatNum(zeroAccountReward) }}</p>
-            <p>{{ $t('community.zeroAccount') }}</p>
-          </div>
-          <div v-if="showCommunitySubsidy" class="performance-info-item">
-            <p>{{ formatNum(communitySubsidyReward) }}</p>
-            <p>{{ $t('community.communitySubsidy') }}</p>
-          </div>
-        </div>
+
+      <div class="section-title-wrap">
+        <div class="title-bar"></div>
+        <h3 class="section-title">{{ $t('community.teamMembers') }}</h3>
       </div>
 
-      <h3 class="list-title">{{ $t('community.downlineRechargeAmount') }}</h3>
-      <div class="table-card downline-table" :class="{ 'is-empty': downlineRechargeList.length === 0 }">
-        <div class="table-header downline-recharge-header">
+      <div v-if="teamLoading" class="team-state">{{ $t('common.loading') }}</div>
+      <div v-else-if="teamMembers.length === 0" class="team-state">{{ $t('community.noTeamMembers') }}</div>
+      <ul v-else class="team-tree">
+        <TeamTreeNode
+          v-for="member in teamMembers"
+          :key="member.address"
+          :node="member"
+          :load-children="loadChildren"
+          :team-count-label="$t('community.teamTotalMembers')"
+          :direct-count-label="$t('community.directMembers')"
+          :personal-performance-label="$t('community.personalPerformance')"
+          :team-performance-label="$t('community.teamPerformance')"
+          :copy-label="$t('common.copy')"
+          :username-placeholder="$t('community.username')"
+          :not-set-label="$t('community.notSet')"
+          :loading-label="$t('common.loading')"
+          :empty-label="$t('community.noTeamMembers')"
+          @copy="copyToClipboard"
+        />
+      </ul>
+
+      <div class="section-title-wrap">
+        <div class="title-bar"></div>
+        <h3 class="section-title">{{ $t('community.directInviteData') }}</h3>
+      </div>
+
+      <div class="ledger">
+        <div class="ledger-head">
           <span>{{ $t('community.walletAddress') }}</span>
-          <span>{{ $t('community.rechargeType') }}</span>
-          <span>{{ $t('community.rechargeAmount') }}</span>
-          <span>{{ $t('community.time') }}</span>
+          <span class="num">{{ $t('community.usdtAmount') }}</span>
+          <span class="time">{{ $t('community.time') }}</span>
         </div>
-        <div v-if="downlineRechargeList.length > 0" class="downline-recharge-list">
-          <div class="downline-recharge-item" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
-            <span class="col-address">{{ formatAddr(item.address) }}</span>
-            <span class="col-type">{{ item.type || item.asset || 'USDT' }}</span>
-            <span class="col-amount">{{ formatNum(item.amount) }}</span>
-            <span class="col-time">{{ item.createdAt }}</span>
+        <template v-if="downlineRechargeList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
+            <span class="aix-mono">{{ formatAddr(item.address) }}</span>
+            <span class="num">{{ formatNum(item.amount) }}</span>
+            <span class="time">{{ item.createdAt }}</span>
           </div>
           <Pagination
             v-model="downlinePage"
@@ -99,39 +172,10 @@
             mode="simple"
             @change="getDownlineRecharges"
           />
-        </div>
-        <div v-else class="empty-state">
-          <p>{{ $t('common.noData') }}</p>
-        </div>
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
       </div>
 
-      <h3 class="list-title">{{ $t('community.generationRewardRecord') }}</h3>
-
-      <div class="table-card" :class="{ 'is-empty': rewardList.length === 0 }">
-        <div class="table-header">
-          <span>{{ $t('community.amount') }}</span>
-          <span>{{ $t('community.source') }}</span>
-          <span>{{ $t('community.time') }}</span>
-        </div>
-        <div class="income-list" v-if="rewardList.length > 0">
-          <div class="income-list-item" v-for="(item, index) in rewardList" :key="index">
-            <div class="income-list-item-info">
-              <p>{{ item.reward }} U<span v-if="item.num"> · {{ $t('community.generationNum', { num: item.num }) }}</span></p>
-              <p>{{ item.createdAt }}</p>
-            </div>
-            <div class="income-list-item-money">{{ formatAddr(item.address) }}</div>
-          </div>
-          <Pagination
-            v-model="page"
-            :page-count="allPageCount"
-            mode="simple"
-            @change="getRewardList"
-          />
-        </div>
-        <div class="empty-state" v-else>
-          <p>{{ $t('common.noData') }}</p>
-        </div>
-      </div>
 
       <div class="safe-bottom"></div>
     </div>
@@ -140,8 +184,9 @@
 
 <script setup lang="ts">
 import Header from '@/components/Header.vue'
+import TeamTreeNode from '@/components/TeamTreeNode.vue'
 import userPerson from '@/pinia/person'
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { showToast } from 'vant'
 import copy from 'copy-to-clipboard'
 import request from '@/tools/request'
@@ -150,37 +195,99 @@ import { useI18n } from 'vue-i18n'
 
 const person = userPerson()
 const { t: $t } = useI18n()
-const userinfo = computed(() => person.userinfo)
-const address = computed(() => person.address)
+const userinfo = computed<Record<string, any>>(() => person.userinfo)
+let teamMembers = $ref<any[]>([])
+let teamLoading = $ref(false)
+let refreshLocked = $ref(false)
+let editingUsername = $ref(false)
+let savingUsername = $ref(false)
+let usernameDraft = $ref('')
+const REFRESH_COOLDOWN_MS = 2000
+let refreshCooldownTimer: ReturnType<typeof setTimeout> | null = null
+
+const firstValue = (...values: any[]) => values.find((value) => value !== undefined && value !== null && value !== '')
+const teamTotal = computed(() => formatCount(firstValue(
+  userinfo.value?.recommendTeamNum,
+  userinfo.value?.teamTotalMembers, userinfo.value?.team_total_members,
+  userinfo.value?.teamNum, userinfo.value?.team_num, userinfo.value?.countLow,
+  teamMembers.length,
+)))
+const teamActiveSubscribe = computed(() => firstValue(
+  userinfo.value?.teamActiveSubscribe,
+  userinfo.value?.team_active_subscribe_principal,
+  0,
+))
+const savedUsername = computed(() => String(firstValue(
+  person.profile?.username, person.profile?.userName, person.profile?.nickname,
+  userinfo.value?.username, userinfo.value?.userName, userinfo.value?.nickname,
+) || '').trim())
+const currentUsername = computed(() => savedUsername.value || $t('community.username'))
+
+const startUsernameEdit = () => {
+  usernameDraft = savedUsername.value
+  editingUsername = true
+}
+const cancelUsernameEdit = () => {
+  usernameDraft = ''
+  editingUsername = false
+}
+const saveUsername = async () => {
+  const username = usernameDraft.trim()
+  if (!username) {
+    showToast($t('community.usernameRequired'))
+    return
+  }
+  if ([...username].length > 24) {
+    showToast($t('community.usernameTooLong'))
+    return
+  }
+  savingUsername = true
+  try {
+    const res: any = await request.patch('/v1/auth/profile', { username })
+    const saved = String(res?.username || username).trim()
+    if (person.profile) person.profile = { ...person.profile, username: saved }
+    if (person.userinfo) person.userinfo = { ...person.userinfo, username: saved }
+    await Promise.allSettled([person.refreshProfile?.(), person.getUser?.()])
+    await loadTeamMembers()
+    editingUsername = false
+    usernameDraft = ''
+    showToast($t('community.usernameSaved'))
+  } finally {
+    savingUsername = false
+  }
+}
+
+const managementReward = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return u.team ?? u.mgmt_reward_total ?? p.mgmt_reward_total ?? p.mgmtRewardTotal ?? 0
+})
+const directReferralReward = computed(() => {
+  const u = userinfo.value || {}
+  const p = person.profile || {}
+  return u.recommend ?? u.direct_reward_total ?? p.direct_reward_total ?? p.directRewardTotal ?? 0
+})
 const overflowReward = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
   return u.overflowReward ?? u.overflow_reward ?? p.overflow_reward ?? p.overflowReward ?? p.pending_mgmt_reward ?? 0
 })
-const incomeTotal = computed(() => {
-  const u = userinfo.value || {}
-  // 累计收益 = 静态收益 + 直推奖励 + 管理奖
-  return u.all ?? 0
-})
-
+const incomeTotal = computed(() => userinfo.value?.all ?? 0)
 const showZeroAccount = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
   return !!(u.is_zero_account ?? u.isZeroAccount ?? p.is_zero_account ?? p.isZeroAccount)
 })
-
 const showCommunitySubsidy = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
   return !!(u.is_community_subsidy ?? u.isCommunitySubsidy ?? p.is_community_subsidy ?? p.isCommunitySubsidy)
 })
-
 const zeroAccountReward = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
   return u.zero_account_reward_total ?? u.zeroAccountRewardTotal ?? p.zero_account_reward_total ?? p.zeroAccountRewardTotal ?? 0
 })
-
 const communitySubsidyReward = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
@@ -208,11 +315,6 @@ const levelLabel = computed(() => {
   return `A${lv}`
 })
 
-let rewardList = $ref<any[]>([])
-let page = $ref(1)
-let allPageCount = $ref(1)
-let active = $ref('3') // reqType=3 代数奖励
-
 let downlineRechargeList = $ref<any[]>([])
 let downlinePage = $ref(1)
 let downlinePageCount = $ref(1)
@@ -228,6 +330,57 @@ const formatAddress = (value: string) => {
 const formatAddr = (value: string) => formatAddress(value) || '-'
 
 const formatNum = (value: any) => Number(value || 0).toFixed(2)
+const formatCount = (value: any) => Math.max(0, Number(value || 0)).toLocaleString()
+
+const normalizeMember = (item: any) => {
+  const directCount = firstValue(item.directCount, item.direct_count, item.recommendNum, item.recommend_num, item.countLow, 0)
+  return {
+    ...item,
+    username: firstValue(item.username, item.userName, item.nickname, item.name),
+    address: firstValue(item.address, item.walletAddress, item.wallet_address),
+    teamCount: firstValue(item.teamCount, item.team_count, item.team_downline_count, item.teamDownlineCount, item.teamNum, item.team_num, item.communityCount, item.community_count, 0),
+    directCount,
+    personalPerformance: firstValue(item.personalPerformance, item.personal_performance, item.personal_stake, item.personalStake, item.performance, 0),
+    teamPerformance: firstValue(item.teamPerformance, item.team_performance, item.team_stake, item.teamTotalPerformance, item.team_total_performance, item.teamTotal, item.team_total, 0),
+    hasChildren: item.hasChildren != null ? !!item.hasChildren : Number(directCount) > 0,
+    children: item.children,
+    childrenLoaded: Array.isArray(item.children),
+  }
+}
+
+const fetchDirectMembers = async (address: string) => {
+  const res: any = await request.get('app_server/recommend_list', {
+    params: { address },
+  })
+  return (res.recommends || res.list || []).map(normalizeMember)
+}
+
+const loadChildren = async (node: any) => {
+  if (!node.address || node.childrenLoaded) return
+  try {
+    node.children = await fetchDirectMembers(node.address)
+  } catch {
+    node.children = []
+  } finally {
+    node.childrenLoaded = true
+  }
+}
+
+const loadTeamMembers = async () => {
+  const address = person.address
+  if (!address) {
+    teamMembers = []
+    return
+  }
+  teamLoading = true
+  try {
+    teamMembers = await fetchDirectMembers(address)
+  } catch {
+    teamMembers = []
+  } finally {
+    teamLoading = false
+  }
+}
 
 const copyToClipboard = (text: string) => {
   copy(text)
@@ -242,366 +395,331 @@ const getDownlineRecharges = async (pageNum: number = 1) => {
   downlineRechargeList = res.list || []
 }
 
-const getRewardList = async (pageNum: number = 1) => {
-  const res: any = await request.get("app_server/reward_list", {
-    params: {
-      page: pageNum,
-      reqType: active
-    }
-  })
-
-  allPageCount = Math.ceil((res.count || 0) / 10) || 1
-  rewardList = res.list || []
+const refreshTeamPage = async () => {
+  if (refreshLocked) return
+  refreshLocked = true
+  try {
+    await Promise.allSettled([person.getUser?.(), person.refreshProfile?.()])
+    await Promise.allSettled([getDownlineRecharges(downlinePage), loadTeamMembers()])
+  } finally {
+    refreshCooldownTimer = setTimeout(() => {
+      refreshLocked = false
+      refreshCooldownTimer = null
+    }, REFRESH_COOLDOWN_MS)
+  }
 }
 
 onMounted(() => {
-  person.getUser?.()
-  person.refreshProfile?.()
-  getRewardList()
-  getDownlineRecharges()
+  refreshTeamPage()
+})
+onBeforeUnmount(() => {
+  if (refreshCooldownTimer) clearTimeout(refreshCooldownTimer)
 })
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
+/* 说明：原先这里有一整块 .stats-grid 样式（约 30 行），但模板里
+   从来没有任何元素用过这个类 —— 已随本次重写删除。
+   .info-card / .performance-list / .table-card 等旧类名同样一并移除，
+   数据网格与表格改用 polish.less 里的共享原语。 */
 
 .community-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #0648df;
+  --accent-dim: rgba(0, 82, 255, 0.1);
   min-height: 100vh;
   padding-top: 64px;
 }
 
 .container {
-  padding: 0 15px;
+  /* 不���设 max-width：polish.less 把 body > #app 限死在 414px，
+     这里写 760px 永远不会生效。 */
+  padding: 0 20px;
 }
 
-.my-level {
-  margin-top: 10px;
-  color: $brand-primary;
-  font-size: 18px;
+.team-dashboard {
+  padding: 22px 0 24px;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.team-dashboard-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-
-  .level-label {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 16px;
-    font-weight: 400;
-  }
-
-  .level-value {
-    color: $brand-primary;
-    font-size: 20px;
-    font-weight: 600;
-  }
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.info-card {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
+.team-dashboard-head h2 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 24px;
 }
 
-.info-box {
-  width: 100%;
-  min-height: 80px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  padding: 15px 15px 20px 15px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-
-  &--row {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 56px;
-    padding: 15px;
-
-    .info-title {
-      flex-shrink: 0;
-    }
-
-    .info-address {
-      flex: 1;
-      text-align: right;
-      word-break: break-all;
-    }
-  }
-
-  .info-title {
-    color: $brand-primary;
-    font-size: 16px;
-  }
-
-  .info-address {
-    word-break: break-all;
-    color: $text-primary;
-    font-size: 14px;
-  }
-
-  .info-link {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-
-    span {
-      word-break: break-all;
-      color: $text-primary;
-      font-size: 14px;
-    }
-
-    .copy-button {
-      flex-shrink: 0;
-      width: 32px;
-      height: 32px;
-      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC6UlEQVR4AexXTWgTQRR+M7tbYpvQWlLw0EMOCh4VLJpGIUcPHhSTEEWQoIWIesjfPVdr2ngpVSz0UolNCz2IUPBgwGztQdCD4MGD3lQaMNJAI4k7vllYTLK7ye5mBQ8O82bn571vvryZeTOh0Ce9zIfF9UIoWV4IfUBhDmVvoxBaLs/PHDGaypQAn3zP194iBJbR8DiK0+xnBJIgjLzeLAR1OKYEvo217gCwC05nNbALKCC8WLt3erpzzJQAJXC9U9GVOmHTI4JQ7MQyJRDLyidjGZk4FQUgSABWOidT64RESouhU2odC1MCODZUjmfk3WhGniMUrvUCiQA3tD6VQHkp7F1fCD3GXX6A4nS3a3b75cLshrbW0ZT8BD2xpk3Iv4yx8/zLha7mwx742XqGSjexw4MybPYCunlEFF9pJH4BLHWDkgA/ZbyPHhprJYFBGNxPAUmQ7nPYg0npHf7ANq9rUh8HL69TSv+sB+9wUwhhEe7hRKLSBCANMEh8D6hMDMbc6BInxqHvsnICbkzkGOM/ASMPbLeZNGU3AoJH8hEGD+2uhY6AorDc1WylZhcodrvS8Deku2iHOx5Li5n26lEGGCl7e621P4N9W6qDFkmxvBg8ulUMT9gR/uAY9bZXEa/vscPxrqwnwKMiox9bSuu7HcEHxxcMPPEudAsNPQELRm6q/JsE+MVBCKnbEoCuy8aql4w8sC1SaSqarh62I41JyUcAHoDNpCNAmZK6lKrUbeJAAm88/76UQ7vh4gBQ6vh2dCUOKAyK5fnZE3ZiANctFc8ERn3tEnrAShz4qnlZtwQIcBYE8tZODOC6giJ8IsAuov2g3BQo488/Vc+IgDrgfsFq+FbcxP8b5y6ndp5r+NiGmtb4G9/6D1A3JT7Rj8XS1WgkLb/pnIfig/RRZ4fL9d1Enr8HzVFpNCuvEEaemqs4Hmng1T43yFrdA9Fs9QpjcAuV8SRhOVxu8rVuM2Umntt5PwjqNwAAAP//ec0etAAAAAZJREFUAwA1x8ykU4MciwAAAABJRU5ErkJggg==') no-repeat;
-      background-size: 20px 20px;
-      cursor: pointer;
-      transition: opacity 0.3s ease;
-
-      &:hover {
-        opacity: 0.8;
-      }
-    }
-  }
+.refresh-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
 }
 
-.stats-grid {
+.team-summary {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  margin-top: 15px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+  border: 1px solid var(--hair);
+}
 
-  .stats-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 0;
-    border: 1px solid rgba(21, 151, 229, 0.25);
-    border-radius: 6px;
-    background: rgba(8, 19, 30, 0.4);
-    backdrop-filter: blur(6px);
+.team-summary > div {
+  min-width: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--hair);
+}
+.team-summary > div:last-child { border-right: 0; }
+.team-summary-single { grid-template-columns: 1fr; }
+.team-summary-single > div { border-right: 0; }
+.team-summary span { display: block; min-height: 28px; font-size: 10px; color: var(--text-3); }
+.team-summary strong { display: block; margin-top: 8px; color: var(--text); font-size: 18px; overflow-wrap: anywhere; }
 
-    &.relative {
-      position: relative;
-    }
+.refresh-btn:disabled { opacity: .55; cursor: wait; }
 
-    .stats-num {
-      font-size: 18px;
-      font-weight: bold;
-      color: $brand-primary;
-    }
+.username-setting {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hair);
+}
+.username-setting-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.username-edit-btn,
+.username-actions button {
+  padding: 7px 11px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.username-edit-btn { color: var(--accent); }
+.username-current {
+  display: block;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.username-form { display: grid; gap: 10px; margin-top: 10px; }
+.username-form input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  outline: none;
+  background: rgba(255,255,255,.025);
+  color: var(--text);
+  font-size: 14px;
+}
+.username-form input:focus { border-color: var(--accent); }
+.username-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.username-actions .primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.username-actions button:disabled { opacity: .55; cursor: wait; }
 
-    .stats-label {
-      margin-top: 7px;
-      font-size: 13px;
-      color: #fff;
-      text-align: center;
-    }
+.team-state { padding: 30px 0; text-align: center; color: var(--text-3); }
+.team-tree { display: grid; gap: 9px; margin: 0; padding: 0; }
+
+.metrics-section { padding-bottom: 8px; }
+.metric-group { margin-top: 18px; }
+.metric-group h4 {
+  margin: 0 0 9px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+}
+.metric-group .aix-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+}
+.metric-group .aix-metrics > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.metric-group .metric-total {
+  background: var(--accent-dim);
+}
+.metric-group .metric-total .k { color: var(--accent); }
+.metric-group .metric-total .v { color: var(--accent-bright); }
+
+/* 页首 */
+.page-head {
+  padding: 26px 0 22px;
+}
+
+/* ���观来自 .aix-figure 原语（见 polish.less 第 10a-2 节），
+   这里只留本页的外边距。 */
+.level-value {
+  margin: 10px 0 0;
+  color: var(--accent);
+  }
+
+/* 地址块。不做成卡片 —— 一条发丝线分隔就够，
+   页面因此从"一叠方框"变回"一份文档"。 */
+.addr-block {
+  padding: 16px 0;
+  border-top: 1px solid var(--hair);
+}
+
+.addr-value {
+  margin: 7px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.addr-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+
+  .addr-value {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
-.list-title {
-  margin: 30px 0 0 0;
-  font-size: 15px;
-  color: $text-muted;
-  text-align: center;
-  font-weight: normal;
-}
+.copy-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 
-.table-card {
-  margin-top: 15px;
-  min-height: 300px;
-  overflow: hidden;
-  border: 1px solid $border-color;
-  border-radius: 11px;
-  background: rgba(8, 19, 30, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 11px 0;
-
-  &.is-empty {
-    min-height: 0;
-
-    .empty-state {
-      height: 80px;
-    }
+  svg {
+    width: 16px;
+    height: 16px;
   }
 
-  .table-header {
-    display: flex;
-    align-items: center;
-    background: #030A11;
-    padding: 8px 0;
-    margin: -11px 0 0;
+  &:hover {
+    color: var(--accent-bright);
+    border-color: var(--accent-deep);
+  }
 
-    span {
-      flex: 1;
-      text-align: center;
+  /* 键盘可见的聚焦环 —— 原来的 <i> 元素根本无法聚焦。 */
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* 账目表。三列网格，表头与表体共用同一套列宽定义，
+   这样列标题永远对得上下面的值。 */
+.ledger {
+  margin-top: 2px;
+}
+
+.ledger-head,
+.ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.ledger-head {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+
+  span {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+}
+
+.ledger-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px;
+  color: var(--text-2);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+
+  .num {
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+
+    /* 代数标记跟在金额后面，作为附注而不是另起一行。 */
+    em {
+      display: block;
+      margin-top: 3px;
       font-size: 10px;
-      color: $text-muted;
+      font-style: normal;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      color: var(--text-3);
+    }
+
+    &.accent {
+      color: var(--accent-bright);
     }
   }
 
-  .income-list {
-    padding: 10px;
-
-    .income-list-item {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border-bottom: 1px solid $border-light;
-      display: flex;
-      align-items: center;
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .income-list-item-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-
-        p {
-          color: $text-muted;
-          font-size: 12px;
-
-          &:last-child {
-            color: $text-muted;
-            font-size: 10px;
-          }
-        }
-      }
-
-      .income-list-item-money {
-        flex-shrink: 0;
-        width: 80px;
-        text-align: right;
-        color: $brand-primary;
-        font-size: 14px;
-        font-weight: 500;
-      }
-    }
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 250px;
-
-    p {
-      margin-top: 8px;
-      font-size: 12px;
-      color: $text-muted;
-    }
+  .time {
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--text-3);
   }
 }
 
- .performance-list {
-    margin-top: 20px;
-    min-height: 200px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 18px;
-    padding: 16px;
-    box-sizing: border-box;
-    margin-bottom: 0;
-    border: 1px solid rgba(21, 151, 229, 0.2);
+.ledger-head .num,
+.ledger-head .time,
+.ledger-row .num,
+.ledger-row .time {
+  text-align: right;
+}
 
-    .performance-info {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 0;
+/* 首列永远左对齐、末列永远右对齐 —— 两端与容器边缘齐平。
+   否则当数值列恰好排在第一位时（代数奖励表的"数量"列），
+   右对齐会在左边留下一道很空的沟。 */
+.ledger-head > :first-child,
+.ledger-row > :first-child {
+  text-align: left;
+}
 
-      .performance-info-item {
-        min-height: 60px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 10px 4px;
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        box-sizing: border-box;
-
-        p {
-          color: #fff;
-          margin: 0;
-          text-align: center;
-
-          &:first-child {
-            font-size: 12px;
-            font-weight: 600;
-            color: $brand-primary;
-            word-break: break-all;
-          }
-
-          &:last-child {
-            font-size: 12px;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.9);
-          }
-        }
-
-        &--first p:first-child {
-          font-size: 14px;
-        }
-      }
-    }
-  }
-
-.downline-table {
-  .downline-recharge-header,
-  .downline-recharge-item {
-    display: grid;
-    grid-template-columns: 1.2fr 0.7fr 1fr 0.95fr;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .downline-recharge-header span {
-    flex: none;
-  }
-
-  .downline-recharge-list {
-    padding: 10px;
-  }
-
-  .downline-recharge-item {
-    padding: 10px;
-    font-size: 12px;
-    color: $text-muted;
-    border-bottom: 1px solid $border-light;
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .col-amount {
-      color: $brand-primary;
-      font-weight: 500;
-      text-align: center;
-    }
-
-    .col-address,
-    .col-type,
-    .col-time {
-      text-align: center;
-    }
-  }
+.empty-state {
+  margin: 0;
+  padding: 54px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
 }
 
 .safe-bottom {
-  height: 50px;
+  height: 56px;
 }
 </style>

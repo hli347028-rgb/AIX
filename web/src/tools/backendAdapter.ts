@@ -139,6 +139,11 @@ function calcOrderDailyRelease(o: any, _withdrawReset = false) {
   return Math.min(want, remaining)
 }
 
+function isActiveOrder(o: any): boolean {
+  const status = String(o?.status || '').toLowerCase()
+  return status === 'active' || status === '1'
+}
+
 function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
   let exitTotal = 0
   let releasedTotal = 0
@@ -153,8 +158,8 @@ function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
     if (exitTarget <= 0) exitTarget = principal * mul
     exitTotal += exitTarget
     releasedTotal += released
-    // 追缴作废的订单不再释放，剩余额度不计入出局剩余（与后端 SummarizeOrders 一致）
-    if (o.status !== 'cancelled') {
+    // 追缴作废的订单不会再释放，不能继续计入未出局余额。
+    if (String(o.status || '').toLowerCase() !== 'cancelled') {
       unexitedTotal += Math.max(0, exitTarget - released)
     }
     dailyReleaseTotal += calcOrderDailyRelease(o, withdrawReset)
@@ -179,7 +184,7 @@ async function fetchUserInfo() {
     const [profileRes, balanceRes, ordersRes] = await Promise.all([
       authGet('/v1/auth/profile'),
       authGet('/v1/wallet/balance'),
-      authGet('/v1/wallet/orders'),
+      authGet('/v1/wallet/subscribe-orders'),
     ])
     let aixProfile: any = {}
     try {
@@ -213,7 +218,17 @@ async function fetchUserInfo() {
     const orderList = apiBody(ordersRes).orders || []
     const orderStats = sumOrderReleaseStats(orderList)
 
-    const buyTotal = orderList.reduce((sum: number, o: any) => sum + numOrZero(o.total_amount), 0)
+    const activeOrders = orderList.filter(isActiveOrder)
+    const activeSubscribeCount = activeOrders.length
+    const activeSubscribePrincipal = activeOrders.reduce(
+      (sum: number, o: any) => sum + numOrZero(o.total_amount),
+      0,
+    )
+    const teamActiveSubscribe = firstText(
+      aixProfile.team_active_subscribe_principal,
+      aixProfile.teamActiveSubscribePrincipal,
+      '0',
+    ) // 伞下所有未出局认购订单本金合计
     const inviteeCount = Number(p.invitee_count || 0)
     const totalDownline = Number(p.total_downline_count || 0)
 
@@ -261,7 +276,12 @@ async function fetchUserInfo() {
       aixProfile.pendingMgmtReward,
     )
     const mgmtRewardAmt = firstAmount(aixProfile.mgmt_reward_total, aixProfile.mgmtRewardTotal)
-    const directRewardAmt = referralLoaded ? directProfit : numOrZero(p.share_profit_total)
+    const directRewardAmt = firstAmount(
+      aixProfile.direct_reward_total,
+      aixProfile.directRewardTotal,
+      referralLoaded ? directProfit : undefined,
+      p.share_profit_total,
+    )
     // 静态收益 = 管理端「静态总收益」同一字段 users.static_usdt_total（日结金本位累计）
     const staticIncomeStr = firstText(
       aixProfile.static_usdt_total,
@@ -286,7 +306,7 @@ async function fetchUserInfo() {
       })(),
       locationNum: String(inviteeCount),
       communityStake: p.community_stake || '0',
-      // 总业绩=伞下；小区=community_stake；大区=总-小区；等级按小区
+      // 总业绩=伞下；小区=community_stake；大区=总-小区；等级须大区+小区同时达标
       total: p.team_stake || '0',
       max: String(Math.max(0, numOrZero(p.team_stake) - numOrZero(p.community_stake))),
       min: p.community_stake || '0',
@@ -295,7 +315,10 @@ async function fetchUserInfo() {
       recommendNum: inviteeCount,
       recommendTeamNum: totalDownline,
       LocationList: p.address ? [{ address: p.address }] : [],
-      buy: buyTotal.toFixed(2),
+      buy: String(activeSubscribeCount),
+      activeSubscribePrincipal: activeSubscribePrincipal.toFixed(2),
+      teamActiveSubscribe,
+      team_active_subscribe_principal: teamActiveSubscribe,
       // 可实际划入钱包的释放余额池（提现操作以此为准）
       amountGetSub: String(poolBalance),
       // 我的资产：已产量 = 所有订单已释放金额合计
@@ -327,6 +350,7 @@ async function fetchUserInfo() {
       staticIncomeTotal: String(staticIncomeStr),
       recommend: String(directRewardAmt),
       recommendTwo: '0.00',
+      direct_reward_total: String(directRewardAmt),
       // 管理奖 = 该用户全部管理奖总和
       team: String(mgmtRewardAmt),
       // 溢出奖励 = 直推溢出 + 管理奖溢出（均因出局帽发不下而暂存，下次认购再释放）
@@ -449,10 +473,13 @@ function paginateList(list: any[], pageRaw: any, pageSize = 10) {
 
 function mapOrders(list: any[]) {
   return (list || []).map((item) => {
-    const createdAt = formatUnixTime(item.created_at)
-    const total = numOrZero(item.total_amount)
-    const released = numOrZero(item.released_amount)
-    let exitTarget = numOrZero(item.exit_target)
+    const createdAt = formatUnixTime(item.created_at ?? item.createdAt)
+    const totalRaw = item.total_amount ?? item.principal ?? item.amount ?? '0'
+    const releasedRaw = item.released_amount ?? item.earned_total ?? '0'
+    const exitTargetRaw = item.exit_target ?? item.exit_cap
+    const total = numOrZero(totalRaw)
+    const released = numOrZero(releasedRaw)
+    let exitTarget = numOrZero(exitTargetRaw)
     const mul = numOrZero(item.exit_multiplier) || 1
     if (exitTarget <= 0) {
       exitTarget = total * mul
@@ -462,18 +489,18 @@ function mapOrders(list: any[]) {
     // 认购订单记录：对接首页「认购记录」展示字段
     return {
       id: item.id,
-      amount: String(item.total_amount ?? '0'),
-      amountGet: String(item.released_amount ?? '0'), // 已释放（订单累计释放进度）
+      amount: String(totalRaw),
+      amountGet: String(releasedRaw), // 已释放（订单累计释放进度）
       amountLast: String(Number(pending.toFixed(8))), // 待释放（出局目标 - 已释放）
       product_name: name,
       four: name, // 名称
       three: '-', // 收货人（链上认购无收货信息）
       one: '-', // 收货地址
-      released_amount: item.released_amount,
-      exit_target: item.exit_target,
+      released_amount: String(releasedRaw),
+      exit_target: String(exitTargetRaw ?? exitTarget),
       exit_multiplier: item.exit_multiplier,
       // 状态：1=收益中 2=已出局；倍率位前端复用 status，同步给出倍数文案字段
-      status: item.status === 'completed' ? '2' : '1',
+      status: String(item.status || '').toLowerCase() === 'completed' ? '2' : '1',
       rate: String(item.exit_multiplier || mul),
       release_day: item.release_day,
       created_at: createdAt,
@@ -537,7 +564,7 @@ function unwrapEntity(body: any) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body || {}
   const nested = body.data
   if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-    if (body.address == null && body.overflow_reward == null && body.mgmt_reward_total == null) {
+    if (body.address == null && body.overflow_reward == null && body.mgmt_reward_total == null && body.direct_reward_total == null) {
       return nested
     }
   }
@@ -714,9 +741,7 @@ function activeSubscribeCountOnDate(orders: any[], settlementDate: string): numb
     let createdMs = numOrZero(o.created_at)
     if (createdMs > 0 && createdMs < 1e12) createdMs *= 1000
     if (createdMs > dayEnd) return false
-    const status = String(o.status || '').toLowerCase()
-    if (status === 'completed' || status === '2') return false
-    return true
+    return isActiveOrder(o)
   }).length
 }
 
@@ -779,10 +804,17 @@ function mapInvitees(items: any[]) {
     const levelLabel =
       level && level !== '0' && Number.isFinite(n) && n > 0 ? `A${Math.min(n, 10)}` : 'A0'
     return {
+      ...item,
       address: item.address,
       amount: exitAmount.toFixed(4),
+      exitAmount: exitAmount.toFixed(4),
       level: levelLabel,
       countLow: item.direct_count || 0,
+      directCount: item.direct_count || 0,
+      teamCount: item.team_downline_count ?? item.teamDownlineCount ?? 0,
+      personalPerformance: String(item.personal_stake ?? item.personalStake ?? '0'),
+      teamPerformance: String(item.team_stake || '0'),
+      hasChildren: Number(item.direct_count || 0) > 0,
     }
   })
 }
@@ -827,11 +859,18 @@ export async function adaptRequest(
       return { count: list.length, list }
     }
     case 'app_server/withdraw': {
-      return { status: 'error', message: 'WIN 提现已关闭' }
+      const profile = await authGet('/v1/auth/profile')
+      const toAddress = data?.to_address || data?.address || profile.data?.address || ''
+      const res = await authPost('/v1/wallet/withdraw-win', {
+        amount: String(data?.amount || ''),
+        to_address: toAddress,
+      })
+      return { status: 'ok', ...res.data }
     }
     case 'app_server/deposit_list': {
       const res = await authGet('/v1/wallet/recharges')
-      const list = mapRecharges(res.data?.recharges || [])
+      const body = apiBody(res)
+      const list = mapRecharges(body.recharges || body.data?.recharges || [])
       return paginateList(list, mergedParams.page)
     }
     case 'app_server/deposit': {
@@ -861,9 +900,10 @@ export async function adaptRequest(
     case 'app_server/order_two_list':
     case 'app_server/order_three_list':
     case 'app_server/order_four_list': {
-      const res = await authGet('/v1/wallet/orders')
-      const list = mapOrders(res.data?.orders || [])
-      return { count: list.length, list }
+      const res = await authGet('/v1/wallet/subscribe-orders')
+      const body = apiBody(res)
+      const list = mapOrders(body.orders || body.data?.orders || [])
+      return paginateList(list, mergedParams.page)
     }
     case 'app_server/reward_list': {
       // 兼容 $ref / 数字 / 字符串
@@ -879,7 +919,7 @@ export async function adaptRequest(
 
       // 1=认购 | 2=静态 | 3/4=直推(1代) | 5=团队(≥2代) | 6=平级 | 7=社区合计 | team=按日汇总 | 11=领取
       if (reqType === '1') {
-        const res = await authGet('/v1/wallet/orders')
+        const res = await authGet('/v1/wallet/subscribe-orders')
         records = mapBuyRecords(apiBody(res).orders || [])
       } else if (reqType === '2') {
         const res = await authGet('/v1/wallet/releases')
@@ -920,7 +960,7 @@ export async function adaptRequest(
         const [releases, referrals, orders] = await Promise.all([
           authGet('/v1/wallet/releases'),
           authGet('/v1/wallet/referral-rewards'),
-          authGet('/v1/wallet/orders'),
+          authGet('/v1/wallet/subscribe-orders'),
         ])
         records = mapTeamRewardRecords(
           apiBody(releases).records || [],
@@ -1011,7 +1051,8 @@ export async function adaptRequest(
     }
     case 'app_server/deposit_win_list': {
       const res = await authGet('/v1/wallet/recharges-win')
-      const list = mapRecharges(res.data?.recharges || [])
+      const body = apiBody(res)
+      const list = mapRecharges(body.recharges || body.data?.recharges || [])
       const pageData = paginateList(list, mergedParams.page)
       return { status: 'ok', ...pageData }
     }

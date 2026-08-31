@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.pnpm-store
 .history
 dist
 www
@@ -31,4 +32,7 @@ bundle/
 # local env (do not commit)
 .env
 .env.local
-.env.prod
+# 例外：预览需要 .env.prod 才能拿到链 ID / 合约地址。被忽略的话文件不受版本管理，
+# 同步后会丢失，导致注入钱包关闭、首屏永远停在加载圈。
+# 里面只有公开的合约地址和公共 RPC，没有任何密钥，因此纳入版本管理。
+!.env.prod

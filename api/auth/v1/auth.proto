@@ -37,6 +37,14 @@ service Auth {
       get: "/v1/auth/invitees"
     };
   }
+
+  // 更新当前用户展示名（我的团队-名称设置）
+  rpc UpdateProfile (UpdateProfileRequest) returns (UpdateProfileReply) {
+    option (google.api.http) = {
+      patch: "/v1/auth/profile"
+      body: "*"
+    };
+  }
 }
 
 message GetChallengeRequest {
@@ -79,6 +87,7 @@ message GetProfileReply {
   string team_stake = 9;
   string share_profit_total = 10;
   string eco_reward_total = 11;
+  string username = 12;
 }
 
 message DownlineInvitee {
@@ -103,8 +112,22 @@ message InviteeNode {
   string exit_amount = 5;
   // 社区等级 V1-V9
   string community_level = 6;
+  string username = 7;
+  // 个人业绩：本人累计认购本金（active+exited，只增不减）
+  string personal_stake = 8;
+  // 团队总人数：该成员伞下全部下级人数
+  int32 team_downline_count = 9;
 }
 
 message ListInviteesReply {
   repeated InviteeNode invitees = 1;
+}
+
+message UpdateProfileRequest {
+  string token = 1;
+  string username = 2;
+}
+
+message UpdateProfileReply {
+  string username = 1;
 }

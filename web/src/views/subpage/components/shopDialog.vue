@@ -116,8 +116,8 @@ defineExpose({
   }
   .withdraw-btn {
     width: 160px;
-    background-color: #1597E5;
-    color: #08131E;
+    background-color: var(--accent);
+    color: var(--surface-1);
     font-weight: 500;
   }
 }

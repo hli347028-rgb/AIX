@@ -3,6 +3,13 @@
     <Header />
 
     <div class="content">
+      <nav class="home-return-bar" :aria-label="$t('common.pageNavigation')">
+        <RouterLink to="/" class="home-return-link" :aria-label="$t('common.backHome')">
+          <span aria-hidden="true">‹</span>
+          {{ $t('common.backHome') }}
+        </RouterLink>
+      </nav>
+
       <div class="page-header">
         <div class="mode-tabs" role="radiogroup">
           <label class="mode-option" :class="{ active: activeMode === 'recharge', disabled: submitting }">
@@ -44,8 +51,34 @@
         </div>
 
         <div class="balance-card">
-          <span>{{ balanceLabel }}</span>
-          <strong>{{ accountBalance }} <small>{{ balanceUnit }}</small></strong>
+          <div class="balance-summary">
+            <span>{{ balanceLabel }}</span>
+            <strong>{{ displayAmount(accountBalance) }} <small>{{ balanceUnit }}</small></strong>
+          </div>
+          <div class="custom-amount">
+            <div class="custom-heading">
+              <label class="custom-hint" for="custom-amount-input">
+                {{ $t('node.customAmountHint', { amount: minAmountText, unit: amountUnit }) }}
+              </label>
+              <button type="button" class="all-btn" :disabled="submitting" @click="fillAll">
+                {{ $t('node.all') }}
+              </button>
+            </div>
+            <div class="custom-row">
+              <input
+                id="custom-amount-input"
+                v-model="customAmount"
+                class="custom-input"
+                type="number"
+                :min="minAmountText"
+                step="any"
+                :placeholder="$t('node.minPlaceholder', { amount: minAmountText })"
+              />
+              <button class="subscribe-btn custom-btn" :disabled="submitting" @click="handleCustomSubscribe">
+                {{ actionText }}
+              </button>
+            </div>
+          </div>
         </div>
         <p v-if="activeMode === 'win' && winPrice > 0" class="mode-tip win-cost-tip">
           {{ $t('node.winPayHint', { price: winPrice }) }}
@@ -71,28 +104,6 @@
         </div>
       </div>
 
-      <div class="custom-amount">
-        <div class="custom-heading">
-          <p class="custom-hint">{{ $t('node.customAmountHint', { amount: minAmountText, unit: amountUnit }) }}</p>
-          <button type="button" class="all-btn" :disabled="submitting" @click="fillAll">
-            {{ $t('node.all') }}
-          </button>
-        </div>
-        <div class="custom-row">
-          <input
-            v-model="customAmount"
-            class="custom-input"
-            type="number"
-            :min="minAmountText"
-            step="any"
-            :placeholder="$t('node.minPlaceholder', { amount: minAmountText })"
-          />
-          <button class="subscribe-btn custom-btn" :disabled="submitting" @click="handleCustomSubscribe">
-            {{ actionText }}
-          </button>
-        </div>
-      </div>
-
       <div class="record-section">
         <div class="section-title-wrap">
           <div class="title-bar"></div>
@@ -108,7 +119,10 @@
           </div>
           <div class="order-list" v-for="(item, index) in orderList" :key="item.id || index">
             <div class="table-row">
-              <span>{{ displayAmount(item.total_amount ?? item.amount) }} USDT</span>
+              <span>
+                {{ item.total_amount ?? item.amount }} USDT
+                <small v-if="item.from_win" class="win-deduct">-{{ displayAmount(item.from_win) }} WIN</small>
+              </span>
               <span>{{ orderStatusText(item.status) }}</span>
               <span>{{ fundingSourceText(item.fund_source || item.product_name) }}</span>
               <span>{{ item.created_at ?? item.createdAt }}</span>
@@ -139,7 +153,6 @@ const person = userPerson()
 type SubscribeMode = 'recharge' | 'reward' | 'win'
 
 const activeMode = ref<SubscribeMode>('recharge')
-
 const winPrice = computed(() => Number(person.profile?.win_price || 0))
 const accountBalance = computed(() => {
   const profile = person.profile
@@ -152,14 +165,9 @@ const balanceLabel = computed(() => {
   if (activeMode.value === 'recharge') return $t('node.rechargeWalletBalance')
   return $t('node.rewardWalletBalance')
 })
-// WIN 模式下报单金额一律以 WIN 计价展示和输入，提交前再按 WIN 价格折回 USDT
-const amountUnit = computed(() => (activeMode.value === 'win' ? 'WIN' : 'USDT'))
+const amountUnit = computed(() => activeMode.value === 'win' ? 'WIN' : 'USDT')
 const balanceUnit = amountUnit
-const modeTip = computed(() => {
-  if (activeMode.value === 'win') return $t('node.winReferralTip')
-  return $t('node.referralRewardTip')
-})
-
+const modeTip = computed(() => activeMode.value === 'win' ? $t('node.winReferralTip') : $t('node.referralRewardTip'))
 const minAmountText = computed(() =>
   activeMode.value === 'win' ? calcWinCost(minSubscribe.value) : String(minSubscribe.value)
 )
@@ -170,8 +178,7 @@ function tierAmountText(price: number) {
 
 function calcWinCost(usdtAmount: number | string) {
   const needWin = calcNeedWin(String(usdtAmount))
-  if (!needWin) return '-'
-  return displayAmount(needWin)
+  return needWin ? displayAmount(needWin) : '-'
 }
 
 function displayAmount(value: unknown) {
@@ -182,6 +189,7 @@ function calcNeedWin(usdtAmount: string) {
   if (!winPrice.value || winPrice.value <= 0 || !isPositiveDecimal(usdtAmount)) return null
   return divDecimal(usdtAmount, String(winPrice.value))
 }
+
 const actionText = computed(() => {
   if (activeMode.value === 'reward') return $t('node.reinvestNow')
   if (activeMode.value === 'win') return $t('node.winPayNow')
@@ -209,17 +217,12 @@ const switchMode = (mode: SubscribeMode) => {
 const getSubscribeTiers = async () => {
   try {
     const res: any = await request.get('app_server/subscribe_tiers')
-    minSubscribe.value = Math.max(100, Number(res.min_subscribe_amount || 100))
-    nodeTiers.value = (res.tiers || []).map((v: string | number) => ({
-      price: Number(v),
-    })).filter((t: NodeTier) => t.price > 0)
+    minSubscribe.value = Math.max(100, Number(res?.min_subscribe_amount || 100))
+    nodeTiers.value = (res?.tiers || []).map((value: string | number) => ({
+      price: Number(value),
+    })).filter((tier: NodeTier) => tier.price > 0)
   } catch {
-    nodeTiers.value = [
-      { price: 100 },
-      { price: 500 },
-      { price: 1000 },
-      { price: 3000 },
-    ]
+    nodeTiers.value = [100, 500, 1000, 3000].map((price) => ({ price }))
     minSubscribe.value = 100
   }
 }
@@ -246,14 +249,24 @@ const fundingSourceText = (source: string) => {
     'win_a+recharge': $t('node.mixSourceWinARecharge'),
     'win_a+win': $t('node.mixSourceWinAWin'),
   }
-  return map[source] || source || $t('node.rechargeSource')
+  return map[source] || $t('node.unknownSource')
 }
 
+/* 状态文案映射。
+   修两个 bug：
+   1. 漏了 'completed' —— 后端确实会返回这个值（截图里第三行就直接显示了
+      英文 "completed"）。而 node.statusCompleted 这个键在 7 种语言里
+      全都已经存在，只是这里忘了接上。
+   2. 兜底 `return s` 会把任何未知的原始状态串直接漏到界面上。
+      未知状态应该显示为中性占位，绝不该把后端的内部值暴露给用户 ——
+      前者是小瑕疵，后者是会让用户看到 "completed"/"pending_review"
+      这类开发术语的信息泄漏。 */
 const orderStatusText = (status: string | number) => {
-  const s = String(status)
+  const s = String(status ?? '').trim().toLowerCase()
   if (s === '1' || s === 'active') return $t('node.statusActive')
   if (s === '2' || s === 'exited') return $t('node.statusExited')
-  return s || '-'
+  if (s === '3' || s === 'completed') return $t('node.statusCompleted')
+  return '—'
 }
 
 const handleSubscribe = async (usdtAmount: string) => {
@@ -264,7 +277,6 @@ const handleSubscribe = async (usdtAmount: string) => {
     return
   }
   const mode = activeMode.value
-
   let needWin: string | null = null
   if (mode === 'win') {
     if (!winPrice.value || winPrice.value <= 0) {
@@ -342,8 +354,7 @@ const handleSubscribe = async (usdtAmount: string) => {
 
 const fillAll = () => {
   if (submitting.value) return
-  const mode = activeMode.value
-  if (mode === 'win') {
+  if (activeMode.value === 'win') {
     if (!winPrice.value || winPrice.value <= 0) {
       showFailToast($t('node.winPriceMissing'))
       return
@@ -392,12 +403,18 @@ onMounted(async () => {
 @use '@/style/variables.scss' as *;
 
 .node-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #0648df;
+  --accent-dim: rgba(0, 82, 255, 0.1);
   min-height: 100vh;
-  background: linear-gradient(180deg, #030A11 0%, #0D1B2A 100%);
+  /* 纯白。原本是 ink-deep → surface-2 的纵向渐变（深色版的做法）。
+     Base 的页面底色是干净的白，全站零渐变。 */
+  background: var(--ink);
 }
 
 .content {
-  padding: 60px 20px 40px;
+  padding: 80px 20px 40px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -407,73 +424,69 @@ onMounted(async () => {
 
   .mode-tabs {
     width: 100%;
-    height: 44px;
+    height: 40px;
     box-sizing: border-box;
     margin: 0 auto 18px;
-    padding: 4px;
-    border: 1px solid $border-color;
-    border-radius: $radius-md;
-    background: rgba(3, 10, 17, 0.72);
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
+    padding: 3px;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-pill);
+  /* 浅灰槽。原本是"深色渐变 + inset 深阴影"做的内凹槽 ——
+     那套拟物凹陷在白底上不成立（深阴影会变成一道脏灰），
+     Base 也没有任何 inset 拟���效果。改成纯浅灰底 + 全圆外框。 */
+  background: var(--surface-2);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .mix-balances {
-    display: grid;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .mix-panel {
-    margin-top: 12px;
-    padding: 14px;
-    border: 1px solid $border-color;
-    border-radius: $radius-md;
-    background: rgba(3, 10, 17, 0.55);
-    display: grid;
+  .funding-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--hair);
+    border-radius: var(--r-md);
+    background: var(--surface-1);
+  }
 
-    .mix-row {
-      display: grid;
-      grid-template-columns: 88px 1fr;
-      gap: 10px;
-      align-items: center;
+  .funding-label {
+    flex: 0 0 auto;
+    color: var(--text-3);
+    font-size: var(--fs-sm);
+  }
 
-      label {
-        color: $text-muted;
-        font-size: 13px;
-      }
+  .funding-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 360px);
+    padding: 3px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+  }
 
-      select,
-      input {
-        width: 100%;
-        height: 36px;
-        box-sizing: border-box;
-        padding: 0 10px;
-        border: 1px solid $border-color;
-        border-radius: $radius-sm;
-        background: rgba(0, 0, 0, 0.35);
-        color: $text-primary;
-        font-size: 13px;
-      }
+  .funding-option {
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--text-3);
+    font-size: var(--fs-sm);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 
-      &.mix-row-fixed {
-        grid-template-columns: 88px 1fr;
-      }
+    &.active {
+      background: var(--accent);
+      color: var(--surface-1);
+      font-weight: 600;
+    }
 
-      .mix-auto-value {
-        display: flex;
-        align-items: center;
-        min-height: 36px;
-        padding: 0 10px;
-        border: 1px solid rgba(21, 151, 229, 0.25);
-        border-radius: $radius-sm;
-        background: rgba(21, 151, 229, 0.08);
-        color: $brand-primary-light;
-        font-size: 13px;
-        font-weight: 600;
-      }
+    &:disabled {
+      cursor: wait;
+      opacity: 0.65;
     }
   }
 
@@ -485,13 +498,16 @@ onMounted(async () => {
     justify-content: center;
     height: 100%;
     box-sizing: border-box;
-    padding: 0 6px;
+
+    padding: 0 4px;
     background: transparent;
     border: 0;
-    border-radius: $radius-sm;
-    color: $text-muted;
+    border-radius: var(--r-pill);
+    color: var(--text-3);
     cursor: pointer;
-    transition: background $transition-fast, color $transition-fast;
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease);
 
     input {
       position: absolute;
@@ -503,8 +519,8 @@ onMounted(async () => {
 
     strong {
       min-width: 0;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 400;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -514,12 +530,29 @@ onMounted(async () => {
       display: none;
     }
 
+    /* 选中态：白��� + 蓝字 + 蓝色描边。
+       ���动的三个原因：
+       1. 原本是"凹槽 + 抬起滑块"（180° 灰渐变 + 内高光 + 45% 黑投影）——
+          这套拟物隐喻依赖深色底才成立，白底上四个标签几乎无差别，
+          实测选中的「铸造」和未选中对比度差异微乎其微。
+       2. 那句 `inset 0 1px 0 var(--gloss)` 现在是**无效 CSS**：
+          我把 --gloss 改成了 none，而 `inset 0 1px 0 none` 不合法，
+          浏览器会把整条 box-shadow 声明一起丢弃。这是改令牌值时
+          容易漏掉的连带破坏 —— 令牌被当作"值的片段"拼进复合属性时，
+          换值可能直接让整条属性失效。
+       3. 用蓝**字**而不是蓝**底**，是为了保住页面主次：
+          下方的认购 CTA 是全页唯一的实心蓝块，若标签也是实心蓝，
+          两块蓝会互相争夺注意力。蓝字足以标明"已选"，
+          又不与唯一主按钮抢位。
+       #0000FF 对白 8.6:1，远超 AA。 */
     &.active {
-      background: $gradient-primary;
-      color: $text-inverse;
+      background: var(--surface-1);
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
 
       strong {
         font-weight: 600;
+        color: var(--accent);
       }
     }
 
@@ -529,190 +562,225 @@ onMounted(async () => {
     }
   }
 
+  /* 可用余额。这是实时数据，所以数值用蓝 —— 符合用色铁律第 1 条。
+     原本是 $brand-primary-light（初版配色遗留的 SCSS 变量）。 */
   .balance-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: block;
     margin-top: 10px;
-    padding: 11px 14px;
-    background: rgba(21, 151, 229, 0.07);
-    border: 1px solid rgba(21, 151, 229, 0.14);
-    border-radius: 12px;
+    padding: 14px;
+    background: var(--surface-1);
+    border: 1px solid var(--hair);
+    border-radius: var(--r-md);
 
-    > span {
-      color: $text-muted;
-      font-size: 11px;
+    .balance-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+
+      > span {
+        color: var(--text-3);
+        font-size: var(--fs-micro);
+        letter-spacing: var(--ls-caps);
+        text-transform: uppercase;
+      }
     }
 
     strong {
-      color: $brand-primary-light;
-      font-size: 16px;
+      font-family: var(--aix-font-display);
+      color: var(--accent-bright);
+      font-size: var(--fs-lead);
       font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-tight);
 
       small {
-        font-size: 10px;
+        margin-left: 3px;
+        font-size: var(--fs-micro);
         font-weight: 500;
-        opacity: 0.7;
+        color: var(--text-3);
       }
     }
   }
 
+  /* 模式说明文字。
+     原本是 color: #fff + font-size: 10px —— 层级是反的：用了全站最亮的
+     颜色（纯白，等同主标题）却给了最小的字号。次要说明文字应该是
+     "字号小、颜色也退"，而不是"小而刺眼"。10px 正文也偏小，提到 --fs-sm。 */
   .mode-tip {
     margin: 8px 2px 0;
-    color: #fff;
-    font-size: 10px;
+    color: var(--text-3);
+    font-size: var(--fs-sm);
     line-height: 1.55;
+  }
+
+  /* 花费提示是需要用户核对的数字，比普通说明重要一档 */
+  .win-cost-tip {
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.custom-amount {
+  margin-bottom: 0;
+
+  .custom-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .custom-hint {
+    display: block;
+    font-size: var(--fs-sm);
+    color: var(--text-3);
+    margin: 0;
+  }
+
+  .all-btn {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+  }
+
+  .custom-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .custom-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--hair-2);
+    border-radius: var(--r-md);
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--aix-font-display);
+    font-size: var(--fs-body);
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition:
+      border-color var(--t-fast) var(--ease),
+      box-shadow var(--t-fast) var(--ease);
+
+    &::placeholder {
+      font-family: var(--aix-font-sans);
+      color: var(--text-3);
+    }
+
+    &:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+  }
+
+  .custom-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 104px;
+    height: 48px;
   }
 }
 
 .node-tiers {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
-.custom-amount {
-  margin-bottom: 40px;
+.tier-card {
+  padding: 14px;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  cursor: pointer;
 
-  .custom-heading {
+  &.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-dim);
+  }
+
+  .tier-header {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
-  .custom-hint {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
-    margin: 0;
+  .tier-price {
+    color: var(--text);
+    font-family: var(--aix-font-display);
+    font-size: var(--fs-lead);
+    font-variant-numeric: tabular-nums;
   }
 
-  .all-btn {
-    flex-shrink: 0;
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: $brand-primary;
-    font-size: 13px;
-    cursor: pointer;
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
-
-  .custom-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-  }
-
-  .custom-input {
-    flex: 1;
-    height: 44px;
-    padding: 0 14px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.25);
-    color: #fff;
-    font-size: 15px;
-    outline: none;
-
-    &:focus {
-      border-color: $brand-primary;
-    }
-  }
-
-  .custom-btn {
-    flex-shrink: 0;
-    min-width: 120px;
-    width: auto;
-    height: 44px;
-    padding: 0 20px;
+  .tier-unit {
+    color: var(--text-3);
+    font-size: var(--fs-micro);
   }
 }
 
 .subscribe-btn {
-  padding: 8px 20px;
-  background: $gradient-primary;
-  color: $text-inverse;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
   width: 100%;
-
-  &:hover:not(:disabled) {
-    background: linear-gradient(135deg, $brand-primary-light 0%, $brand-primary 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(21, 151, 229, 0.3);
-  }
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--surface-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
 
   &:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.5);
+    cursor: wait;
   }
 }
 
+/* .section-title-wrap 样式已统一到 polish.less */
 .record-section {
   margin-top: 20px;
-
-  .section-title-wrap {
-    position: relative;
-    margin-bottom: 10px;
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-
-    .title-bar {
-      position: absolute;
-      left: -10px;
-      top: 50%;
-      width: 4px;
-      height: 16px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #1597E5 0%, #075FB8 100%);
-      transform: translateY(-50%);
-    }
-
-    .section-title {
-      margin: 0 0 0 8px;
-      font-size: 16px;
-      font-weight: bold;
-      color: #fff;
-    }
-  }
 }
 
 .table-card {
   margin-top: 10px;
-  min-height: 300px;
+  /* min-height: 300px 去掉。
+     记录只有 3 条时，表格照样撑到 300px，最后一行下面空一大片 ——
+     和 wallet.vue 的 records-panel 是同一个毛病（那边是写死 height）。
+     空状态的高度由 .empty-state 自己负责，不需要整张卡陪着撑高。 */
   overflow: hidden;
-  border: 1px solid $border-color;
-  border-radius: 11px;
-  background: rgba(8, 19, 30, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 11px 0;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  padding: 0 0 4px;
 
   .table-header {
     display: flex;
     align-items: center;
-    background: #030A11;
-    padding: 8px 0;
-    margin: -11px 0 0;
+    background: var(--ink-deep);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hair);
 
     span {
       flex: 1;
       text-align: center;
-      font-size: 10px;
-      color: $text-muted;
+      font-size: var(--fs-micro);
+      letter-spacing: var(--ls-caps);
+      text-transform: uppercase;
+      color: var(--text-3);
     }
   }
 
@@ -720,188 +788,94 @@ onMounted(async () => {
     .table-row {
       display: flex;
       align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid $border-light;
+      padding: 12px 8px;
+      border-bottom: 1px solid var(--hair);
+      transition: background-color var(--t-fast) var(--ease);
 
       &:last-child {
         border-bottom: none;
       }
 
+      &:hover {
+        background: var(--surface-2);
+      }
+
       span {
         flex: 1;
+        min-width: 0;
         text-align: center;
-        font-size: 14px;
-        color: $text-primary;
+        font-size: var(--fs-sm);
+        color: var(--text-2);
+
+        .win-deduct {
+          display: block;
+          margin-top: 2px;
+          font-size: 11px;
+          color: var(--text-3);
+        }
+      }
+
+      /* 金额列：给它更多空间并禁止换行。
+         原本四列均分 flex:1，"1000.0000 USDT" 在 414px 宽下必然折成两行
+         （截图里三行金额全是两行），把整张表撑得很松散。
+         这一列信息量最大，理应分到更宽的份额。 */
+      span:first-child {
+        flex: 1.5;
+        white-space: nowrap;
+        font-family: var(--aix-font-display);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: var(--ls-tight);
+        color: var(--text);
       }
     }
   }
 
+  /* 空状态。高度从写死的 250px 改为 min-height 160px：
+     卡片的 min-height 已去掉，这里就成了空列表时唯一的高���来源，
+     不需要占那么高。 */
   .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 250px;
+    min-height: 160px;
 
     p {
-      margin-top: 8px;
-      font-size: 12px;
-      color: $text-muted;
+      margin: 0;
+      font-size: var(--fs-sm);
+      color: var(--text-3);
     }
   }
 
-  .pagination-wrapper {
-    padding: 16px 0;
-    display: flex;
-    justify-content: center;
+  /* .pagination-wrapper 已删除：模板里没有分页器，是死样式。 */
+}
+
+/* 页面唯一主按钮 */
+.primary-cta {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+
+  /* 禁用态只保留 cursor，不再写 opacity: .45。
+     那条 opacity 会把整颗按钮（连文字一起）压到 45% 透明，
+     正好抵消 polish.less 里给 .aix-cta:disabled 定的可读配色 —— 
+     实测这颗按钮的文字只剩 2.1:1。
+
+     而这颗按钮的标签是**操作指引**（未填金额时显示"请输入认购金额"），
+     用户必须读懂才知道下一步做什么，不能压到看不清。
+     "不可点"由 polish.less 的灰底 + cursor + 无 hover 反馈传达。 */
+  &:disabled {
+    cursor: not-allowed;
   }
 }
 
-.tier-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(21, 151, 229, 0.3);
-    transform: translateY(-4px);
-  }
-
-  &.active {
-    background: rgba(21, 151, 229, 0.1);
-    border-color: $brand-primary;
-    box-shadow: 0 0 20px rgba(21, 151, 229, 0.2);
-  }
-
-  .tier-header {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    min-width: 0;
-    
-    .tier-price {
-      font-size: 20px;
-      font-weight: 500;
-      color: $brand-primary;
-      line-height: 1;
-    }
-
-    .tier-unit {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-  }
-
-  .subscribe-btn {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 104px;
-    min-height: 34px;
-    padding: 6px 14px;
-    border-radius: 9px;
-    font-size: 13px;
-  }
-
-  .tier-divider {
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-    margin-bottom: 16px;
-  }
-
-  .tier-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-
-    .info-label {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .info-value {
-      font-size: 18px;
-      font-weight: 500;
-      color: #fff;
-    }
-  }
-
-  .tier-status {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-
-    &.available {
-      background: rgba(21, 151, 229, 0.2);
-      color: $brand-primary;
-    }
-
-    &.full {
-      background: rgba(255, 59, 59, 0.2);
-      color: #ff3b3b;
-    }
-
-    &.coming {
-      background: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.6);
-    }
-  }
-}
-
-.action-section {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
-
-  .subscribe-btn {
-    padding: 16px 48px;
-    background: linear-gradient(135deg, $brand-primary 0%, #087BC1 100%);
-    color: #000;
-    border: none;
-    border-radius: 32px;
-    font-size: 18px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(21, 151, 229, 0.3);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      background: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.5);
-    }
-  }
-}
-
-@keyframes gradient-move {
-  0% {
-    background-position: 100% 50%;
-  }
-  50% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 100% 50%;
-  }
-}
+/* .action-section 与 @keyframes gradient-move 已删除 —— 两块都��死代码：
+   模板里从来没有 .action-section 这个元素，也没有任何规则引用
+   gradient-move。它��还各自藏着问题（#04121A 调色板外色、
+   transition: all 0.3s、白色外发光 box-shadow），
+   而其中那句"全页唯一的主操作"注释指向的 DOM 早就不存在了 ——
+   过期注释比没有注释更误导人。 */
 </style>
+

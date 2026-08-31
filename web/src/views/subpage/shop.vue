@@ -190,7 +190,7 @@ const handleBack = () => {
         .card-main-title {
           font-size: 18px;
           font-weight: 500;
-          color: #fff;
+          color: var(--text);
           margin-bottom: 8px;
           display: flex;
           align-items: center;
@@ -200,13 +200,13 @@ const handleBack = () => {
             height: 28px;
             line-height: 28px;
             text-align: center;
-            background-color: #102235;
-            color: #8ab4f8;
+            background-color: var(--surface-2);
+            color: var(--text-2);
             border-radius: 50%;
             margin-right: 12px;
             font-size: 14px;
             font-weight: normal;
-            border: 1px solid #183247;
+            border: 1px solid var(--hair-2);
           }
         }
         .investment-details {
@@ -215,7 +215,7 @@ const handleBack = () => {
           li {
             display: flex;
             padding: 8px 0;
-            border-bottom: 1px solid #102235;
+            border-bottom: 1px solid var(--surface-2);
             &:last-child {
               border-bottom: none;
             }
@@ -235,8 +235,8 @@ const handleBack = () => {
         .purchase-btn {
           width: 100%;
           padding: 12px 20px;
-          background-color: #1597E5;
-          color: #08131E;
+          background-color: var(--accent);
+          color: var(--surface-1);
           border: none;
           border-radius: 8px;
           font-size: 16px;
@@ -249,8 +249,8 @@ const handleBack = () => {
       .shop-item {
         width: calc(50% - 5px);
         box-sizing: border-box;
-        background: #03070B;
-        border: 1px solid #183247;
+        background: var(--ink-deep);
+        border: 1px solid var(--hair-2);
         border-radius: 8px;
         padding: 10px;
         display: flex;
@@ -266,12 +266,12 @@ const handleBack = () => {
           font-size: 14px;
         }
         .shop-btn {
-          background: rgba(255, 255, 255, 0.2);
+          background: var(--surface-2);
           border-radius: 6px;
           border: 0;
           height: 30px;
           text-align: center;
-          color: #1597E5;
+          color: var(--accent);
         }
       }
     }

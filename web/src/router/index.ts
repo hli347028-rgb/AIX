@@ -25,6 +25,8 @@ const mainRoutes = [
   { path: "/profile", component: () => import("@/views/profile/index.vue") },
   { path: "/mine", component: Mine },
   { path: "/announcements", component: () => import("@/views/announcements.vue") },
+  { path: "/rules", component: () => import("@/views/rules.vue") },
+  { path: "/futurefi", component: () => import("@/views/futurefi.vue") },
 ];
 
 /** 旧路径 → 主路径（质押入口并到认购） */

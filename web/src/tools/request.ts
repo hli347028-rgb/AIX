@@ -12,6 +12,7 @@ interface RequestClient {
   get<T = any>(url: string, config?: RequestConfig): Promise<T>
   post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T>
   put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T>
+  patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T>
   delete<T = any>(url: string, config?: RequestConfig): Promise<T>
 }
 
@@ -25,7 +26,7 @@ function isLegacyApi(url = '') {
 }
 
 async function dispatch(
-  method: 'get' | 'post' | 'put' | 'delete',
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   url: string,
   data?: any,
   config?: RequestConfig,
@@ -55,13 +56,14 @@ async function dispatch(
     const isFrozen =
       reason === 'ACCOUNT_FROZEN' ||
       /账户已被冻结|ACCOUNT_FROZEN/i.test(String(message || ''))
-    // 冻结账户不弹前端提示，仍抛出错误让调用方停止后续流程
+    // 与参考项目一致：冻结账户静默拦截，但继续抛错终止登录流程。
     if (!isFrozen && !data?.noMsg && !config?.params?.noMsg && !config?.silent) {
       showFailToast(message || error?.response?.statusText || lang('操作失败'))
     }
     if (status === 401) {
       const person = userPerson()
-      person.outLogin()
+      // 初始化中的 401 由当前登录流程处理；其他场景由全局锁保证只重登一次。
+      if (!person.isInitializing) person.handleUnauthorized()
     }
     throw error
   } finally {
@@ -78,6 +80,9 @@ const request: RequestClient = {
   },
   put(url: string, data?: any, config?: RequestConfig) {
     return dispatch('put', url, data, config)
+  },
+  patch(url: string, data?: any, config?: RequestConfig) {
+    return dispatch('patch', url, data, config)
   },
   delete(url: string, config?: RequestConfig) {
     return dispatch('delete', url, undefined, config)

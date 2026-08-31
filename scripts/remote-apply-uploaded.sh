@@ -20,12 +20,10 @@ tar -xzf /tmp/web-dist-deploy.tar.gz -C /tmp/web-dist-extract
 rsync -a --delete --no-owner --no-group --exclude admin /tmp/web-dist-extract/dist/ /opt/aix/www/
 
 echo "=== deploy admin dist ==="
-# 鍏煎 scp -r 钀藉埌 /tmp/admin-dist-new/dist 鐨勬儏鍐碉紝閬垮厤鍚屾鍒版棫浜х墿
 ADMIN_SRC=/tmp/admin-dist-new
 if [ -f "${ADMIN_SRC}/dist/index.html" ]; then
   ADMIN_SRC="${ADMIN_SRC}/dist"
 fi
-# www/admin 鍙兘鏇捐 root 鍐欏叆锛岄渶 sudo锛涗笉淇濈暀灞炰富/灞炵粍閬垮厤 chgrp 澶辫触
 sudo rsync -a --delete --no-owner --no-group "${ADMIN_SRC}/" /opt/aix/www/admin/
 sudo chown -R ubuntu:ubuntu /opt/aix/www/admin
 

@@ -1,481 +1,367 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="sidebar-overlay" @click="handleOverlayClick">
-      <div class="sidebar" @click.stop>
-        <!-- 关闭按钮 -->
-        <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="close">×</button>
-
-        <!-- Logo -->
-        <div class="sidebar-logo">
-          <img src="/assets/logo.png" alt="Logo" class="logo-img" />
-          <div class="brand-copy">
-            <!-- <strong>AIX</strong> -->
-          </div>
+    <div v-if="visible" class="sidebar-overlay" @click="close">
+      <aside class="sidebar" :aria-label="$t('futurefi.navigation')" @click.stop>
+        <div class="ambient-logo" aria-hidden="true">
+          <img src="/assets/aix-orbit-logo.jpeg" alt="" />
         </div>
 
-        <div class="user-address" @click="handleCopyAddress">
-          <div class="address-value">{{ userAddress }}</div>
-          <span class="copy-mark" aria-hidden="true"></span>
+        <header class="sidebar-head">
+          <div class="brand">
+            <span class="brand-mark-wrap">
+              <img src="/assets/aix-logo-sm.png" alt="AIX" class="brand-mark" />
+            </span>
+            <div class="brand-copy">
+              <span class="brand-name">AI PREDICTION EXCHANGE</span>
+              <span class="brand-meta">FUTUREFI PROTOCOL</span>
+            </div>
+          </div>
+
+          <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="close">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="nav-heading">
+          <span>{{ $t('common.explore') }}</span>
+          <span>{{ String(liveItems.length).padStart(2, '0') }}</span>
         </div>
 
         <nav class="sidebar-nav">
-          <div
-            v-for="item in navItems"
+          <a
+            v-for="(item, index) in liveItems"
             :key="item.key"
-            class="nav-item"
-            :class="{
-              active: item.path && isActive(item.path),
-              external: !!item.href,
-              upcoming: item.upcoming,
-            }"
-            @click="handleNav(item)"
+            class="nav-row"
+            :class="{ active: item.path && isActive(item.path) }"
+            :href="item.href || item.path"
+            :target="item.href ? '_blank' : undefined"
+            :rel="item.href ? 'noopener noreferrer' : undefined"
+            @click="handleNav(item, $event)"
           >
-            {{ item.label }}
-          </div>
+            <span class="nav-index">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="nav-label">{{ item.label }}</span>
+            <span class="nav-direction" :class="{ external: item.href }" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path v-if="item.href" d="M8 16 16 8M16 8H9M16 8v7" stroke="currentColor" stroke-width="1.5" />
+                <path v-else d="M5 12h13m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </span>
+          </a>
         </nav>
 
-      </div>
+        <section v-if="upcomingItems.length" class="sidebar-parked">
+          <div class="parked-head">
+            <span>{{ $t('common.comingSoon') }}</span>
+            <span class="parked-line"></span>
+          </div>
+          <div class="parked-grid">
+            <button
+              v-for="item in upcomingItems"
+              :key="item.key"
+              class="parked-row"
+              type="button"
+              @click="handleNav(item, $event)"
+            >
+              <span>{{ item.label }}</span>
+              <span class="parked-dot" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+      </aside>
     </div>
-
-    <Modal
-      :visible="showModal"
-      :message="modalMessage"
-      :confirm-text="$t('common.confirm')"
-      @close="handleModalClose"
-      @confirm="handleModalClose"
-    />
   </Teleport>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { showToast } from 'vant'
-import userPerson from '@/pinia/person'
-import Modal from '@/components/Modal.vue'
 
 const router = useRouter()
 const route = useRoute()
-const person = userPerson()
 const { t: $t } = useI18n()
 
-const props = defineProps({
-  visible: Boolean
-})
-
-const emit = defineEmits(['close', 'languageClick'])
-
-const showModal = ref(false)
-const modalMessage = ref('')
+defineProps({ visible: Boolean })
+const emit = defineEmits(['close'])
 
 const BRIDGE_URL = 'https://bridge.winbit.win/'
-const EXCHANGE_DOWNLOAD_URL = 'https://download.winwallet.co/4i3kho'
 
 const navItems = computed(() => [
   { key: 'home', label: $t('tab.home'), path: '/' },
+  { key: 'project-intro', label: $t('futurefi.projectIntro'), path: '/futurefi' },
   { key: 'team', label: $t('tab.myTeam'), path: '/community' },
   { key: 'assets', label: $t('tab.myAssets'), path: '/wallet' },
   { key: 'recharge', label: $t('tab.rechargeZone'), path: '/recharge' },
   { key: 'order', label: $t('tab.orderZone'), path: '/node' },
-  { key: 'announcements', label: $t('announcement.title'), upcoming: true },
+  { key: 'rules', label: $t('index.rulesSummaryTitle'), path: '/rules' },
   { key: 'bridge', label: $t('tab.crossChain'), href: BRIDGE_URL },
+  { key: 'announcements', label: $t('announcement.title'), path: '/announcements' },
   { key: 'launch', label: $t('tab.globalLaunch'), upcoming: true },
-  { key: 'walletDl', label: $t('tab.walletDownload'), upcoming: true },
   { key: 'bank', label: $t('tab.digitalBank'), upcoming: true },
   { key: 'games', label: $t('tab.chainGameZone'), upcoming: true },
   { key: 'predict', label: $t('tab.predictionZone'), upcoming: true },
   { key: 'chat', label: $t('tab.cloudChat'), upcoming: true },
   { key: 'faq', label: $t('tab.faq'), upcoming: true },
-  { key: 'exchange', label: $t('tab.exchangeDownload'), href: EXCHANGE_DOWNLOAD_URL },
 ])
 
-const address = computed(() => person.address)
-
-const formatAddress = (value) => {
-  const frontSix = value.slice(0, 6)
-  const backFour = value.slice(-4)
-  return frontSix + '...' + backFour
-}
-
-const userAddress = computed(() => {
-  return formatAddress(address.value || '0x0000000000000000000000000000000000000000')
-})
-
-const isActive = (path) => {
-  return route.path === path
-}
+const liveItems = computed(() => navItems.value.filter((item) => !item.upcoming))
+const upcomingItems = computed(() => navItems.value.filter((item) => item.upcoming))
+const isActive = (path) => route.path === path
+const close = () => emit('close')
 
 const go = (path) => {
-  if (route.path !== path) {
-    router.push(path)
-  }
+  if (route.path !== path) router.push(path)
   close()
 }
 
-const openExternal = (url) => {
-  window.open(url, '_blank', 'noopener,noreferrer')
-  close()
-}
-
-const handleNav = (item) => {
+const handleNav = (item, event) => {
   if (item.path) {
+    event?.preventDefault()
     go(item.path)
     return
   }
   if (item.href) {
-    openExternal(item.href)
+    close()
     return
   }
   showToast($t('common.comingSoon'))
 }
 
-const close = () => {
-  emit('close')
-}
-
-const handleOverlayClick = () => {
-  close()
-}
-
-const handleDownload = () => {
-  const link = document.createElement('a')
-  link.href = '/base.apk'
-  link.download = 'base.apk'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
-
-const handleExternalLink = () => {
-  router.push('/recharge')
-  close()
-}
-
-const handleComingSoon = () => {
-  showModal.value = true
-  modalMessage.value = $t('common.comingSoon')
-}
-
-const handleModalClose = () => {
-  showModal.value = false
-}
-
-const handleCopyAddress = async () => {
-  const addr = userAddress.value
-  if (!addr) return
-  const copyText = `${window.location.origin}/?code=${addr}`
-  try {
-    await navigator.clipboard.writeText(copyText)
-    showToast($t('common.inviteLinkCopied'))
-  } catch (err) {
-    console.error('复制失败:', err)
-    showToast($t('common.copyFailed'))
-  }
-}
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
-
 .sidebar-overlay {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(1, 5, 9, 0.72);
-  backdrop-filter: blur(6px);
-  animation: fadeIn 0.25s ease;
+  background: rgba(10, 11, 13, 0.28);
+  backdrop-filter: blur(12px) saturate(0.9);
+  animation: overlay-in 0.35s ease both;
 }
 
 .sidebar {
+  --panel-text: #0a0b0d;
+  --panel-muted: #606775;
+  --panel-line: #dfe3ea;
+  --panel-blue: #0052ff;
   position: absolute;
-  top: 0;
-  left: max(0px, calc(50% - 207px));
-  bottom: 0;
-  width: min(88vw, 360px);
+  inset: 0 auto 0 max(0px, calc(50% - 207px));
+  width: min(94vw, 414px);
   box-sizing: border-box;
-  padding: 0 22px 32px;
-  background:
-    radial-gradient(circle at 16% 5%, rgba(33, 182, 234, 0.16), transparent 30%),
-    linear-gradient(165deg, rgba(13, 31, 47, 0.99) 0%, rgba(3, 10, 17, 0.99) 48%, rgba(2, 7, 12, 1) 100%);
-  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.48);
-  animation: slideInLeft 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 22px 24px 32px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+  color: var(--panel-text);
+  background: #f7f8fa;
+  border-right: 1px solid var(--panel-line);
+  box-shadow: 36px 0 90px rgba(10, 11, 13, 0.16);
+  animation: panel-in 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) both;
 
-  &::before {
+  &::after {
     content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 2px;
-    height: 34%;
-    background: linear-gradient(180deg, $brand-accent, rgba(21, 151, 229, 0));
-    box-shadow: 0 0 18px rgba(33, 182, 234, 0.7);
+    position: fixed;
+    inset: 0 auto 0 max(0px, calc(50% - 207px));
+    width: min(94vw, 414px);
     pointer-events: none;
+    opacity: 1;
+    background: linear-gradient(to bottom, var(--panel-blue) 0 4px, transparent 4px);
   }
 
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  &::-webkit-scrollbar { display: none; }
 }
+
+.ambient-logo {
+  position: absolute;
+  top: 86px;
+  right: -76px;
+  width: 260px;
+  pointer-events: none;
+  opacity: 0.08;
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(circle, black 30%, transparent 72%);
+
+  img { display: block; width: 100%; }
+}
+
+.sidebar-head,
+.account-row,
+.nav-heading,
+.sidebar-nav,
+.sidebar-parked { position: relative; z-index: 1; }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-mark-wrap {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26, 75, 124, 0.18), transparent 72%);
+}
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: block;
+  object-fit: contain;
+  mix-blend-mode: screen;
+  filter: contrast(1.22) saturate(0.82) brightness(0.92);
+  -webkit-mask-image: radial-gradient(circle, #000 48%, rgba(0, 0, 0, 0.94) 60%, transparent 78%);
+  mask-image: radial-gradient(circle, #000 48%, rgba(0, 0, 0, 0.94) 60%, transparent 78%);
+}
+.brand-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.brand-name { overflow: hidden; color: var(--panel-text); font-size: 10px; font-weight: 750; letter-spacing: 0.17em; text-overflow: ellipsis; white-space: nowrap; }
+.brand-meta { color: var(--panel-muted); font-size: 8px; font-weight: 600; letter-spacing: 0.24em; }
 
 .close-btn {
-  position: sticky;
-  top: 16px;
-  z-index: 2;
-  align-self: flex-end;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  margin-right: -4px;
-  background: rgba(143, 223, 255, 0.06);
-  border: 1px solid rgba(143, 223, 255, 0.14);
-  border-radius: 50%;
-  color: $text-muted;
-  font-size: 26px;
-  font-weight: 300;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--panel-muted);
   cursor: pointer;
+  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease, transform 0.35s ease;
+
+  svg { width: 18px; height: 18px; }
+  &:hover { color: var(--panel-text); border-color: rgba(101, 184, 243, 0.48); background: rgba(101, 184, 243, 0.08); transform: rotate(4deg); }
+  &:focus-visible { outline: 2px solid var(--panel-blue); outline-offset: 3px; }
+}
+
+.account-row {
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  // transition: all $transition-fast;
+  gap: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
 
-  &:hover {
-    color: $text-primary;
-    border-color: rgba(33, 182, 234, 0.45);
-    background: rgba(21, 151, 229, 0.14);
-    transform: rotate(8deg);
-  }
+  &:hover { border-color: rgba(101, 184, 243, 0.42); background: rgba(101, 184, 243, 0.07); transform: translateY(-1px); }
+  &:focus-visible { outline: 2px solid var(--panel-blue); outline-offset: 2px; }
 }
 
-.sidebar-logo {
-  width: 100%;
-  margin: 16px 0 22px;
+.account-status { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--panel-blue); box-shadow: 0 0 14px rgba(101, 184, 243, 0.7); }
+.account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.account-label { color: var(--panel-muted); font-size: 8px; font-weight: 650; letter-spacing: 0.18em; }
+.address-value { color: #dce7f3; font-family: var(--aix-font-display); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+.copy-action { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--panel-blue); background: rgba(101, 184, 243, 0.08); }
+.copy-action svg { width: 15px; height: 15px; }
+
+.nav-heading {
+  margin-top: 26px;
+  padding-bottom: 9px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  color: var(--panel-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.sidebar-nav { display: flex; flex-direction: column; }
+.nav-row {
+  min-height: 57px;
+  padding: 0 4px;
+  display: flex;
   align-items: center;
-
-  .logo-img {
-    width: 108px;
-    height: 108px;
-    object-fit: cover;
-  }
-
-  .brand-copy {
-    margin-top: 12px;
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-
-    strong {
-      color: $text-primary;
-      font-size: 22px;
-      line-height: 1;
-      letter-spacing: 4px;
-    }
-
-    span {
-      color: $brand-primary-light;
-      font-size: 9px;
-      letter-spacing: 2.4px;
-      opacity: 0.72;
-    }
-  }
+  gap: 14px;
+  border-bottom: 1px solid var(--panel-line);
+  color: #aebaca;
+  text-decoration: none;
+  transition: color 0.25s ease, padding 0.35s cubic-bezier(0.2, 0.75, 0.2, 1), background 0.25s ease;
+  animation: item-in 0.5s both;
 }
 
-.user-address {
-  position: relative;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 13px 46px 13px 16px;
-  background: linear-gradient(135deg, rgba(21, 151, 229, 0.13), rgba(143, 223, 255, 0.04));
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all $transition-base;
-  border: 1px solid rgba(21, 151, 229, 0.22);
-  text-align: left;
+.nav-row:nth-child(1) { animation-delay: 0.08s; }
+.nav-row:nth-child(2) { animation-delay: 0.12s; }
+.nav-row:nth-child(3) { animation-delay: 0.16s; }
+.nav-row:nth-child(4) { animation-delay: 0.2s; }
+.nav-row:nth-child(5) { animation-delay: 0.24s; }
+.nav-row:nth-child(6) { animation-delay: 0.28s; }
+.nav-row:nth-child(7) { animation-delay: 0.32s; }
+.nav-row:hover { padding-left: 10px; color: var(--panel-text); background: linear-gradient(90deg, rgba(101, 184, 243, 0.08), transparent 78%); }
+.nav-row.active { color: var(--panel-text); background: linear-gradient(90deg, rgba(101, 184, 243, 0.12), transparent 80%); }
+.nav-row.active .nav-index { color: var(--panel-blue); }
+.nav-row.active .nav-label { font-weight: 750; }
+.nav-index { width: 20px; flex: 0 0 auto; color: #536274; font-family: var(--aix-font-display); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; }
+.nav-label { flex: 1; font-size: 15px; font-weight: 550; letter-spacing: 0.02em; }
+.nav-direction { width: 28px; height: 28px; display: grid; place-items: center; color: #607186; transition: color 0.25s ease, transform 0.3s ease; }
+.nav-direction svg { width: 16px; height: 16px; }
+.nav-row:hover .nav-direction { color: var(--panel-blue); transform: translateX(3px); }
+.nav-row:hover .nav-direction.external { transform: translate(2px, -2px); }
 
-  &:hover {
-    background: linear-gradient(135deg, rgba(21, 151, 229, 0.2), rgba(143, 223, 255, 0.07));
-    border-color: rgba(33, 182, 234, 0.5);
-    box-shadow: 0 8px 28px rgba(0, 80, 145, 0.18);
-  }
+.sidebar-parked { margin-top: 25px; }
+.parked-head { display: flex; align-items: center; gap: 12px; color: #59697c; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
+.parked-line { height: 1px; flex: 1; background: var(--panel-line); }
+.parked-grid { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px 16px; }
+.parked-row { min-height: 31px; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; background: transparent; color: #59697c; font-size: 12px; font-weight: 550; text-align: left; cursor: pointer; transition: color 0.2s ease; }
+.parked-row:hover { color: #8999ab; }
+.parked-dot { width: 3px; height: 3px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
 
-  &:active {
-    transform: scale(0.98);
-  }
+.brand-mark-wrap { background: #f2f5ff; }
+.brand-mark { mix-blend-mode: multiply; filter: saturate(1.05) brightness(1.08); }
+.close-btn { background: #fff; }
+.close-btn:hover { color: #fff; border-color: var(--panel-blue); background: var(--panel-blue); }
+.account-row { background: #fff; }
+.account-row:hover { border-color: rgba(0, 82, 255, 0.45); background: #f2f5ff; }
+.account-status { box-shadow: none; }
+.address-value { color: var(--panel-text); }
+.copy-action { color: var(--panel-blue); background: #f2f5ff; }
+.nav-row { color: #303744; }
+.nav-row:hover { color: var(--panel-text); background: linear-gradient(90deg, #f2f5ff, transparent 82%); }
+.nav-row.active { color: #fff; background: var(--panel-blue); }
+.nav-row.active .nav-index,
+.nav-row.active .nav-direction { color: #fff; }
+.nav-index,
+.nav-direction { color: #737b89; }
+.parked-head,
+.parked-row { color: #737b89; }
+.parked-row:hover { color: var(--panel-blue); }
 
-  .address-label {
-    margin-bottom: 5px;
-    color: $text-muted;
-    font-size: 10px;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-  }
-
-  .address-value {
-    color: $brand-primary-light;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.4px;
-    word-break: break-all;
-  }
-
-  .copy-mark {
-    position: absolute;
-    top: 50%;
-    right: 16px;
-    width: 14px;
-    height: 14px;
-    border: 1px solid rgba(143, 223, 255, 0.72);
-    border-radius: 3px;
-    transform: translateY(-35%);
-
-    &::before {
-      content: '';
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      top: -5px;
-      left: -5px;
-      border: 1px solid rgba(143, 223, 255, 0.42);
-      border-radius: 3px;
-    }
-  }
-}
-
-.sidebar-nav {
-  width: 100%;
-  margin-top: 22px;
-  margin-bottom: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.nav-item {
-  position: relative;
-  min-height: 46px;
-  box-sizing: border-box;
-  padding: 13px 42px 13px 20px;
-  background: rgba(143, 223, 255, 0.035);
-  border-radius: 13px;
-  color: rgba(244, 250, 255, 0.78);
-  font-size: 14px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: all $transition-fast;
-  border: 1px solid rgba(143, 223, 255, 0.06);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    right: 20px;
-    width: 5px;
-    height: 5px;
-    border-top: 1px solid currentColor;
-    border-right: 1px solid currentColor;
-    opacity: 0.42;
-    transform: translateY(-50%) rotate(45deg);
-  }
-
-  &:hover {
-    color: $text-primary;
-    background: rgba(21, 151, 229, 0.1);
-    border-color: rgba(21, 151, 229, 0.2);
-    transform: translateX(3px);
-  }
-
-  &.active {
-    color: $text-primary;
-    background: linear-gradient(90deg, rgba(21, 151, 229, 0.3), rgba(33, 182, 234, 0.08));
-    border-color: rgba(33, 182, 234, 0.48);
-    box-shadow: inset 3px 0 0 $brand-accent, 0 8px 24px rgba(0, 91, 156, 0.16);
-
-    &::before {
-      color: $brand-primary-light;
-      opacity: 1;
-    }
-  }
-
-  &.external::after {
-    content: '↗';
-    position: absolute;
-    right: 18px;
-    top: 50%;
-    color: $brand-primary-light;
-    font-size: 13px;
-    opacity: 0.62;
-    transform: translateY(-50%);
-  }
-
-  &.external::before {
-    display: none;
-  }
-
-  &.upcoming {
-    color: rgba(159, 179, 200, 0.62);
-
-    &::before {
-      width: 4px;
-      height: 4px;
-      border: 0;
-      border-radius: 50%;
-      background: $brand-primary;
-      box-shadow: 0 0 8px rgba(33, 182, 234, 0.7);
-      transform: translateY(-50%);
-    }
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
+@keyframes overlay-in { from { opacity: 0; } }
+@keyframes panel-in { from { opacity: 0; transform: translateX(-42px); } }
+@keyframes item-in { from { opacity: 0; transform: translateX(-10px); } }
 
 @media (max-width: 374px) {
-  .sidebar {
-    width: 92vw;
-    padding-inline: 16px;
-  }
+  .sidebar { width: 100vw; padding-inline: 18px; }
+  .brand-name { max-width: 190px; font-size: 9px; }
+}
 
-  .sidebar-logo {
-    margin-top: 8px;
-
-    .logo-img {
-      width: 92px;
-      height: 92px;
-    }
-  }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-overlay,
+  .sidebar,
+  .nav-row { animation: none; }
+  .nav-row,
+  .close-btn,
+  .account-row,
+  .nav-direction { transition: none; }
 }
 </style>

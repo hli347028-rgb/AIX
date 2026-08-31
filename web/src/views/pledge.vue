@@ -104,7 +104,7 @@ const handleSubmit = () => {
           line-height: 48px;
           font-size: 40px;
           font-weight: bold;
-          color: #fff;
+          color: var(--text);
           text-align: center;
         }
       }
@@ -114,7 +114,7 @@ const handleSubmit = () => {
         line-height: 48px;
         font-size: 40px;
         font-weight: bold;
-        color: #fff;
+        color: var(--text);
         text-align: center;
       }
     }
@@ -123,7 +123,7 @@ const handleSubmit = () => {
   .asset-label {
     margin-top: 4px;
     font-size: 12px;
-    color: #fff;
+    color: var(--text);
     text-align: center;
   }
 
@@ -158,7 +158,7 @@ const handleSubmit = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.07);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -168,7 +168,7 @@ const handleSubmit = () => {
 .modal-content {
   width: 100%;
   max-width: 414px;
-  background: rgba(8, 19, 30, 0.8);
+  background: var(--surface-1);
   backdrop-filter: blur(10px);
   border-radius: 32px 32px 0 0;
   padding: 20px 24px 32px;
@@ -183,12 +183,12 @@ const handleSubmit = () => {
   .modal-title {
     font-size: 16px;
     font-weight: bold;
-    color: #fff;
+    color: var(--text);
   }
 
   .modal-close {
     font-size: 24px;
-    color: #fff;
+    color: var(--text);
     cursor: pointer;
     line-height: 1;
   }
@@ -197,7 +197,7 @@ const handleSubmit = () => {
 .modal-body {
   .section-label {
     font-size: 13px;
-    color: #fff;
+    color: var(--text);
     margin: 0 0 16px 0;
   }
 
@@ -214,7 +214,7 @@ const handleSubmit = () => {
       justify-content: center;
       min-height: 70px;
       padding: 10px 5px 15px;
-      border: 0.5px solid rgba(21, 151, 229, 0.2);
+      border: 0.5px solid var(--hair);
       border-radius: 10px;
       background: $bg-card;
       cursor: pointer;
@@ -270,7 +270,7 @@ const handleSubmit = () => {
 
   .balance-text {
     font-size: 13px;
-    color: #fff;
+    color: var(--text);
     margin: 0 0 12px 0;
     font-weight: bold;
   }
@@ -283,8 +283,8 @@ const handleSubmit = () => {
 
     .input-wrap {
       flex: 1;
-      background: #030A11;
-      border: 0.5px solid rgba(21, 151, 229, 0.15);
+      background: var(--ink-deep);
+      border: 0.5px solid var(--hair);
       border-radius: 8px;
       padding: 10px 12px;
 
@@ -292,7 +292,7 @@ const handleSubmit = () => {
         width: 100%;
         background: transparent;
         border: none;
-        color: #fff;
+        color: var(--text);
         font-size: 14px;
         outline: none;
 
@@ -325,7 +325,7 @@ const handleSubmit = () => {
     display: flex;
     justify-content: space-between;
     font-size: 11px;
-    color: #fff;
+    color: var(--text);
     margin-bottom: 20px;
   }
 
@@ -333,7 +333,7 @@ const handleSubmit = () => {
     display: flex;
     justify-content: space-between;
     font-size: 14px;
-    color: #fff;
+    color: var(--text);
     margin-bottom: 20px;
   }
 

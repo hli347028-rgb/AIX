@@ -214,7 +214,7 @@ const handleBack = () => {
         display: flex;
         flex-direction: column;
         gap: 10px;
-        background: #0D1B2A;
+        background: var(--surface-2);
         border-radius: 6px;
         padding: 15px;
         .order-header {
@@ -246,13 +246,13 @@ const handleBack = () => {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            color: #CCC;
+            color: var(--text-2);
           }
         }
         .order-address {
           border-bottom: 1px solid #222;
           padding-bottom: 10px;
-          color: #CCC;
+          color: var(--text-2);
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -261,7 +261,7 @@ const handleBack = () => {
       .order-footer {
         text-align: right;
         font-size: 14px;
-        color: #CCC;
+        color: var(--text-2);
       }
     }
   }

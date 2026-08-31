@@ -83,7 +83,7 @@ const handleRule = () => {
     background-size: 100% auto;
     .current-price {
       background: hsla(0, 0%, 100%, .1);
-      border: 1px solid #666;
+      border: 1px solid var(--hair);
       border-radius: 8px;
       padding: 20px 15px;
       display: flex;
@@ -91,8 +91,11 @@ const handleRule = () => {
       justify-content: space-between;
       span {
         &:nth-child(2) {
-          color: rgb(21, 151, 229);
+          /* 原为高饱和蓝 rgb(21,151,229)：价格数值不需要用颜色强调，
+             近白 + 等宽数字已经足够醒目，且与全站无彩色方向一致。 */
+          color: var(--text);
           font-weight: 500;
+          font-variant-numeric: tabular-nums;
         }
       }
     }
@@ -137,12 +140,17 @@ const handleRule = () => {
           }
         }
       }
+      /* 三对统计卡原本都是「浅色块 + 蓝色块」。蓝色归中性后两块会完全同色，
+         所以配对关系改由「实底 vs 描边」承担：重点项实底，参照项描边。
+         这比两块彩色更克制，主次也一眼可辨。三对统一用这一套写法。 */
       .column-left {
-        background: #1597E5;
-        color: #03070B;
+        background: var(--accent);
+        color: var(--ink-deep);
       }
       .column-right {
-        background: #087BC1;
+        background: var(--surface-1);
+        border: 1px solid var(--hair-2);
+        color: var(--text);
       }
     }
     .double-column-2 {
@@ -165,13 +173,15 @@ const handleRule = () => {
       }
       .column-left {
         width: 45%;
-        background: #087BC1;
-        color: #FFF;
+        background: var(--accent);
+        /* 底色转近白，字色必须同时从 #FFF 改为近黑 */
+        color: var(--ink-deep);
       }
       .column-right {
         flex: 1;
-        background: #03070B;
-        border: 1px solid #087BC1;
+        background: var(--surface-1);
+        border: 1px solid var(--hair-2);
+        color: var(--text);
       }
     }
     .double-column-3 {
@@ -192,16 +202,19 @@ const handleRule = () => {
           }
         }
       }
+      /* 这一对的重点项在右侧（全网总算力是汇总值），保留其实底不动，
+         只把左侧参照项的亮白描边降为发丝线 —— 描边用 --accent（近白）
+         会和实底一样抢眼，失去主次。 */
       .column-left {
         width: 50%;
-        background: #03070B;
-        border: 1px solid #1597E5;
-        color: #FFF
+        background: var(--surface-1);
+        border: 1px solid var(--hair-2);
+        color: var(--text);
       }
       .column-right {
         flex: 1;
-        background: #1597E5;
-        color: #222;
+        background: var(--accent);
+        color: var(--ink-deep);
       }
     }
   }

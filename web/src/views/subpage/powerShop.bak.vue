@@ -171,7 +171,7 @@ const handleBack = () => {
             border: 0;
             height: 30px;
             text-align: center;
-            color: #1597E5;
+            color: var(--accent);
           }
         }
       }

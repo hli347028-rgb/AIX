@@ -4,6 +4,7 @@
             <div class="dataCon" :style="{ width: `calc(100% - ${index * 20}px)` }">
                 <div class="data" @click="look(value)">
                     <a>{{ value.address }}</a>
+                    <a v-if="value.username">{{ value.username }}</a>
                     <a>{{ value.createdAt }}</a>
                 </div>
                 <div class="circle" @click="look(value)">

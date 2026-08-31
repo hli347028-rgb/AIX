@@ -206,16 +206,16 @@ var legacyConfigDefs = []struct {
 	{18, "W8 收益系数"},
 	{19, "W9 收益系数"},
 	{20, "W10 收益系数"},
-	{21, "成为 W1 的小区业绩金额(USDT)"},
-	{22, "成为 W2 的小区业绩金额(USDT)"},
-	{23, "成为 W3 的小区业绩金额(USDT)"},
-	{24, "成为 W4 的小区业绩金额(USDT)"},
-	{25, "成为 W5 的小区业绩金额(USDT)"},
-	{26, "成为 W6 的小区业绩金额(USDT)"},
-	{27, "成为 W7 的小区业绩金额(USDT)"},
-	{28, "成为 W8 的小区业绩金额(USDT)"},
-	{29, "成为 W9 的小区业绩金额(USDT)"},
-	{30, "成为 W10 的小区业绩金额(USDT)"},
+	{21, "成为 W1 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{22, "成为 W2 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{23, "成为 W3 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{24, "成为 W4 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{25, "成为 W5 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{26, "成为 W6 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{27, "成为 W7 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{28, "成为 W8 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{29, "成为 W9 的大区/小区业绩门槛(USDT，须同时达标)"},
+	{30, "成为 W10 的大区/小区业绩门槛(USDT，须同时达标)"},
 }
 
 func (s *AdminLegacyService) HandleLogin(ctx khttp.Context) error {
@@ -343,6 +343,7 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"userId":              u.ID,
 			"id":                  u.ID,
 			"address":             u.Address,
+			"username":            u.Username,
 			"usdt_recharge":       u.UsdtRecharge,
 			"usdt_reward":         u.UsdtReward,
 			"aix_balance":         u.AixBalance,        // AIX 代币数
@@ -748,70 +749,33 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 	}
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
-	addressFilter := strings.TrimSpace(q.Get("address"))
-	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
 
-	type row struct {
-		ID             int64
-		Type           string
-		Asset          string
-		Amount         decimal.Decimal
-		Address        string
-		FromAddress    string
-		SettlementDate *string
-		CreatedTime    time.Time
-	}
-	var rows []row
-	db := s.data.DB().WithContext(ctx).
-		Table("reward_logs rl").
-		Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
-			COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
-		Joins("JOIN users u ON u.id = rl.user_id").
-		Joins("LEFT JOIN users fu ON fu.id = rl.from_user_id").
-		Order("rl.id desc")
-	if addressFilter != "" {
-		db = db.Where("u.address LIKE ?", "%"+addressFilter+"%")
-	}
-	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
-		switch typeFilter {
-		case "mgmt", "mgmt_pool_release", "管理奖":
-			db = db.Where("rl.type IN ?", []string{biz.RewardTypeMgmt, biz.RewardTypeMgmtPoolRelease, biz.RewardTypeMgmtOverflow})
-		case "dynamic_usdt", "direct_pool_release", "直推奖":
-			db = db.Where("rl.type IN ?", []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease})
-		default:
-			db = db.Where("rl.type = ?", typeFilter)
-		}
-	}
-	if err := db.Scan(&rows).Error; err != nil {
+	var total int64
+	if err := s.rewardListDB(ctx, q).Count(&total).Error; err != nil {
 		return err
 	}
-	total := len(rows)
-	pageRows := paginateSlice(rows, offset, pageSize)
-	items := make([]map[string]interface{}, 0, len(pageRows))
-	for _, r := range pageRows {
-		settle := ""
-		if r.SettlementDate != nil {
-			settle = *r.SettlementDate
-		}
-		items = append(items, map[string]interface{}{
-			"id":             r.ID,
-			"type":           normalizeRewardType(r.Type),
-			"rawType":        r.Type,
-			"asset":          r.Asset,
-			"amount":         r.Amount.String(),
-			"address":        r.Address,
-			"addressTwo":     r.FromAddress,
-			"reason":         normalizeRewardType(r.Type),
-			"settlementDate": settle,
-			"createdAt":      formatLegacyTime(r.CreatedTime),
-			"date":           formatLegacyTime(r.CreatedTime),
-		})
+	stats, err := s.rewardStats(ctx, q)
+	if err != nil {
+		return err
+	}
+
+	var rows []rewardListRow
+	if err := s.rewardListDB(ctx, q).
+		Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
+			COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
+		Order("rl.id desc").Offset(offset).Limit(pageSize).Scan(&rows).Error; err != nil {
+		return err
+	}
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, rewardRowToItem(r))
 	}
 	return ctx.Result(200, map[string]interface{}{
 		"rewards": items,
 		"list":    items,
 		"count":   total,
 		"page":    page,
+		"stats":   stats,
 	})
 }
 
@@ -1250,6 +1214,7 @@ func (s *AdminLegacyService) HandleUserRecommend(ctx khttp.Context) error {
 		users = append(users, map[string]interface{}{
 			"userId":             n.User.ID,
 			"address":            n.User.Address,
+			"username":           n.User.Username,
 			"createdAt":          formatLegacyTime(n.User.CreatedAt),
 			"amount":             n.User.UsdtRecharge,
 			"recommendAllAmount": n.RecommendAmount,

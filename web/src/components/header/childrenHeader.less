@@ -1,6 +1,6 @@
 .children-header {
   height: 45px;
-  background: #8FDFFF;
+  background: var(--accent-bright);
   position: relative;
   z-index: 999;
   .children-header-main {
@@ -57,8 +57,14 @@
       flex: 1;
       display: flex;
       justify-content: center;
+      align-items: center;
       img {
         height: 22px;
+        /* width: auto + contain：徽标非正方形时不会被压变形。
+           注意 22px 会被 px→rem 转换（旧页面是 rem 缩放布局，
+           根字号随视口变化），实际渲染尺寸按比例放大是正常的。 */
+        width: auto;
+        object-fit: contain;
       }
     }
     .set-button {

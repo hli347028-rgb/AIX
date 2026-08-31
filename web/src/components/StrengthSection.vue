@@ -1,207 +1,175 @@
 <template>
   <div class="strength-section">
     <h2 class="section-title">{{ $t('advantage.title') }}</h2>
-    <div ref="wrapperRef" class="carousel-wrapper">
-      <div ref="trackRef" class="carousel-track" :style="trackStyle">
-        <div
-          v-for="(card, i) in clonedCards"
-          :key="i"
-          class="strength-card"
-          :class="{ active: i === activeIndex }"
+
+    <!-- 静态清单。原本是自动轮播的三张卡，见 <style> 中的说明。 -->
+    <ul class="strength-list">
+      <li v-for="card in cards" :key="card.tag" class="strength-item">
+        <svg
+          class="item-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
         >
-          <div class="card-border">
-            <div class="card-tag">{{ $t(card.tag) }}</div>
-            <div class="card-inner">
-              <img :src="card.illustration" :alt="$t(card.tag)" class="card-illustration" />
-              <img :src="card.icon" :alt="$t(card.tag)" class="card-icon" />
-              <p class="card-desc">{{ $t(card.desc) }}</p>
-            </div>
-          </div>
+          <path :d="card.iconPath" />
+        </svg>
+        <div class="item-body">
+          <h3 class="item-title">{{ $t(card.tag) }}</h3>
+          <p class="item-desc">{{ $t(card.desc) }}</p>
         </div>
-      </div>
-    </div>
+      </li>
+    </ul>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-
 interface StrengthCard {
   tag: string
-  illustration: string
-  icon: string
+  /** 线性图标路径（24x24 viewBox） */
+  iconPath: string
   desc: string
 }
 
+/* 去掉了 illustration 字段：三张深色库存图（保险箱转盘/金币堆/电路板）
+   已不再使用。同时删除了首尾克隆、自动播放定时器、ResizeObserver 和
+   translateX 计算 —— 静态清单不需要这些。 */
 const cards: StrengthCard[] = [
   {
     tag: 'advantage.revenueTag',
-    illustration: '/static/advantage/illustration-revenue-growth.png',
-    icon: '/static/advantage/icon-revenue-up.png',
+    // 上升折线
+    iconPath: 'M3 17l5-5 4 3 6-7M17 8h4v4',
     desc: 'advantage.revenueDesc'
   },
   {
     tag: 'advantage.transparentTag',
-    illustration: '/static/advantage/illustration-data-transparent.png',
-    icon: '/static/advantage/icon-transparent-link.png',
+    // 链接环
+    iconPath: 'M10 13a4 4 0 006 0l2-2a4 4 0 00-6-6l-1 1M14 11a4 4 0 00-6 0l-2 2a4 4 0 006 6l1-1',
     desc: 'advantage.transparentDesc'
   },
   {
     tag: 'advantage.securityTag',
-    illustration: '/static/advantage/illustration-security-shield.png',
-    icon: '/static/advantage/icon-security-lock.png',
+    // 盾牌 + 勾
+    iconPath: 'M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3zM9 12l2 2 4-4',
     desc: 'advantage.securityDesc'
   }
 ]
-
-// 首尾克隆实现无限循环
-const clonedCards = [
-  cards[cards.length - 1],
-  ...cards,
-  cards[0]
-]
-
-const wrapperRef = ref<HTMLDivElement>()
-const activeIndex = ref(1)
-const isTransitioning = ref(true)
-const translateX = ref(0)
-const CARD_WIDTH_RATIO = 0.55
-const GAP = 12
-
-const updateTranslateX = () => {
-  if (!wrapperRef.value) return
-  const wrapperWidth = wrapperRef.value.clientWidth
-  const cardWidth = wrapperWidth * CARD_WIDTH_RATIO
-  const stagePadding = (wrapperWidth - cardWidth) / 2
-  translateX.value = stagePadding - activeIndex.value * (cardWidth + GAP)
-}
-
-const trackStyle = computed(() => ({
-  transform: `translateX(${translateX.value}px)`,
-  transition: isTransitioning.value ? 'transform 0.5s ease' : 'none'
-}))
-
-let timer: ReturnType<typeof setInterval> | null = null
-let resizeObserver: ResizeObserver | null = null
-
-const goNext = () => {
-  activeIndex.value++
-  isTransitioning.value = true
-  updateTranslateX()
-
-  if (activeIndex.value >= clonedCards.length - 1) {
-    setTimeout(() => {
-      isTransitioning.value = false
-      activeIndex.value = 1
-      updateTranslateX()
-    }, 500)
-  }
-}
-
-onMounted(() => {
-  updateTranslateX()
-
-  resizeObserver = new ResizeObserver(updateTranslateX)
-  if (wrapperRef.value) resizeObserver.observe(wrapperRef.value)
-
-  timer = setInterval(goNext, 3000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
-  if (resizeObserver) resizeObserver.disconnect()
-})
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
+/* 已改为消费 polish.less 的设计令牌，不再依赖 variables.scss 的旧色值。 */
 
+/* 这一块原本是「自动轮播的三张卡 + 深色库存图 + 悬浮胶囊标签」。
+   三个问题叠在一起，是全页最主要的廉价感来源：
+
+     1. 库存图 —— 保险箱转盘、金币堆、电路板。这类图几乎是"廉价加密项目"
+        的视觉标志，而且它们自带的棕/蓝色偏与整套中性灰阶冲突（之前还得
+        专门写一个构建脚本去给它们统一色调，这本身就是信号：素材不对）。
+     2. 自动轮播 —— 只有三条短文案，却让用户每 3 秒被动等一次，
+        还永远只能看到一张半。手法比内容重。
+     3. 悬浮胶囊标签 —— 骑在卡沿上的小圆角标签是促销贴纸的语言。
+
+   改为静态纵向清单：三条并列可见，一眼读完，不抢视线也不需要等待。
+   这也和页面其他部分（账目行、区块标题）的发丝线语言统一起来。 */
 .strength-section {
-  margin-bottom: 32px;
+  /* 与首页其余区块统一到 40px 的纵向节奏 */
+  margin-bottom: 40px;
+}
 
+  /* 区块标题。与首页"合作机构"保持同一套写法（一致性是对的），
+     但档位从 --fs-micro(10px) 提到 --fs-title(19px)。
+
+     原来的问题是层级倒挂：区块标题用了全站最弱的一档 —— 10px 全大写
+     微型标签 —— 结果比它所统辖的条目标题（item-title，15px）还轻。
+     标题比内容轻，读者就无法靠字号判断结构。
+     微型大写标签适合做 kicker（眉标），不适合做区块主标题。
+
+     字距同时从 0.32em 收到 --ls-tight：宽字距是小号大写标签的做法，
+     19px 的中文标题用宽字距会散。 */
   .section-title {
-    font-size: 21px;
-    font-weight: bold;
-    color: #fff;
-    text-align: center;
-    margin: 0 0 20px 0;
+  margin: 0 0 14px;
+  font-family: var(--aix-font-display);
+  font-size: var(--fs-title);
+  font-weight: 500;
+  letter-spacing: var(--ls-tight);
+  color: var(--text);
   }
 
-  .carousel-wrapper {
-    overflow: hidden;
-    width: 100%;
-  }
+.strength-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
-  .carousel-track {
-    display: flex;
-    gap: 12px;
-    padding-top: 16px;
-    will-change: transform;
-  }
+/* 发丝线分隔而非卡片：三条内容是并列关系，用一条线区隔就够，
+   给每条套一个圆角容器只会把简单的列表变成三个盒子。 */
+.strength-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--hair);
+}
 
-  .strength-card {
-    flex: 0 0 55%;
-    height: 280px;
-    min-width: 0;
+.strength-item:last-child {
+  border-bottom: 0;
+}
 
-    .card-border {
-      position: relative;
-      padding: 2px;
-      background: linear-gradient(180deg, #8FDFFF 0%, #1597E5 100%);
-      border-radius: 20px;
-      height: 100%;
-    }
+/* 图标压到最小可辨，且不给强调色 —— 它是标记，不是主角 */
+.item-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  color: var(--text-3);
+}
 
-    .card-tag {
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 24px;
-      background: linear-gradient(180deg, #8FDFFF 0%, #1597E5 51%, #075FB8 100%);
-      color: #000;
-      font-size: 13px;
-      font-weight: 800;
-      border-radius: 20px;
-      z-index: 2;
-      white-space: nowrap;
-    }
+.item-body {
+  min-width: 0;
+}
 
-    .card-inner {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      background: rgba(8, 19, 30, 0.6);
-      backdrop-filter: blur(10px);
-      border-radius: 18px;
-      padding: 0 0 20px;
-      overflow: hidden;
-      height: calc(100% - 4px);
+/* 标题用细字重的显示字体。原本这里是 10px 全大写粗体的胶囊标签文字，
+   现在恢复成正常的小标题 —— 内容本来就是完整短句，不该被塞进标签里。 */
+.item-title {
+  margin: 0 0 5px;
+  font-family: var(--aix-font-display);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--accent);
+}
 
-      .card-illustration {
-        width: 100%;
-        height: 140px;
-        object-fit: contain;
-        margin-bottom: 8px;
-      }
+.item-desc {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
 
-      .card-icon {
-        width: 48px;
-        height: 48px;
-        object-fit: contain;
-        margin-bottom: 12px;
-      }
-
-      .card-desc {
-        font-size: 12px;
-        color: rgba(244, 250, 255, 0.9);
-        text-align: center;
-        margin: 0;
-        line-height: 1.5;
-        padding: 0 8px;
-      }
-    }
-  }
+.strength-section { padding-top: 12px; }
+.strength-item {
+  position: relative;
+  transition: padding-left .35s cubic-bezier(.2,.8,.2,1), background .35s ease;
+}
+.strength-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: width .45s cubic-bezier(.2,.8,.2,1);
+}
+.strength-item:hover { padding-left: 14px; }
+.strength-item:hover::after { width: 100%; }
+.item-icon { transition: color .3s ease, transform .35s cubic-bezier(.2,.8,.2,1); }
+.strength-item:hover .item-icon { color: var(--accent); transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .strength-item, .strength-item::after, .item-icon { transition: none; }
 }
 </style>

@@ -13,6 +13,7 @@ type UserPO struct {
 	Address           string          `gorm:"uniqueIndex;size:42;not null"`
 	InviterID         *int64          `gorm:"index"`
 	InviteCode        string          `gorm:"uniqueIndex;size:64;not null"`
+	Username          string          `gorm:"column:username;size:64;default:'';not null"` // 用户端「我的团队」名称设置
 	UsdtRecharge      decimal.Decimal `gorm:"column:usdt_recharge;type:decimal(36,18);default:0;not null"`
 	UsdtReward        decimal.Decimal `gorm:"column:usdt_reward;type:decimal(36,18);default:0;not null"`
 	AixBalance        decimal.Decimal `gorm:"column:aix_balance;type:decimal(36,18);default:0;not null"`         // AIX 代币数（静态换算入账）

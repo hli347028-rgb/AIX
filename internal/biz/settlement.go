@@ -207,7 +207,7 @@ func (uc *SettlementUsecase) creditUsdtReward(ctx context.Context, userID int64,
 	})
 }
 
-// refreshMgmtLevels 刷新全网小区业绩与 W 等级
+// refreshMgmtLevels 刷新全网大区/小区业绩与 W 等级（晋级须大小区同时达标）
 func (uc *SettlementUsecase) refreshMgmtLevels(ctx context.Context) error {
 	return uc.userRepo.RefreshPerformance(ctx)
 }

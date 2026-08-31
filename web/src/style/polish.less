@@ -1,0 +1,1539 @@
+/**
+ * ============================================================================
+ *  AIX 设计地基 —— "精密仪器 / Precision Instrument"
+ * ============================================================================
+ *  设计方向：瑞士机械表盘 + 金融终端。
+ *  核心手法是「材质」而非「配色」—— 用极细的机雕纹(guilloché)、发丝分割线、
+ *  等宽数字与克制的负空间做高级感，而不是靠加新颜色或发光特效。
+ *
+ *  【为什么这次是重构而不是继续打补丁】
+ *  上一版是 690 行 !important 皮肤层，压在各页 scoped 样式之上，
+ *  所以每次只能"修一点点"，且极脆弱。现在改为：
+ *    本文件   = 真正的地基（令牌 / 字体 / 材质 / 动效 / 组件基元）
+ *    各页面   = 直接调用地基令牌，重写自己的 scoped 样式
+ *  第 9 节的过渡补丁只服务「尚未重写的页面」，重写到哪就删到哪。
+ *
+ *  【对后端的影响】
+ *  不含任何接口、字段、路由、文案。删掉 index.less 里的 import 即可完全回退。
+ * ============================================================================
+ */
+
+/* ----------------------------------------------------------------------------
+   0. 字体 —— 两款自托管可变字体（国内无墙、零外部请求）
+      · Manrope 正文/数字：几何骨架，等宽数字优秀
+      · Sora    标题/大数字：低对比几何体，克制的科技感
+      均只接管拉丁字母与数字，中文交给系统屏显字体，中英混排不突兀。
+   ---------------------------------------------------------------------------- */
+@latin-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+  U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+  U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+
+@font-face {
+  font-family: 'AixSans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/static/fonts/manrope-var.woff2') format('woff2');
+  unicode-range: @latin-range;
+}
+
+@font-face {
+  font-family: 'AixDisplay';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/static/fonts/sora-var.woff2') format('woff2');
+  unicode-range: @latin-range;
+}
+
+/* ----------------------------------------------------------------------------
+   中文字形。这是整个界面「高级感」最大的一块短板，之前一直没补：
+   全站主语言是中文，但中文字形完全交给系统字体 —— iOS 上是苹方（好），
+   安卓与桌面端则是各家默认黑体，字形、字重、字面率都不可控。
+
+   更关键的是字重：版面里大量使用 300 / 500 这种非常规字重，而多数系统中文
+   字体只有 Regular 一档，浏览器只能拿 400 硬顶，或用算法伪造粗体 ——
+   于是精心调过的「细字重大标题」在中文下全部塌回普通字重，
+   这正是"看起来不够高级"的根源之一。
+
+   做法：把思源黑体按全站实际用到的 1245 个字形做子集化（源字库 1.1MB/档
+   → 175KB/档），三档真实字重共 528KB，且用 unicode-range 限定 ——
+   英文/韩文/日文等其它 7 个语种的用户完全不会下载这些文件。
+   ---------------------------------------------------------------------------- */
+@cjk-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+
+@font-face {
+  font-family: 'AixCJK';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/static/fonts/aixcjk-300.woff2') format('woff2');
+  unicode-range: @cjk-range;
+}
+
+@font-face {
+  font-family: 'AixCJK';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/aixcjk-400.woff2') format('woff2');
+  unicode-range: @cjk-range;
+}
+
+@font-face {
+  font-family: 'AixCJK';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/fonts/aixcjk-500.woff2') format('woff2');
+  unicode-range: @cjk-range;
+}
+
+/* 700 粗体档。之前只有 300/400/500 三档，最粗到 500 为止 ——
+   于是"超粗大标题"这个想法在中文下根本无法成立：给中文设 font-weight: 700
+   时浏览器只能拿 500 那一档做**算法伪粗**（把字形整体外扩描边），
+   笔画交叉处会糊成一团，中文尤其明显，反而比不加粗更廉价。
+
+   所以这一档是必需的，不是锦上添花。同样按项目实际用到的 1464 个字形
+   子集化（源字库 8.5MB → 222KB），并沿用 unicode-range 限定，
+   非中文语种用户不会下载。
+   代价要说清楚：中文字重总量从 528KB 增至 750KB。
+   它只服务于标题，配 font-display: swap 不阻塞渲染，
+   且首屏文字会先用系统字体显示、字体到位后替换。 */
+@font-face {
+  font-family: 'AixCJK';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/fonts/aixcjk-700.woff2') format('woff2');
+  unicode-range: @cjk-range;
+}
+
+/* ----------------------------------------------------------------------------
+   1. 设计令牌
+   ---------------------------------------------------------------------------- */
+:root {
+  /* —— 字体栈 —— */
+  /* 'AixCJK' 排在系统中文字体之前：中文优先用自带的三档字重，
+     子集之外的字（接口返回的动态内容等）自动落回苹方/鸿蒙黑，不会缺字。 */
+  --aix-font: 'AixSans', 'AixCJK', -apple-system, BlinkMacSystemFont,
+    'SF Pro Text', 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans',
+    'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+  --aix-font-display: 'AixDisplay', 'AixSans', 'AixCJK', -apple-system,
+    BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans',
+    'Source Han Sans SC', 'Microsoft YaHei', sans-serif;
+
+  /* ==========================================================================
+     配色：电光蓝 · 信号面板
+     --------------------------------------------------------------------------
+     【前三版为什么都失败，以及这一版凭什么不一样】
+
+     v1 降饱和蓝 —— 把蓝调低成灰蓝，结果是 LOGO 的褪色副本。
+     v2 香槟金   —— 与画面里既有的蓝/品红打架。
+     v3 全无彩色 —— 颜色是安全的，但版面变成一份灰色文档：全是同款圆角卡
+                    片叠罗汉、没有层级，"素"最终等于"平"。
+
+     三次的共同点是：我一直在换油漆，却没动构图。所以这一版真正的改动是
+     层级与构图（见下面的 --fs-* 与第 4 节材质），配色只是其中一环。
+
+     【为什么这次敢用蓝】
+     v1 的错不在"用蓝"，而在"把蓝调灰"。画面里本来就有一枚饱和电光蓝的
+     品牌标记 —— 与其躲开它、调出一个半死的蓝，不如把它认作品牌色，
+     满强度使用。躲着用才是褪色副本的由来。
+
+     【铁律：蓝色只在三种位置出现】
+       1. 实时数据（余额、收益、行情等会变的数字）
+       2. 主操作（唯一的主按钮、激活态）
+       3. 状态指示（进行中 / 已激活的信号点）
+     绝不用于：装饰性描边、卡片背景渐变、图标底板、静态标签、分割线。
+     这条约束是这套配色成立的前提 —— 蓝一旦用于装饰，立刻变回"又一个
+     深色加密模板"，也就是 v1 的结局。
+
+     合作方的 20 个真实品牌 logo（Uniswap 品红、Cardano 蓝……）仍保持原色：
+     它们是金融产品的信任凭据。底色保持中性近黑，也是为了让它们烘死在
+     #000 上的 PNG 背景无缝融入版面。
+     ========================================================================== */
+
+  /* —— 底色：白。
+        这一版整体改为模仿 base.org，配色与风格都取自真实站点的实测值
+        （用浏览器逐元���采样得出，不����记忆）：
+          底色      #FFFFFF（25 个元素）/ #F8F8F8（7 个）
+          正文      rgb(23,23,23) = #171717
+          标志蓝    #0000FF（111 个元素，作为通栏区块底色）
+          次级蓝    #0052FF（Coinbase 蓝）
+          淡蓝      #9AB8FF
+          圆角      卡片 12px、按钮 9999px（全圆）
+        Base 的观感来自"白底 + 近黑字 + 整块纯蓝"，全站零渐变、零发光、
+        极度扁平 —— 与本项目前几版的深色海军蓝＋青蓝渐变正好相反，
+        这也是之前反复"还是难看"的根因：方向不对，细节再修也不对。
+
+        --ink       应用底色（body）
+        --ink-deep  设备列以外的画布，压深一档让 414px 正文列读作一张白卡 */
+  --ink: #FFFFFF;
+  --ink-deep: #EFEFEF;
+
+  /* —— 表面层级：靠明���差建立层次，而不是靠到处画边框。
+        每档带极轻微的蓝偏������� 2% 色度），让表面���������������纯���拉������
+        与蓝色强调同处一个色温里，但单看时读不出"这是蓝的"。 —— */
+  /* Base 的卡片是"白底 + 一条极细灰边"，不靠明度差堆层次 ——
+     所以 surface-1 与页面同为纯白，边界完全交给 --hair。
+     surface-2 / 3 是压深的通栏带（Base 用 #F8F8F8 放统计区块）。 */
+  --surface-1: #FFFFFF;
+  --surface-2: #F8F8F8;
+  --surface-3: #EFEFEF;
+
+  /* —— 强调色：电光蓝，满饱和。
+        --accent        主操作 / 实时数值
+        --accent-bright 高亮态（hover / 数值跳动瞬间）
+        --accent-deep   渐变收尾与压深态
+        --accent-dim    低强度衬托（进度槽等），已足够暗，不算"装饰用蓝" —— */
+  /* 取自 base.org 实测：#0000FF 是它的标志色，用作通栏区块底；
+     #0052FF（Coinbase 蓝）用于文字与描边；#9AB8FF 是淡衬托。
+
+     这里有个必须显式处理的语义反转：--accent-bright 在深色版里意为
+     "更亮的蓝"（#6BA5FF），而它有上百处被当作**文字色**使用。
+     在白底上"更亮"恰好等于"看不见"—— #6BA5FF 对白只有约 2:1，
+     远低于可读线。所以浅色版里它必须指向**更深**的蓝。
+     名字保持不变是为了让现存的 660 处令牌引用继续生效，
+     语义则从"更亮"改为"更强调"。 */
+  --accent: #008CFF;
+  --accent-bright: #00C8FF;  /* 电光青蓝，用于高亮态 */
+  --accent-deep: #005BDF;    /* 按下态 */
+  --accent-dim: rgba(0, 140, 255, 0.10);
+  --accent-pale: #A8DDFF;    /* 淡电光蓝，用于低强度衬托 */
+  /* 蓝底区块上的前景色（Base 的纯蓝通栏配白字，对比 8.6:1） */
+  --on-accent: #FFFFFF;
+
+  /* —— 信号辉光：只服务于"实时/激活"语义，不做通用投影。
+        用两层不同扩散度叠加，单层发光是廉价特效的典型特征。 —— */
+  /* 发光在白底上不成立 —— 浅色背景上的外发光只会糊成一团脏色，
+     Base 全站没有任何发光。这两个名字保留（尚有页面在引用），
+     但语义改为"焦点/激活环"：实心细环，扁平、干净。 */
+  --glow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-dim);
+  --glow-soft: 0 0 0 3px var(--accent-dim);
+
+  /* —— 文字三档：中性白到中性灰。
+        正文刻意保持无彩色 —— 蓝色留给数据和操作，正文一旦染蓝，
+        上面那条铁律就失效了。 —— */
+  --text: #171717;   /* base.org 实测正文色 rgb(23,23,23)，对白 16.9:1 */
+  --text-2: #5B5B5B; /* 次级，对白 7.0:1 */
+  /* --text-3 原本定 #8A8A8A，实测后改深：
+     它在白底上只有 3.54:1、在 #F8F8F8 的分段控件底上只有 3.25:1，
+     都低于 WCAG AA 对正文的 4.5:1 —— 而它正被用在"未选中标签"这类
+     真实要读的文字上（节点页那四个模式标签就是实测到 3.25:1）。
+     深色版里这个值没问题（白字压黑底本就高对比），
+     翻成浅色后同一个"弱化"语义必须重新定值，不能等比照搬。
+     #6E6E6E：对白 5.0:1、对 #F8F8F8 4.8:1，两种底色下都过线。 */
+  --text-3: #6E6E6E;
+
+  /* —— 语义色：金融产品必需的涨跌两色。
+        与蓝色共存时需要错开色相距离：绿往青偏（远离蓝）、红往橙偏，
+        避免"蓝-绿"在深底上糊成一团。 —— */
+  /* 涨跌色必须重新定值，不能沿用深色版：
+     #34D399 对白只有 1.8:1、#FB6E62 约 2.7:1，在白底上都读不出来。
+     压深到对白 4.5:1 以上（分别约 4.6 与 4.8）。 */
+  --up: #0F8A5F;
+  --down: #D22D20;
+
+  /* —— 发丝线：高级感几乎全在这几条线的克制程度上。
+        中性白低透明度，不带色相 —— 分割线是结构而非信号，不能用蓝。 —— */
+  /* 从"白色低透明"翻为"黑色低透明"—— 白色叠加在白底上完全不可见。
+     Base 的卡片边界就是这一条极细灰线（实测 rgba(0,0,0,.1) 一档），
+     浅色版里它承担了原本由明度差承担的全部分层职责，所以比深色版
+     略微加重一点。 */
+  --hair: rgba(0, 0, 0, 0.10);
+  --hair-2: rgba(0, 0, 0, 0.16);
+  --hair-3: rgba(0, 0, 0, 0.28);
+
+  /* —— 旧强调色令牌别名 ——
+        pledge / exchange / node 等尚未重写的页面仍在引用 --gold* 与 --cyan*
+        （历史遗留：这两批命名分别来自前两版配色）。统一指向 --accent，
+        使换色一次性覆盖全站；页面重写到哪里，就把那里改成 --accent。
+        注意：这些名字现在与实际颜色不符，属于过渡状态，不要在新代码里用。 */
+  --gold: var(--accent);
+  --gold-deep: var(--accent-deep);
+  --gold-bright: var(--accent-bright);
+  --cyan: var(--accent);
+  --cyan-deep: var(--accent-deep);
+  --cyan-bright: var(--accent-bright);
+
+  /* ==========================================================================
+     体量尺度
+     --------------------------------------------------------------------------
+     所有 px 都会被 px2rem(rootValue 37.5) 换算：414px 视口下 ×1.10，
+     桌面预览列(html font-size 封顶 54px)下 ×1.44。定档时必须按换算后
+     的实际值来想，否则就会重演上一版的错误 —— 那版 --fs-hero 定在 76px，
+     换算后达 107px，大到没有任何页面敢用，于是这个"主数字"档位一次都
+     没被使用过，层级也就从来没有建立起来。
+
+     这一版按换算后的目标值反推，并补上中间档：
+     原本只有 76 / 52 / 26 / 14 四档，26→14 之间是断崖，
+     结果所有副标题、行标签只能挤在 12–14px 里，全都一样重 ——
+     这正是"卡片汤"在字号层面的成因。
+     ========================================================================== */
+  --fs-hero: 46px;    /* 每屏唯一的主数字（换算后 ≈51/66px） */
+  --fs-display: 30px; /* 区块级主数值 */
+  --fs-title: 19px;   /* 区块标题 */
+  --fs-lead: 15px;    /* 副标题 / 引导句（新增，补断崖） */
+  --fs-body: 13px;
+  --fs-sm: 11.5px;
+  --fs-micro: 10px;   /* 仅用于全大写标签 */
+
+  /* —— 字距：大字号必须收紧，小号全大写标签必须放开。
+        这一条不做的话，大标题会显得松散、小标签会糊成一块。 —— */
+  --ls-hero: -0.03em;
+  --ls-tight: -0.015em;
+  --ls-caps: 0.16em;
+
+  /* —— 圆角：只留三档，收敛原本 6/10/12/20/26/31px 混用的杂乱 —— */
+  /* 对齐 base.org 实测：卡片圆角集中在 12px（16 个元素），
+     按钮为 9999px 全圆（12 个）。原本 --r-lg 是 18px，偏圆润；
+     Base 的观感更方正克制，所以整体下调一档。 */
+  --r-lg: 12px;
+  --r-md: 8px;
+  --r-sm: 4px;
+  --r-pill: 9999px;
+
+  /* —— 阴影：近景锐利 + 远景弥散。单层阴影是廉价感的典������ —— */
+  /* 深色版的阴影不透明度高达 0.4–0.55 —— 那是为了在近黑底上还能看出层次。
+     白底上同样的值会变成一圈脏灰"脱水"轮廓。压到 0.04–0.10，
+     并保留"近景锐利 + 远景弥散"的双层结构。
+     Base 基本不用阴影（靠发丝线分层），所以这几档只用于浮层/弹窗。 */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-3: 0 4px 8px rgba(0, 0, 0, 0.08), 0 20px 48px rgba(0, 0, 0, 0.10);
+  /* 顶边高光。白底上白色内高光毫无意义（白叠白），Base 也���全���有
+     这类拟物细节，所以视觉上要让它消失。
+
+     取值必须是 **颜色**（transparent），不能写 none —— 这里有个
+     排查出来的真实缺陷：全站 10 处把它拼进复合 box-shadow，且用法
+     分成两种互不兼容的契约：
+       6 处当颜���用���  inset 0 1px 0 var(--gloss)
+       4 ���当整值用：  box-shadow: var(--shadow-1)
+     而它**原本的值**是一个完整阴影（inset 0 1px 0 rgba(255,255,255,.025)），
+     于是那 6 处展开后是 `inset 0 1px 0 inset 0 1px 0 rgba(...)` ——
+     不合法，浏览器整条丢弃。也就是说这 6 处**在本次改色之前就一直是
+     死代码**，那层"顶边高光"从来没真正渲染过。
+     写 none 同样���合法（none 不能出现在阴影列表里），会把 4 处整值
+     用法也一起弄坏。transparent 是唯一能同时满足两种用法的合法值：
+     颜色位合法、且完全不可见。 */
+  --gloss: transparent;
+
+  /* ==========================================================================
+     动效
+     --------------------------------------------------------------------------
+     上一版全站只有一条 expo-out 曲线。单曲线的问题是：入场、退场、
+     点按回弹、数值跳动本是四种不同性质的运动，用同一条曲线会让所有动效
+     "感觉一样"—— ���质、���有���格，这也是动效显廉价的常见原因。
+
+     这一版按 base.org 的实测动效重定值（浏览器逐元素采样）：
+       时长   0.15s 占绝对主导（122 个元素），其次 0.2s / 0.3s（各 15）
+       缓动   cubic-bezier(.4,0,.2,1) 占 124 个，其次 (0,0,.2,1) 21 个
+       属性   颜色类占 117 个（color/background-color/border-color），
+              transform 仅 15 个、opacity 8 个
+
+     结论很清楚：Base 的动效是**快 + 主要只变颜色**，极度克制，
+     几乎不做位移和缩放。而本项目原本 --t-base 是 0.34s ——
+     比 Base 的主时长慢一倍多，配上 expo-out 这种强减速曲线，
+     整体就是"肉、拖、慢半拍"，这也是观感不够利落的一部分原因。
+
+     四条曲线的分工保留（入场/退场/回弹/往复确实是四种性质），
+     但主曲线换成 Base 的标准曲线，时长整体压快：
+       --ease        Base 主曲线 (.4,0,.2,1)。颜色/位移通用。
+       --ease-out-q  减速收尾 (0,0,.2,1)，Base 的第二曲线。用于入场。
+       --ease-spring 轻微过冲。对齐 Base 实测的 (.34,1.56,.64,1)。
+       --ease-inout  对称曲线。用于往复、循环类运动。
+     ========================================================================== */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-q: cubic-bezier(0, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  /* 0.15s = Base 的绝对主时长；交互反馈全部走这一档 */
+  --t-fast: 0.15s;
+  /* 0.34s → 0.2s，对齐 Base 的第二档 */
+  --t-base: 0.2s;
+  /* 入场等较大范围的运动，对齐 Base 的 0.3s（原本 0.6s，整整慢一倍） */
+  --t-slow: 0.3s;
+  /* 入场序列的单步间隔。错落入场的关键在于间隔足够小 ——
+     超过 90ms 就会被感知成"一个个蹦出来"而不是"一次编排"。 */
+  --t-stagger: 55ms;
+
+  /* —— 旧令牌别名：第 9 节过渡补丁仍在用，页面重写完即可移除 —— */
+  --aix-bg: var(--ink);
+  --aix-surface-1: var(--surface-1);
+  --aix-surface-2: var(--surface-2);
+  --aix-surface-3: var(--surface-3);
+  --aix-brand: var(--accent);
+  --aix-ice: var(--accent-bright);
+  --aix-fill-a: var(--accent-deep);
+  /* 曾经是硬编码的深蓝，上一版改成了暖褐 —— 两者都是��配色的残留。
+     现在统一走中性灰阶。 */
+  --aix-fill-b: #5A6066;
+  --aix-text: var(--text);
+  --aix-text-2: var(--text-2);
+  --aix-text-3: var(--text-3);
+  --aix-line: var(--hair);
+  --aix-line-strong: var(--hair-2);
+  --aix-shadow: var(--shadow-1);
+  --aix-shadow-lg: var(--shadow-3);
+  --aix-inset: var(--gloss);
+  --aix-r-card: var(--r-lg);
+  --aix-r-ctrl: var(--r-md);
+  --aix-r-pill: var(--r-pill);
+  --aix-ease: var(--ease);
+
+  /* —— Vant 变量对齐新配色 —— */
+  --van-primary-color: var(--gold);
+  --van-border-color: var(--hair);
+  --van-background-2: var(--surface-1);
+  --van-text-color: var(--text);
+  --van-popup-background: var(--surface-1);
+}
+
+/* ----------------------------------------------------------------------------
+   2. 基础层
+   ---------------------------------------------------------------------------- */
+html {
+  background-color: var(--ink-deep);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--aix-font);
+  color: var(--text);
+  /* 等宽数字：金融界面最立竿见影的一处。
+     不开的话金额小数点会左右跳动，一眼就显业余。 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.005em;
+  background-color: var(--ink);
+}
+
+/* ----------------------------------------------------------------------------
+   2a. 设备列（本轮最关键的一处修正）
+
+   这是个移动端 DApp：Header 与 Tabbar 都是 position: fixed + max-width: 414px
+   + translateX(-50%) 居中，但**正文容器从来没有被约束过**，于是在宽屏上
+   正文铺满整个视口、顶栏却只有中间一条 —— 三个入口卡被拉到 270px 宽、
+   图标浮在大片空��里。这正是宽屏下"怎么改都还是丑"的真正原因。
+
+   另外项目用 lib-flexible + postcss-plugin-px2rem(rootValue 37.5)：
+   html font-size = 视口宽/10 且上限 54px，所以在 804px 视口下整个 UI
+   会被放大到 1.44 倍。这不是 bug 而是既有体系，不能拆 —— 但必须给它一个
+   宽度上限，否则放大后就是"糊在大屏上的手机页"。
+
+   这里写 414px 是刻意的：经 px2rem 后与 Header / Tabbar 的 414px 换算出
+   完全相同的 rem 值，三者像素级对齐。窄屏(<414px 等效)时 width:100% 生效，
+   移动端表现完全不变。
+   ---------------------------------------------------------------------------- */
+body > #app {
+  max-width: 414px;
+  margin-inline: auto;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* 宽屏：把列外区域压暗，并给列身描边 + 投影，
+   让它读起来是"一台居中的设备"，而不是没做响应式的残页。
+   px2rem 配了 mediaQuery: false，所以媒体查询里的 px 不会被换算。 */
+@media (min-width: 500px) {
+  html {
+    /* 宽屏仍使用 375px 设计稿的 rem 基准，避免 lib-flexible 的 54px
+       上限把整套移动端界面放大 1.44 倍。 */
+    /* 大写 PX 用于跳过 postcss-plugin-px2rem，浏览器仍按 px 解析。 */
+    font-size: 37.5PX !important;
+
+    /* 宽屏下设备列两侧的外圈画布。
+       原本是 #16181B → #000000 的近黑径向渐变（还藏在媒体查询里，
+       所以前两轮换色都漏了它）。
+
+       改用 --ink-deep（#EFEFEF）—— 令牌注释里它的定义就是
+       "设备列以外的画布��压深一档让正文列读作一张白卡"。
+       浅灰外圈 + 纯白列，正是 Base 那种"白卡浮在浅灰上"的关系；
+       同时这里不再出现任何硬编码色，后续改色只需动令牌。 */
+    background: var(--ink-deep);
+  }
+
+  body > #app {
+    /* 原本写的是 var(--hair-1)，但令牌只有 --hair / --hair-2 / --hair-3，
+       没有 --hair-1 —— 变量解析失败会让整条声明被丢弃，
+       所以宽屏下这条"设备列"一直是没有侧边线的。 */
+    border-inline: 1px solid var(--hair-2);
+    box-shadow: 0 0 80px 20px rgba(0, 0, 0, 0.07);
+  }
+}
+
+/* 覆盖散落各处的 Arial / Source Han Sans 硬编码。
+   排除项包在 :where() 里 —— :where() 不贡献权重，
+   本规则权重恒等于 `body *`，后面的标题规则才盖得动。 */
+body *:where(:not(.van-icon):not([class^='van-icon']):not([class*=' van-icon']):not(.anticon):not(.anticon *)) {
+  font-family: var(--aix-font);
+}
+
+/* 图标字体必须保留原字体，否则图标会变方块 */
+.van-icon,
+[class^='van-icon'],
+[class*=' van-icon'],
+.anticon {
+  font-family: 'vant-icon', 'anticon' !important;
+  font-variant-numeric: normal;
+}
+
+input,
+textarea,
+button,
+select {
+  font-family: var(--aix-font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文本选中态。原本是 30% 白 —— 在白底上等于完全没有选中反馈。
+   改用品牌蓝实底 + 白字，这也是 Base 的选中色。 */
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ----------------------------------------------------------------------------
+   3. 排版
+      高级感来自：大字负字距、小字正字距、标签小型大写 + 宽字距
+   ---------------------------------------------------------------------------- */
+h1, h2, h3, h4,
+.title,
+[class*='-title'] {
+  font-family: var(--aix-font-display);
+  letter-spacing: -0.022em;
+  font-weight: 600;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+/* 大额数字：展示字体 + 等宽 + 负字距，做出"仪表盘"感 */
+.aix-figure,
+.balance-amount,
+.total-amount,
+[class*='balance-num'],
+[class*='amount-num'],
+[class*='big-num'] {
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+/* 数值类文本统一等宽 */
+[class*='amount'],
+[class*='balance'],
+[class*='price'],
+[class*='total'],
+[class*='count'],
+[class*='num'],
+[class*='value'],
+[class*='rate'] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* 小标签：宽字距 + 大写，"精密仪器"观感的重要一环 */
+.aix-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* 地址 / 哈希：等宽数字 + 轻微字距（省掉第三个字体族） */
+.aix-mono,
+[class*='address'],
+[class*='hash'] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ----------------------------------------------------------------------------
+   4. 材质系统
+      原本这里有两个装饰纹理工具类，现已整体删除：
+        .aix-guilloche —— 钞券机雕纹（同心圆 + 放射线叠加出莫尔干涉）
+        .aix-grid-bg   —— 34px 仪器刻度网格
+      三个理由，任意一条都足够：
+      1. 全项目 **零引用** —— 所有 .vue 里一次都没用过，是纯死代码；
+      2. 两者都���"白色低透��度画线"成立，翻成白底后完全不可见；
+      3. 这一版模仿 base.org，而它的观感恰恰建立在彻底的留白上：
+         实测全站没有任何底纹，视觉重量全部交给大面积白、一块纯蓝、
+         和近黑标题的对比。加纹理就是往回走。
+   ---------------------------------------------------------------------------- */
+/* 4c. 卡片表面：纯白 + 一条发丝描边。
+   原本是 168° 三段渐变 + 顶边高光 + 多层阴影 —— 深色版靠这些堆出体积感。
+   Base 的卡片正相反：纯白填充、一条 rgba(0,0,0,.1) 的细边、12px 圆角，
+   没有渐变也没有阴影。全站零渐变是它"干净"的核心原因，
+   所以这里必须拍平，否则白底上那层灰渐变会让每张卡都显脏。 */
+.aix-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+}
+
+/* 4d. 输入槽：输入框、数据行。
+   原本是"180° 渐变 + inset 内阴影"做的拟物凹陷。两个问题：
+   1. --ink 与 --surface-1 现在同为 #FFFFFF，那条渐变是白→白，
+      已经是一句无效果的声明；
+   2. 内凹拟物是深色界面的隐喻，Base 没有任何 inset 效果 ——
+      它的输入框就是浅灰底 + 发丝边。 */
+.aix-well {
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-md);
+}
+
+/* 4e. 发丝分割线：中间亮两端淡，比一条实色线精致得多 */
+.aix-rule {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--hair-2) 18%,
+    var(--hair-2) 82%,
+    transparent
+  );
+}
+
+/* ============================================================================
+   4g–4k. 签名元素：信号读数
+   ----------------------------------------------------------------------------
+   这一版的"签名元素"—— 整个界面被记住的那一个东西。前三版失败的共同点
+   是没有任何签名元素：全是同款圆角卡片，谁都不突出，于是谁都不好看。
+
+   信号读数 = 主数字 + 脉冲信号点 + 示波器基线。
+   它只用在每屏那个唯一的主数值上，其余区域必须保持安静 ——
+   把"大胆"集中花在一处，是这套设计成立的前提。
+   ============================================================================ */
+
+/* 4g. 脉冲信号点：表示"这个数字是实时的"。
+   用双层结构：实心点 + 向外扩散的环。环用 animation 扩散并淡出，
+   比单纯改透明度的"闪烁"高级得多 —— 闪烁像故障，扩散像心跳。 */
+.aix-signal-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  /* 去掉 `box-shadow: 0 0 8px var(--accent)` 外发光：
+     白底上蓝色发光会在圆点周围糊出一圈脏蓝，Base 全站零发光。
+     "实时"语义完全由下方 ::after 的扩散环承担，不需要发光叠加。 */
+  flex: none;
+}
+
+.aix-signal-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  animation: aix-ping 2.4s var(--ease-inout) infinite;
+}
+
+@keyframes aix-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  /* 70% 处就淡尽，剩下 30% 是静默间隔 ——
+     没有间隔的循环动效会变成持续骚扰。 */
+  70%,
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* 4h. 示波器基线：主数字下方一条会"跑"的细线。
+   这是信号面板语汇的核心视觉。渐变里嵌一段亮点，用 background-position
+   平移产生扫描感 —— 纯 CSS，无 JS、无位图。 */
+.aix-trace {
+  position: relative;
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: var(--hair);
+  overflow: hidden;
+}
+
+.aix-trace::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 45%,
+    var(--accent-bright) 50%,
+    var(--accent) 55%,
+    transparent 100%
+  );
+  /* 200% 宽度 + 平移 = 扫描光点掠过。
+     4.5s 是刻意的慢：快了就成了加载条，慢才像仪器在待机扫描。 */
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: aix-trace-run 4.5s var(--ease-inout) infinite;
+}
+
+@keyframes aix-trace-run {
+  0% { background-position: -50% 0; }
+  100% { background-position: 150% 0; }
+}
+
+/* 4i. 信号面板：本方向的主卡片。
+   与"左侧色条卡片"（已被明确列为陈词滥调）不同 ——
+   这里的信号在**顶边**，且是一条从左侧渐隐的发光细线，
+   宽度只占 40%，像面板上的电源指示灯带而非装饰���块。 */
+/* 面板：纯白 + 发丝边，与 .aix-surface 完全同一套配方。
+   原本这里又复制了一份 168° 三段渐变 —— 这已是该配方的**第三个副本**
+   （.aix-surface、.entries、这里），所以我改了 .aix-surface 之后
+   面板依然是灰的，是实测截图才发现的。
+   同一视觉配方散落多份是典型维护陷阱：改一处必漏其余。
+   三处现在统一为"纯白 + 一条 hairline"，与 Base 的卡片一致。 */
+.aix-panel {
+  position: relative;
+  background: var(--surface-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.aix-panel--live::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 1px;
+  /* 实时面板的顶部指示线：保留这条蓝线（它是有信息含量的状态标识），
+     但去掉 `box-shadow: 0 0 12px rgba(47,123,255,.5)` 外发光 ——
+     又一处**旧版青蓝**硬编码，且白底上发光只会糊边。 */
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+/* 4j. 主按钮：全站唯一允许用满饱���蓝填充的元素。 */
+/* 主按钮，完全按 base.org 的按钮语言重做：
+   实心纯蓝 #0000FF + 白字 + 全圆 pill，无渐变、无阴影��无发光。
+
+   这一版删掉了三样东西，都是"看起来高级、实际显廉价"的典���：
+   1. 135° 蓝色渐变 —— Base 的蓝是一整���实色，渐变会让它变"塑料感"���
+   2. box-shadow + glow_soft 外发光 —— 白底上发光只会糊出一圈脏蓝；
+   3. **hover 时的白色扫光**（原 ::after，一道 28% 白光 0.62s 扫过按钮）。
+      第 3 条最值得说：扫光是"营销模板"的标志性炫技，Base 全站没有任何
+      类似效果，它的按钮 hover 只是颜色加深。而且 0.62s 的扫光在 Base
+      那套 0.15s 的节奏里显得慢得离谱 —— 风格和节奏两头都不对。
+
+   交互只保留两���事，和 Base 一致：hover 变深、按下微缩。
+   过渡属性显式列出 background-color / transform，
+   不用 transition: all（避免把 layout 属性也带进动画）。 */
+.aix-cta {
+  position: relative;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 0;
+  border-radius: var(--r-pill);
+  font-family: var(--aix-font);
+  font-weight: 600;
+  letter-spacing: var(--ls-tight);
+  transition:
+    background-color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.aix-cta:hover:not(:disabled) {
+  background: var(--accent-deep);
+}
+
+.aix-cta:active:not(:disabled) {
+  transform: scale(0.98);
+  background: var(--accent-deep);
+}
+
+  /* 禁用态：中性灰底 + **可读**的灰字。
+     原本没有单独定义禁用态，靠 opacity 压暗整颗按钮 ——
+     白底上"半透明的蓝"会变成一种很脏的淡紫灰，所以改为显式中性色。
+
+     但我第一版给的是 #E8E8E8 底 + #A0A0A0 字，实测只有 2.13:1。
+     这里的关键判断：本项目里禁用按钮的标签**承载操作指引**
+     （节点页那颗按钮在未填金额时显示"请输入认购金额"），
+     用户必须读懂它才知道下一步做什么 —— 它不是可以被忽略的装饰性
+     禁用控件，所以不能套用"禁用态豁免对比度"的惯例。
+     改为 --text-2 压在 --surface-3 上，实测 5.8:1；
+     "不可点"的信息交给灰底、cursor 和 hover 无反馈来传达，
+     而不是靠把字压到看不清。 */
+  .aix-cta:disabled {
+  background: var(--surface-3);
+  color: var(--text-2);
+  cursor: not-allowed;
+  }
+
+/* 4k. 数值跳动：实时数字更新时的一次性提亮。
+   由页面加 .is-tick 触发。 */
+/* 数值跳动：原本是"变亮 + 16px 外发光"。
+   白底上 text-shadow 发光会把数字糊成一团，且 Base 无任何发光。
+   改为纯粹的颜色闪变（蓝→原色）—— 正好也符合 Base "动效主要只变颜色"
+   的实测特征（117 个颜色过渡 vs 15 个 transform）。
+   时长 0.9s → 0.45s，对齐 Base 的快节奏。 */
+@keyframes aix-tick {
+  0% { color: var(--accent); }
+  100% { color: inherit; }
+}
+
+.is-tick {
+  animation: aix-tick 0.45s var(--ease-out-q);
+}
+
+/* 4f. 胶片颗粒：极低透明度，肉眼几乎不可见，但能消除大色块的塑料感 */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ----------------------------------------------------------------------------
+   5. 动效 —— 一次编排良好的入场，胜过散落各处的微交互
+   ---------------------------------------------------------------------------- */
+@keyframes aix-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aix-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 极慢呼吸，仅用于氛围光。不做位移，避免"跳动"的廉价感 */
+@keyframes aix-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+.aix-rise {
+  animation: aix-rise var(--t-slow) var(--ease) both;
+}
+
+/* 错峰入场：让内容"依次落位"，而不是整块闪现。
+   原本用 nth-child 手写 6 条，超过 6 个子元素就没有延迟、会整块闪现。
+   改为 --t-stagger(55ms) × 序号：数量不限，间隔也统一到令牌里。
+   60ms → 55ms 是刻意的：间隔越接近 50ms，越会被感知成"一次编排"
+   而不是"一个个蹦出来"。 */
+.aix-stagger > * {
+  animation: aix-rise var(--t-slow) var(--ease) both;
+}
+.aix-stagger > *:nth-child(1)  { animation-delay: calc(var(--t-stagger) * 0); }
+.aix-stagger > *:nth-child(2)  { animation-delay: calc(var(--t-stagger) * 1); }
+.aix-stagger > *:nth-child(3)  { animation-delay: calc(var(--t-stagger) * 2); }
+.aix-stagger > *:nth-child(4)  { animation-delay: calc(var(--t-stagger) * 3); }
+.aix-stagger > *:nth-child(5)  { animation-delay: calc(var(--t-stagger) * 4); }
+.aix-stagger > *:nth-child(6)  { animation-delay: calc(var(--t-stagger) * 5); }
+.aix-stagger > *:nth-child(7)  { animation-delay: calc(var(--t-stagger) * 6); }
+.aix-stagger > *:nth-child(8)  { animation-delay: calc(var(--t-stagger) * 7); }
+.aix-stagger > *:nth-child(9)  { animation-delay: calc(var(--t-stagger) * 8); }
+.aix-stagger > *:nth-child(n + 10) { animation-delay: calc(var(--t-stagger) * 9); }
+
+/* 尊重系统的"减少动态效果"设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   6. 交互态
+   ---------------------------------------------------------------------------- */
+/* 按下必须快（0.08s），松开才慢 —— 反过来会觉得"迟钝" */
+.aix-press {
+  transition: transform var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease);
+}
+.aix-press:active {
+  transform: scale(0.985);
+  transition-duration: 0.08s;
+}
+
+/* 二级页面返回首页导航：与固定主导航保持明确间距。 */
+.home-return-bar {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px 8px;
+}
+
+.home-return-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-family: var(--aix-font);
+  font-size: 13px;
+  line-height: 1;
+  text-decoration: none;
+  transition: color var(--t-base) var(--ease);
+}
+
+.home-return-link span {
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.home-return-link:hover {
+  color: var(--accent);
+}
+
+/* 键盘可达性：项目原本完全没有 focus 样式 */
+:focus-visible {
+  outline: 1px solid var(--gold-bright);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 滚动条：默认粗���条会直接破坏暗色调 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hair-2);
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hair-3);
+}
+
+/* ----------------------------------------------------------------------------
+   7. Vant 组件对齐（Vant 自带亮色主题，不覆盖会出现刺眼白块）
+   ---------------------------------------------------------------------------- */
+.van-toast {
+  border-radius: var(--r-md) !important;
+  background: rgba(10, 16, 21, 0.94) !important;
+  border: 1px solid var(--hair) !important;
+  box-shadow: var(--shadow-2) !important;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.van-dialog {
+  border-radius: var(--r-lg) !important;
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%) !important;
+  border: 1px solid var(--hair) !important;
+  box-shadow: var(--shadow-3) !important;
+  overflow: hidden;
+}
+
+.invite-code-dialog {
+  width: calc(100% - 48px) !important;
+  max-width: 360px;
+  border-radius: 24px !important;
+
+  .van-dialog__header {
+    padding: 22px 22px 0;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .van-dialog__content {
+    min-height: 0;
+    padding: 0 22px 16px !important;
+  }
+
+  .van-dialog__message {
+    min-height: 0;
+    padding: 14px 0 0;
+    overflow: visible;
+    line-height: 0;
+  }
+
+  #inviteInput {
+    display: block;
+    width: 100%;
+    height: 44px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    outline: none;
+    background: var(--surface-3);
+    color: var(--text);
+    font-size: 14px;
+    line-height: normal;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+
+    &::placeholder {
+      color: var(--text-3);
+    }
+
+    &:focus {
+      border-color: var(--accent);
+      background: var(--surface-1);
+      box-shadow: var(--glow-soft);
+    }
+  }
+
+  .van-dialog__footer {
+    display: flex;
+    gap: 12px;
+    padding: 0 22px 20px;
+    border-top: 0;
+    background: transparent;
+  }
+
+  .van-dialog__button {
+    height: 44px;
+    border: 1px solid var(--hair) !important;
+    border-radius: 22px;
+    background: var(--surface-3);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .van-dialog__confirm {
+    border-color: var(--accent) !important;
+    background: var(--accent) !important;
+    color: var(--on-accent) !important;
+  }
+}
+
+.van-action-sheet {
+  border-radius: var(--r-lg) var(--r-lg) 0 0 !important;
+  background: var(--surface-1) !important;
+}
+
+.van-popup {
+  border-radius: var(--r-lg);
+}
+
+.van-overlay {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.van-field,
+.van-cell {
+  background: transparent !important;
+}
+
+.van-field__control {
+  color: var(--text) !important;
+}
+
+.van-tabs__nav {
+  background: transparent !important;
+}
+
+.van-tabs__line {
+  border-radius: var(--r-pill) !important;
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold)) !important;
+}
+
+/* ============================================================================
+   9. 过渡补丁
+   仅服务「尚未重写的页面」，避免重构过程中出现新旧混杂的破面。
+   每重写完一个页面就删掉对应段落。
+   ============================================================================ */
+
+/* 9a. 子页顶部大图底纹 a3.png 自带一片橄榄黄光晕，与蓝色主题冲�����。
+   saturation 混色吸走黄色饱和度、只留明暗结构，再由底色补上冷调。
+   注意不能用 filter：容器 filter 会连子元素文字一起染色。 */
+.exchange-page,
+.wallet-page,
+.page {
+  background-color: var(--ink) !important;
+  background-blend-mode: saturation, normal !important;
+}
+
+/* 9b.（已移除）此前这里用三层混色去"洗"余额卡底图 a1.png 里那枚暖金色美元币。
+   wallet.vue 现已把整张位图换成渐变生成的机雕纹卡面，补丁不再需要 ——
+   继续留着的话，它的 !important 会把新卡面重新盖成旧位图。 */
+
+/* 9c. 通用容器：渐变表面 + 发丝描边 + 多层阴影
+   注意：首页的 .advantage-section 已在 index.vue 中重写��纯布局容器，
+   故不再列入此处，否则会被强行套上卡片背景。 */
+.content-box,
+.subscribe-table,
+.data-box,
+.list-box,
+.info-box,
+.panel-box,
+.pledge {
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--shadow-1) !important;
+}
+
+.usdt-price,
+.ispay-price {
+  border-radius: var(--r-lg) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-1) !important;
+}
+
+/* 9d. 胶囊切换条
+   .wallet-tab 已在 wallet.vue 中按"凹槽 + 抬起滑块"重写，故从选择器里摘出，
+   这里只保留仍未重写的 .tab-menu。 */
+.tab-menu {
+  /* 原本是近黑半透明 rgba(5,8,11,.6) + inset 凹槽 ——
+     整站翻白后这条切换带会是页面上一块突兀的深色。
+     凹槽拟物一并去掉：Base 没有任何 inset 拟物效果。 */
+  background: var(--surface-2) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: var(--r-pill) !important;
+  box-shadow: none !important;
+  }
+
+  .tab-menu .tab-item {
+  border-radius: var(--r-pill) !important;
+  color: var(--text-3) !important;
+  /* 0.25s → --t-fast(0.15s)，对齐 Base 实测主时长；
+     并补上 background-color 的过渡，否则选中态换底是硬切。 */
+  transition: color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease) !important;
+  }
+  
+  /* 选中标签：白底 + 蓝字 + 蓝框，与节点页分段控件同一套语言。
+     刻意**不用实心蓝** —— 每屏只应有一块实心蓝（主 CTA），
+     标签若也用实心蓝就会和主按钮抢注意力。 */
+  .tab-menu .active-tab {
+  background: var(--surface-1) !important;
+  border: 1.5px solid var(--accent) !important;
+  border-radius: var(--r-pill) !important;
+  box-shadow: none !important;
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  }
+
+/* 9e. 按钮 */
+.wallet-actions .wallet-action,
+.exchange-entry {
+  border: 1px solid var(--hair-2) !important;
+  border-radius: var(--r-pill) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  box-shadow: var(--gloss) !important;
+  transition: transform var(--t-base) var(--ease), background-color 0.25s var(--ease),
+    border-color 0.25s var(--ease) !important;
+}
+
+.wallet-actions .wallet-action:active,
+.exchange-entry:active {
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-color: var(--hair-3) !important;
+  transform: scale(0.97) !important;
+  transition-duration: 0.08s !important;
+}
+
+.withdrawal-btn,
+.submit-btn,
+.confirm-btn,
+.van-button--danger,
+.van-button--primary {
+  position: relative;
+  border: 0 !important;
+  border-radius: var(--r-md) !important;
+  /* 实心纯蓝 + 白字 + 零阴影，与 .aix-cta 保持同一配方。
+
+     原本是 `background: var(--accent)` 配 `color: #0A0B0C`（近黑），
+     注释还写着"纯平白色填充"—— 那在**上一版**是对的，当时 --accent
+     就是白色，近黑字压白底属于高对比反相。
+     但 --accent 现已翻成纯蓝 #0000FF，近黑字压纯蓝只有约 2.4:1，
+     基本读不出来。这是"背景走令牌、前景写死"的典型代价：
+     令牌换值时写死的前景不会跟着走，连注释都留在了旧语义上。
+     改用与 accent 成对定义的 --on-accent（8.6:1）。
+
+     阴影一并去掉 —— Base 的按钮完全扁平，无任何投影。
+     这已是同一 bug 在全站的第 4 份副本（另见 Modal.vue、
+     AnnouncementModal.vue、下方 .aix-btn-primary）。 */
+  background: var(--accent) !important;
+  box-shadow: none !important;
+  color: var(--on-accent) !important;
+  font-weight: 600 !important;
+  overflow: hidden;
+  transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
+    filter 0.25s var(--ease) !important;
+}
+
+/* 静态斜向柔光，模拟弧面反光（不做循环动画，保持克制） */
+.withdrawal-btn::after,
+.submit-btn::after,
+.confirm-btn::after,
+.van-button--primary::after,
+.van-button--danger::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0) 42%);
+}
+
+.withdrawal-btn:active,
+.submit-btn:active,
+.confirm-btn:active,
+.van-button--danger:active,
+.van-button--primary:active {
+  transform: translateY(1px) scale(0.985) !important;
+  filter: brightness(1.12) !important;
+  transition-duration: 0.08s !important;
+}
+
+.van-button--default {
+  border: 1px solid var(--hair-2) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+}
+
+/* 9f. 底部导航 / 子页头：毛玻璃 */
+.footer {
+  /* 原本是近黑半透明（rgba(6,11,18,.82)）+ 40% 黑的上方投影 ——
+     整站翻白后，屏幕底部会留下一条突兀的黑带。
+     改为半透明白 + 模糊，与顶栏用同一套配方，让吸顶/吸底语��一致。 */
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-top: 1px solid var(--hair) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: none !important;
+}
+
+.footer .footer-item {
+  transition: opacity 0.25s var(--ease), transform var(--t-base) var(--ease);
+}
+
+.footer .footer-item:active {
+  opacity: 0.65;
+  transform: scale(0.92);
+  transition-duration: 0.08s;
+}
+
+.children-header {
+  background: transparent !important;
+}
+
+/* 子页面的吸顶栏。原为 rgba(5,9,15,.78)（近黑半透明）——
+   它是 sticky 元素，需要不透明底来遮住下方滚动的内容，深色版里正好
+   用页面底色。翻白后这条深色栏会横在每个子页面顶部。
+   改用白色半透明 + 模糊，与 Header.vue 的吸顶栏保持同一配方。 */
+.children-header .children-header-main {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-bottom: 1px solid var(--hair) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
+/* 9g. 数据表格：发丝分隔线 + 克制表头。
+   原为 rgba(3,7,12,.9)（近黑）配下方的 --text-3 深灰字 ——
+   深���压深字，**完全读不出来**。这和钱包页那条表头是同一个 bug
+   （深色版里表头靠深底 + 浅灰字成立，翻色时只改了字没改底）。
+   改为白底 + 发丝下边线，字色沿用 --text-3（对白 4.7:1）。 */
+.subscribe-table .table-header {
+  background: var(--surface-1) !important;
+  border-bottom: 1px solid var(--hair) !important;
+  border-radius: var(--r-lg) var(--r-lg) 0 0 !important;
+}
+
+.subscribe-table .table-header,
+.subscribe-table .table-header * {
+  color: var(--text-3) !important;
+  letter-spacing: 0.06em !important;
+  font-weight: 550 !important;
+}
+
+.subscribe-table .income-list-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  transition: background-color 0.25s var(--ease);
+}
+
+.subscribe-table .income-list-item:last-child {
+  border-bottom: 0 !important;
+}
+
+.subscribe-table .income-list-item:active {
+  background: var(--surface-2) !important;
+}
+
+/* 9h. 质押 / 统计数据区 */
+.pledge .pledge-total {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: var(--r-md) !important;
+  box-shadow: var(--gloss) !important;
+}
+
+.pledge .pledge-info .pledge-item {
+  border-right-color: var(--hair) !important;
+  border-bottom-color: var(--hair) !important;
+}
+
+.pledge .pledge-total span:nth-child(2),
+.pledge .pledge-count span {
+  color: var(--gold-bright) !important;
+  font-weight: 620 !important;
+}
+
+.pledge .pledge-count {
+  border-top: 1px solid var(--hair) !important;
+}
+
+.pledge-frame,
+.pledge-earnings {
+  border-radius: var(--r-lg) !important;
+  overflow: hidden !important;
+  border: 1px solid var(--hair) !important;
+  box-shadow: var(--shadow-1) !important;
+}
+
+.pledge-frame {
+  background-color: var(--surface-1) !important;
+  background-blend-mode: luminosity !important;
+}
+
+/* 9i. 未重写页面的入场动效 */
+.pledge,
+.pledge-frame,
+.pledge-earnings,
+.content-box,
+.subscribe-table,
+.usdt-price {
+  animation: aix-rise var(--t-slow) var(--ease) both;
+}
+
+/* ============================================================================
+   10. 跨页共享原语
+   ----------------------------------------------------------------------------
+   下面这些结构原先在 mine / node / recharge / transfer 四个文件里各写了一遍，
+   样式还各不相同（有的用 $gradient-primary，有的写死 var(--gold)）。
+   集中定义一次，四页删掉本地重复实现 —— 既统一观感，也避免以后改一处漏三处。
+   ============================================================================ */
+
+/* 10a. 节标题。
+   原实现是「一根 4px 蓝色渐变竖条 + 20px 粗标题」。这是最套路化的卡片装饰
+   之一，而且那根竖条不承载任何信息。改为「细排字小标题 + 一道通栏发丝线」：
+   分区靠留白和线交代，标题本身退回次要色，让页面里的数字成为主角。 */
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 32px 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+/* 区块标题走"铭牌"处理：极小字号 + 很开的字距 + 全大写。
+   颜色回到中性灰（上一版是��槟金）—— 标题是导航性文字，不需要被点亮，
+   开阔的字距本身已经足够���供仪式感。 */
+.section-title-wrap .section-title {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--aix-font);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+/* 那根装饰竖条：不删 DOM（四个模板都在用），改为让��撑开剩余空间并消失，
+   这样即便某页忘了删也不会露出色条。 */
+.section-title-wrap .title-bar {
+  display: none;
+}
+
+/* 10a-2. 主数值。资产页、团队页、充值页各有一个"本页唯一主数值"。
+
+   这里去掉了上一版的金属渐变文字（background-clip: text 的金色渐变）。
+   渐变文字是廉价加密产品最典型的标志之一 —— 它试图用材质效果替代
+   排版功力，结果反而显得刻意。真正高级的做法是反过来：字是平的、实的、
+   精确的，让字号、字重、字距本身承担全部表现力。
+
+   两个关键细节：
+     · 字重 300 —— 大号数字配粗字重会变成促销价签，细笔画才从容；
+     · tabular-nums —— 等宽数字，金融数据滚动时小数点不会左右跳动。 */
+.aix-figure {
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-hero);
+  font-weight: 300;
+  line-height: 1;
+  /* 大字号必须收紧字距，否则字母间会散架；这是大标题最容易被漏掉的一步 */
+  letter-spacing: -0.04em;
+  color: var(--text);
+}
+
+/* 主数值后面的币种单位。压到最暗的一档，纯粹作为注解存在。 */
+.aix-figure-unit {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--text-3);
+}
+
+/* 10b. 账目行。取代「每条数据一个圆角卡片」的写法。
+   导航项和数据条都不是内容卡片，不需要各自的描边、圆角和底色 ——
+   铺平 + 发丝分隔线，视线只需扫一列数字。 */
+.aix-ledger {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 行距加大：原本 13px 上下内边距过于紧凑，密集的行本身���是"局促"的来源。
+   加到 18px 后每行有呼吸，一列数字读起来才从容。 */
+.aix-ledger-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.aix-ledger-row:last-child {
+  border-bottom: 0;
+}
+
+/* 键值对比刻意拉大：标签压到 12px 并调暗，数值升到 22px。
+   原本是 13px / 17px —— 差距太小，两者互相竞争，谁都不突出。
+   现在数值明显主导，标签退为注解。 */
+.aix-ledger-row .k {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+.aix-ledger-row .v {
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  text-align: right;
+}
+
+/* 10c. 数据网格：多个并列指标。同样不做成卡片，
+   靠一条竖发丝线分栏，比 12 个描边圆角安静得多。 */
+.aix-metrics {
+  display: grid;
+  /* 用 auto-fit 而不是固定列数：调用方的子项数量不一样
+     （充值页 2 项、团队页 3 项），固定 3 列会在只有 2 项时
+     空出一格带边框的死单元。auto-fit 会自动���起空轨道。 */
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.aix-metrics > * {
+  background: var(--ink);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.aix-metrics .k {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+  margin-bottom: 5px;
+}
+
+.aix-metrics .v {
+  display: block;
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* 此前这里有一个 560px 断点把列数改成 3 —— auto-fit 已经能
+   按可用宽度自行决定列数，断点覆盖反而会重新引入空单元问题。 */
+
+/* 10d. 整幅主操作按钮。
+   抽成原语的原因：mine / recharge / transfer 三页各有一个"页面唯一主操作"
+   的通栏按钮，此前是各写一份、渐变和圆角还都不一致。
+
+   配色刻意用 --gold-deep 而不是 --gold-bright：后者的令牌注释写明
+   「仅限文字与小面积强调，禁止大面积填充」，用它铺满一条 300px 宽的按钮
+   正是该令牌明令禁止的用法（实测也确实过亮、抢走了页面主数字的注意力）。
+   这里与第 9e 节既有的主按钮处理保持同一套深蓝填充。 */
+.aix-btn {
+  width: 100%;
+  padding: 14px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--aix-font);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  /* 白字压纯蓝：Base 的主按钮配方，对比 8.6:1。
+     原本是 `color: #0A0B0C`（近黑）配 var(--accent)，注释写"反相"——
+     那是 --accent 还是白色时的语义。翻成纯蓝后近黑字只剩约 2.4:1。
+     同 .confirm-btn 一处的成因，属同��� bug 的第 5 份副本。 */
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--r-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+  cursor: pointer;
+  transition: filter var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.aix-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.aix-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.aix-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 禁用态：退成描边，不再伪装成可点击 */
+.aix-btn:disabled {
+  background: transparent;
+  border: 1px solid var(--hair-2);
+  box-shadow: none;
+  color: var(--text-3);
+  cursor: not-allowed;
+}

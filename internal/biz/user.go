@@ -20,6 +20,7 @@ type User struct {
 	ID              int64
 	Address         string
 	InviteCode      string
+	Username        string // 用户展示名（团队内可见）
 	UsdtRecharge      string
 	UsdtReward        string
 	AixBalance        string // AIX 代币数
@@ -127,6 +128,7 @@ type DownlineInvitee struct {
 // DirectInvitee 直推下级节点
 type DirectInvitee struct {
 	Address          string
+	Username         string
 	TeamStake        string
 	ExitAmount       string
 	CommunityLevel   string
@@ -134,6 +136,8 @@ type DirectInvitee struct {
 	ShareProfitTotal string
 	EcoRewardTotal   string
 	DirectCount      int32
+	TeamDownlineCount int32
+	PersonalStake    string
 	CreatedAt        time.Time
 }
 
@@ -167,12 +171,17 @@ type UserRepo interface {
 	CountUsersUnder(ctx context.Context, rootID int64) (int32, error)
 	ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error)
 	SumPrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
+	// SumCumulativePrincipalByUserIDs 累计认购本金（active+exited），与 team_perf 口径一致
+	SumCumulativePrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
+	// SumActivePrincipalUnder 伞下所有未出局认购订单本金合计（含本人及全部下级，status=active）
+	SumActivePrincipalUnder(ctx context.Context, rootID int64) (string, error)
 	// SumExitAmountByUserIDs 兼容旧接口：活跃订单本金合计（业绩）
 	SumExitAmountByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
 	UpdateMgmtStats(ctx context.Context, userID int64, level int32, smallArea, teamPerf string) error
 	RefreshPerformance(ctx context.Context) error
 	RefreshPerformanceFromUsers(ctx context.Context, userIDs ...int64) error
 	AdminUpdateUser(ctx context.Context, update *AdminUserUpdate) error
+	UpdateUsername(ctx context.Context, userID int64, username string) error
 	SetRole(ctx context.Context, userID int64, role string) error
 	GetBalances(ctx context.Context, userID int64) (recharge, reward, aix string, err error)
 	AddUsdtRecharge(ctx context.Context, userID int64, amount string) (string, error)

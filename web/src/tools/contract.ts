@@ -48,8 +48,17 @@ const CHAINS: Record<ChainKey, ChainConfig> = {
 /* 链接钱包类 */
 export class ETH {
   public static provider: any = undefined // 提供者
+  public static rawProvider: any = undefined // 钱包注入的原始 EIP-1193 provider
   public static account: string = '' // 钱包地址
   public static signer: any = undefined // 用户签名者
+  public static getRawProvider() {
+    return ETH.rawProvider
+  }
+  public static resetConnection() {
+    ETH.provider = undefined
+    ETH.account = ''
+    ETH.signer = undefined
+  }
   // 链接钱包返回钱包地址；USDT / WIN 充值均在 EOEO
   public static async getAccount(chain: ChainKey = 'eoeo'): Promise<string> {
     const ethereum: any = await detectEthereumProvider()
@@ -57,12 +66,16 @@ export class ETH {
       showFailToast(lang('请安装钱包'))
       throw lang('请安装钱包')
     }
+    ETH.rawProvider = ethereum
 
     const target = CHAINS[chain] || CHAINS.eoeo
 
     // 先授权账号，再按需切链。已在目标链时不要再发 switch，
     // 部分手机钱包（TokenPocket / imToken）对已在当前链的 switch 会一直不返回。
-    const accounts = await ethereum.request({ method: 'eth_requestAccounts' })
+    let accounts = await ethereum.request({ method: 'eth_accounts' })
+    if (!accounts?.length) {
+      accounts = await ethereum.request({ method: 'eth_requestAccounts' })
+    }
     const currentChainId = Number(await ethereum.request({ method: 'eth_chainId' }))
     if (currentChainId !== target.chainId) {
       try {
@@ -99,7 +112,8 @@ export class ETH {
       showFailToast(message)
       throw new Error(message)
     }
-    const connected = accounts?.[0] || (await ethereum.request({ method: 'eth_requestAccounts' }))[0]
+    const connected = accounts?.[0]
+    if (!connected) throw new Error(lang('common.walletDisconnected'))
     ETH.account = ethers.utils.getAddress(connected)
     ETH.signer = ETH.provider.getSigner()
     return ETH.account

@@ -89,13 +89,15 @@ const handleOverlayClick = () => {
 }
 
 .modal {
-  background: rgba(8, 19, 30, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  /* 与 Modal.vue / AnnouncementModal.vue 统一为 Base 的浅色浮层。
+     原本是近黑半透明面板 + 10% 白描边（白底上不可见）。 */
+  background: var(--surface-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
   width: 100%;
   max-width: 360px;
-  backdrop-filter: blur(10px);
-  animation: modalSlideIn 0.3s ease;
+  box-shadow: var(--shadow-3);
+  animation: modalSlideIn var(--t-slow) var(--ease-out-q);
 }
 
 .modal-header {
@@ -103,12 +105,12 @@ const handleOverlayClick = () => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--hair);
 
   .modal-title {
     font-size: 18px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text);
     margin: 0;
   }
 
@@ -117,16 +119,16 @@ const handleOverlayClick = () => {
     height: 32px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--text-3);
     font-size: 24px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: color var(--t-fast) var(--ease);
 
     &:hover {
-      color: #fff;
+      color: var(--text);
     }
   }
 }
@@ -136,7 +138,7 @@ const handleOverlayClick = () => {
 
   .modal-message {
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-2);
     line-height: 1.6;
     margin: 0 0 16px 0;
   }
@@ -145,21 +147,21 @@ const handleOverlayClick = () => {
     .modal-input {
       width: 100%;
       padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--surface-2);
+      border: 1px solid var(--hair);
       border-radius: 12px;
-      color: #fff;
+      color: var(--text);
       font-size: 14px;
       outline: none;
-      transition: all 0.3s ease;
+      transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
 
       &::placeholder {
-        color: rgba(255, 255, 255, 0.4);
+        color: var(--text-3);
       }
 
       &:focus {
         border-color: $brand-primary;
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--surface-2);
       }
     }
   }
@@ -178,25 +180,24 @@ const handleOverlayClick = () => {
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
   }
 
   .cancel-btn {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--surface-3);
+    color: var(--text);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: var(--surface-3);
     }
   }
 
   .confirm-btn {
-    background: linear-gradient(135deg, $brand-primary 0%, #087BC1 100%);
-    color: #000;
+    background: var(--accent);
+    color: var(--on-accent);
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(21, 151, 229, 0.3);
+      transform: none;
     }
 
     &:active {

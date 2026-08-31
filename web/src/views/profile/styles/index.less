@@ -1,6 +1,12 @@
 .profile {
   margin-top: 20px;
-  background: #08131E;
+  /* 原为硬编码 #08131E（近黑）—— 初版深色主题遗留，走不到令牌，
+     所以整站两轮换色都没能带走它，在白页上会是一整块黑。
+     改为 Base 的卡片配方：纯白 + 发丝边 + 12px 圆角。 */
+  background: var(--surface-1);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  overflow: hidden;
   li {
     height: 50px;
     line-height: 50px;
@@ -14,10 +20,20 @@
   height: 42px;
   line-height: 42px;
   margin: 20px 5%;
-  background: @lg2;
-  border-radius: 10px;
+  /* 这里原本是 `background: @lg2` + `color: #FFF`，是一个**完全不可见**
+     的按钮：@lg2 在 global.less 里已被重映射为 var(--surface-1)（纯白），
+     而文字色写死 #FFF —— 白字压白底。
+     成因和其它几处一样：别名变量被指到了新令牌，但写死的前景色没跟着改。
+     改为 Base 的主按钮配方：实心纯蓝 + 白字 + 全圆。 */
+  background: var(--accent);
+  border-radius: var(--r-pill);
   border: 0;
-  color: #FFF;
+  color: var(--on-accent);
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
+  transition: background-color var(--t-fast) var(--ease);
+
+  &:active {
+    background: var(--accent-deep);
+  }
 }

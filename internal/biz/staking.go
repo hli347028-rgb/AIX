@@ -201,7 +201,8 @@ func CalcExitCap(principal decimal.Decimal) decimal.Decimal {
 	return principal.Mul(mul)
 }
 
-// MgmtLevelByPerf returns A level 0-10 from small-area performance.
+// MgmtLevelByPerf returns A level 0-10 from a single area's performance
+// against MgmtThresholds (used as the shared large/small threshold ladder).
 func MgmtLevelByPerf(perf decimal.Decimal) int32 {
 	level := int32(0)
 	for i := len(MgmtThresholds) - 1; i >= 0; i-- {
@@ -211,6 +212,18 @@ func MgmtLevelByPerf(perf decimal.Decimal) int32 {
 		}
 	}
 	return level
+}
+
+// MgmtLevelByAreas returns A level 0-10 requiring both large-area and
+// small-area performance to meet the same threshold for that level.
+// Effective level = min(levelByLarge, levelBySmall).
+func MgmtLevelByAreas(large, small decimal.Decimal) int32 {
+	byLarge := MgmtLevelByPerf(large)
+	bySmall := MgmtLevelByPerf(small)
+	if byLarge < bySmall {
+		return byLarge
+	}
+	return bySmall
 }
 
 // MgmtRateForLevel returns rate for A level (1-10); 0 for A0.

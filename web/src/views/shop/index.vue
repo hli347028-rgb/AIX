@@ -72,7 +72,7 @@ const transferUsdt = async (count: number) => {
         title: lang('提示'),
         message: lang(`USDT 转账成功！`),
         theme: 'round-button',
-        confirmButtonColor: "#0A1724",
+        confirmButtonColor: "#1A1C1E",
         confirmButtonText: lang('我知道了！'),
       })
   }).catch(() => loading.value = false);
@@ -115,12 +115,17 @@ const transferUsdt = async (count: number) => {
     width: 90%;
     height: 40px;
     line-height: 40px;
-    background: #1597E5;
+    background: var(--accent);
+    /* 底色是近白，但这里从未声明字色，继承来的是浅色文字 —— 白底白字，
+       按钮文案会整个消失。补上近黑字色。 */
+    color: var(--ink-deep);
     border: 0;
     border-radius: 4px;
     display: inline-block;
     font-size: 16px;
-    opacity: .9;
+    /* opacity .9 会把底色和文字一起调淡，主按钮看起来像禁用态。
+       禁用态下面已单独定义（:disabled），这里应当是最实的一块。 */
+    opacity: 1;
     font-weight: 500;
     margin-left: 20px;
     margin-top: 30px;

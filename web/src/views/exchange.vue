@@ -75,7 +75,7 @@
       <section class="record-section">
         <h2>{{ $t('exchange.records') }}</h2>
         <div class="record-card" :aria-busy="recordLoading">
-          <div v-if="recordLoading" class="state-box"><van-loading color="#1597e5" /></div>
+          <div v-if="recordLoading" class="state-box"><van-loading color="#8A9096" /></div>
           <van-empty v-else-if="records.length === 0" :description="$t('exchange.noRecords')" :image="emptyImage" />
           <div v-else class="record-list">
             <article v-for="item in records" :key="item.id">
@@ -176,8 +176,8 @@ function displayPrice(value: unknown) {
 }
 
 function recordToAsset(asset?: string) {
-  const a = String(asset || 'USDT').toUpperCase()
-  return a === 'WIN' ? 'WIN' : 'USDT'
+  const value = String(asset || 'USDT').toUpperCase()
+  return value === 'WIN' ? 'WIN' : 'USDT'
 }
 
 function recordUnitRate(item: AixExchangeRecord) {
@@ -243,40 +243,70 @@ onMounted(async () => {
 <style scoped lang="scss">
 @use '@/style/variables.scss' as *;
 
-.exchange-page { min-height: 100vh; background: url('@/assets/images/a3.png') no-repeat top / 100% auto; }
+/* 全项目最后一处 a3.png 引用（暖橄榄黄底 + 3D 服务器渲染图，418KB）。
+   与 wallet.vue 统一为冷色渐晕 + 仪器刻度网格，纯渐变生成，不再拉位图。 */
+.exchange-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  /* 纯白页面底。原本是近黑径向渐晕（起点硬编码 #16181B）——
+     这是该配方在项目里的第 4 个副本（另三处：body、html 外圈、
+     wallet.vue），四份都各自硬编码，所以两轮整站改色全都没带走它们。
+     Base 的页面底是一片干净的白，零渐变。 */
+  background: var(--ink);
+
+  /* 这里原本还有一层 ::before 装饰网格（32px 等距细线、5% 白、向下淡出），
+     与 wallet.vue 那层是同一份复制品。删掉的两个原因：
+     1. 5% 白线在白底上完全不可见，改成深色又会变成"格子纸"，
+        与 Base 干净的白底相冲；
+     2. 它不承载任何信息，纯装饰 —— 留着只会稀释真正要读的数据。 */
+}
 .page-main { padding: 70px 15px 30px; display: flex; flex-direction: column; gap: 20px; }
-.balance-card { min-height: 80px; padding: 14px 20px; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; border: 1px solid #1d4059; border-radius: 16px; background: linear-gradient(135deg, #102b40, #091722); box-shadow: 0 10px 30px rgba(0,0,0,.2); }
-.balance-card > .van-icon { color: #1597e5; font-size: 24px; }
+/* 这一页原本大量写死高饱和蓝（#8A9096 / #34aef7）与带蓝的描边（#1d4059），
+   与其他页统一后的钢青体系不一致。改为复用发丝描边与卡面渐变。 */
+/* 拍平为 Base 的卡片配方：纯白 + 发丝边 + 12px 圆角。
+   原本那句 box-shadow 里有 `0 10px 28px rgba(0, 0, 0, 0.07)` —— 50% 的黑，
+   在白底上会糊出一大团脏灰，是深色版遗留里危害最大的一类写法。 */
+.balance-card { min-height: 80px; padding: 14px 20px; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--surface-1); }
+.balance-card > .van-icon { color: var(--accent-bright); font-size: 24px; }
 .balance-card div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.balance-card span { color: #91a7b7; font-size: 12px; }
+.balance-card span { color: var(--text-3); font-size: 12px; }
+/* 数值列右对齐 + 等宽数��，小数点成一条基准线 */
 .balance-card .target-balance { text-align: right; }
-.exchange-form, .record-card { padding: 20px; border: 1px solid #183247; border-radius: 16px; background: #0b1824; }
-.amount-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #d9e5ed; font-size: 14px; }
-.amount-heading button { border: 0; color: #34aef7; background: transparent; font-size: 13px; }
-.input-shell { height: 58px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border: 1px solid #24455d; border-radius: 12px; background: #07131d; }
-.input-shell:focus-within { border-color: #1597e5; box-shadow: 0 0 0 2px rgba(21,151,229,.12); }
+.balance-card div { font-variant-numeric: tabular-nums; }
+.exchange-form, .record-card { padding: 20px; border: 1px solid var(--hair); border-radius: 16px; background: linear-gradient(180deg, var(--surface-1) 0%, var(--ink) 100%); }
+.amount-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--text-2); font-size: 14px; }
+.amount-heading button { border: 0; color: var(--accent-bright); background: transparent; font-size: 13px; cursor: pointer; }
+/* 输入框做成内凹槽，和分段控件同一套语言 */
+.input-shell { height: 58px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--hair); border-radius: 12px; background: var(--ink-deep); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07); }
+.input-shell:focus-within { border-color: var(--accent); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07), 0 0 0 3px var(--accent-dim); }
 .input-shell.invalid { border-color: #e65f5f; }
-.input-shell input { min-width: 0; flex: 1; border: 0; outline: 0; color: #fff; background: transparent; font-size: 24px; }
-.input-shell span { color: #8ed5ff; font-weight: 600; }
+.input-shell input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.input-shell span { color: var(--text-3); font-size: 13px; font-weight: 500; }
 .error-text { margin: 7px 2px 0; color: #f17b7b; font-size: 12px; }
 .rate-row { margin-top: 18px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .rate-row + .rate-row { margin-top: 10px; }
-.rate-row span { color: #91a7b7; }
-.rate-row strong { text-align: right; color: #dcebf4; }
+.rate-row span { color: var(--text-3); }
+/* 等宽数字 —— 汇率/价格几行需要能上下对齐比对 */
+.rate-row strong { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 .rate-row.rate-sub { margin-top: 8px; }
-.rate-row.rate-sub strong { font-size: 11px; color: #70899a; font-weight: 400; }
-.estimate-box { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(21,151,229,.08); color: #8ed5ff; font-size: 12px; line-height: 1.6; }
-.rate-note { margin: 10px 0 0; color: #70899a; font-size: 12px; line-height: 1.5; }
-.submit-btn { width: 100%; height: 46px; margin-top: 22px; border: 0; border-radius: 24px; color: #fff; background: linear-gradient(90deg, #087bc1, #1597e5); font-size: 15px; font-weight: 600; }
+/* 次级价格（AIX 价格按业务要求固定 15 位小数，这里靠字号和弱化色降权，
+   避免一长串尾随零抢走主汇率的注意力） */
+.rate-row.rate-sub strong { font-size: 11px; color: var(--text-3); font-weight: 400; }
+.estimate-box { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); color: var(--accent-bright); font-size: 12px; line-height: 1.6; }
+.rate-note { margin: 10px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+/* 主按钮改为近白实底 + 近黑字，与全站主操作统一。
+   字色必须同时从 #fff 改掉 —— 底色转近白后再用白字就是白底白字。 */
+.submit-btn { width: 100%; height: 46px; margin-top: 22px; border: 0; border-radius: 24px; color: var(--ink-deep); background: var(--accent); font-size: 15px; font-weight: 600; }
 .submit-btn:disabled { opacity: .4; }
 .record-section h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
 .record-card { padding: 0 16px; }
 .state-box { height: 120px; display: flex; align-items: center; justify-content: center; }
-.record-list article { padding: 16px 0; border-bottom: 1px solid #183247; }
+.record-list article { padding: 16px 0; border-bottom: 1px solid var(--hair-2); }
 .record-list article:last-child { border-bottom: 0; }
 .record-assets { display: flex; align-items: center; gap: 10px; }
-.record-assets .van-icon { color: #617b8d; }
-.record-assets .usdt-value { color: #39b7ff; }
-.record-meta { margin-top: 8px; display: flex; justify-content: space-between; color: #70899a; font-size: 11px; }
-.record-fee { margin-top: 4px; color: #617b8d; font-size: 11px; }
+.record-assets .van-icon { color: var(--text-3); }
+.record-assets .usdt-value { color: var(--text); }
+.record-meta { margin-top: 8px; display: flex; justify-content: space-between; color: var(--text-3); font-size: 11px; }
+.record-fee { margin-top: 4px; color: var(--text-3); font-size: 11px; }
 </style>

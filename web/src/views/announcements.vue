@@ -10,7 +10,7 @@
 
     <main class="page-main">
       <div v-if="loading" class="state-box">
-        <van-loading color="#1597e5" />
+        <van-loading color="#8A9096" />
       </div>
 
       <div v-else-if="list.length === 0" class="empty-state">
@@ -29,7 +29,11 @@
             <h3>{{ item.title }}</h3>
             <span class="item-time">{{ item.created_at || formatTime(item.add_time) }}</span>
           </div>
-          <div v-show="expandedId === item.id" class="item-body" v-html="item.content"></div>
+          <div v-show="expandedId === item.id" class="item-body">
+            <img v-if="item.image_url" class="item-image" :src="item.image_url" :alt="item.title || $t('announcement.title')" />
+            <div v-if="item.content" v-html="item.content"></div>
+            <p v-else-if="item.summary">{{ item.summary }}</p>
+          </div>
         </article>
       </div>
     </main>
@@ -82,8 +86,11 @@ onMounted(async () => {
 
 .announcements-page {
   min-height: 100vh;
-  background: #061018;
-  color: #fff;
+  /* 原为 #061018（近黑）配 color: var(--text)（近黑）——
+     整个公告页此前是深底压深字，**通篇不可读**。
+     又一处"背景硬编码、前景走令牌"的代价。改为纯白底。 */
+  background: var(--ink);
+  color: var(--text);
 }
 
 .page-main {
@@ -95,7 +102,7 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   padding: 48px 0;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-2);
 }
 
 .announcement-list {
@@ -107,14 +114,14 @@ onMounted(async () => {
 .announcement-item {
   padding: 16px;
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(13, 27, 42, 0.95), rgba(8, 19, 30, 0.98));
-  border: 1px solid rgba(21, 151, 229, 0.22);
+  background: var(--surface-1);
+  border: 1px solid var(--hair);
   cursor: pointer;
   transition: border-color 0.2s ease;
 
   &.open,
   &:hover {
-    border-color: rgba(21, 151, 229, 0.55);
+    border-color: var(--text-2);
   }
 
   .item-head {
@@ -126,28 +133,33 @@ onMounted(async () => {
       margin: 0;
       font-size: 16px;
       font-weight: 600;
-      color: #fff;
+      color: var(--text);
       line-height: 1.4;
     }
 
     .item-time {
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.45);
+      color: var(--text-2);
     }
   }
 
   .item-body {
     margin-top: 14px;
     padding-top: 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--hair);
     font-size: 14px;
     line-height: 1.7;
-    color: rgba(255, 255, 255, 0.82);
+    color: var(--text);
     word-break: break-word;
 
-    :deep(img) {
+    :deep(img),
+    .item-image {
+      display: block;
       max-width: 100%;
       height: auto;
+      margin-bottom: 14px;
+      border-radius: 12px;
+      object-fit: contain;
     }
 
     :deep(p) {

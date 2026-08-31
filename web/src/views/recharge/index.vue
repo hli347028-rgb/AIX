@@ -100,20 +100,20 @@ const copyToClipboard = (text: string) => {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background-color: #0D1B2A;
+  background-color: var(--surface-2);
   padding: 10px 0;
   margin-bottom: 20px;
 }
 
 .tab-link {
-  color: #CCC;
+  color: var(--text-2);
   padding: 10px 20px;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .tab-link-active {
-  color: #21B6EA;
+  color: var(--accent-bright);
   font-weight: bold;
 }
 
@@ -155,7 +155,7 @@ const copyToClipboard = (text: string) => {
   margin: 0 auto;
   border: 0;
   background: @c7;
-  color: #FFF;
+  color: var(--text);
   cursor: pointer;
 }
 </style>

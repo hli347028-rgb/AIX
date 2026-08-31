@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	v1 "backend/api/auth/v1"
 	"backend/internal/conf"
@@ -234,6 +235,25 @@ func (uc *AuthUsecase) GetProfile(ctx context.Context, tokenString string) (*Use
 	return user, count, totalDownline, nil
 }
 
+func (uc *AuthUsecase) UpdateProfile(ctx context.Context, tokenString, username string) (*User, error) {
+	user, err := uc.resolveCaller(ctx, tokenString)
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(username)
+	if name == "" {
+		return nil, errors.BadRequest(v1.ErrorReason_INVALID_ADDRESS.String(), "用户名不能为空")
+	}
+	if utf8.RuneCountInString(name) > 24 {
+		return nil, errors.BadRequest(v1.ErrorReason_INVALID_ADDRESS.String(), "用户名不能超过24个字符")
+	}
+	if err := uc.userRepo.UpdateUsername(ctx, user.ID, name); err != nil {
+		return nil, err
+	}
+	user.Username = name
+	return user, nil
+}
+
 func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address string) ([]*DirectInvitee, error) {
 	// 冻结判定针对调用者本人；查看的目标可以是下级，不因下级被冻结而拒绝。
 	caller, err := uc.resolveCaller(ctx, tokenString)
@@ -266,6 +286,14 @@ func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address st
 	if err != nil {
 		return nil, err
 	}
+	inviteeIDs := make([]int64, 0, len(invitees))
+	for _, item := range invitees {
+		inviteeIDs = append(inviteeIDs, item.ID)
+	}
+	personalMap, err := uc.userRepo.SumCumulativePrincipalByUserIDs(ctx, inviteeIDs)
+	if err != nil {
+		return nil, err
+	}
 	memo := make(map[int64]decimal.Decimal)
 	result := make([]*DirectInvitee, 0, len(invitees))
 	for _, item := range invitees {
@@ -273,17 +301,24 @@ func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address st
 		if err != nil {
 			return nil, err
 		}
+		teamDownline, err := uc.userRepo.CountUsersUnder(ctx, item.ID)
+		if err != nil {
+			return nil, err
+		}
 		lineExit := CalcSubtreeStake(item.ID, stakeMap, childrenMap, memo)
 		result = append(result, &DirectInvitee{
-			Address:          item.Address,
-			TeamStake:        item.TeamPerf,
-			ExitAmount:       lineExit.String(),
-			CommunityLevel:   item.CommunityLevel,
-			ReleasedBalance:  item.UsdtReward,
-			ShareProfitTotal: "0",
-			EcoRewardTotal:   "0",
-			DirectCount:      directCount,
-			CreatedAt:        item.CreatedTime,
+			Address:           item.Address,
+			Username:          item.Username,
+			TeamStake:         item.TeamPerf,
+			PersonalStake:     personalMap[item.ID],
+			ExitAmount:        lineExit.String(),
+			CommunityLevel:    item.CommunityLevel,
+			ReleasedBalance:   item.UsdtReward,
+			ShareProfitTotal:  "0",
+			EcoRewardTotal:    "0",
+			DirectCount:       directCount,
+			TeamDownlineCount: teamDownline,
+			CreatedAt:         item.CreatedTime,
 		})
 	}
 	return result, nil

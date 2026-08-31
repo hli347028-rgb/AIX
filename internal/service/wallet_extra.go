@@ -412,6 +412,16 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 	if err != nil {
 		return err
 	}
+	directRewardTotal := "0"
+	if directTotal, directErr := s.uc.GetDirectRewardTotal(ctx, token); directErr == nil && strings.TrimSpace(directTotal) != "" {
+		directRewardTotal = directTotal
+	}
+	teamActiveSubscribe := "0"
+	if user != nil {
+		if v, sumErr := s.uc.GetTeamActiveSubscribePrincipal(ctx, token); sumErr == nil && strings.TrimSpace(v) != "" {
+			teamActiveSubscribe = v
+		}
+	}
 
 	// AIX 现价优先取当日 aix_prices，统一格式化为 15 位小数
 	aixPriceStr := ""
@@ -450,6 +460,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 
 	return ctx.JSON(http.StatusOK, map[string]any{
 		"address":              user.Address,
+		"username":             user.Username,
 		"usdt_recharge":        recharge,
 		"usdt_reward":          reward,
 		"aix_balance":          aix,
@@ -473,9 +484,11 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"mgmt_reward_released": mgmtSummary.Released,
 		"mgmt_reward_pending":  mgmtSummary.Pending,
 		"mgmt_reward_total":    mgmtSummary.Total,
+		"direct_reward_total":  directRewardTotal,
 		"large_area_perf":      largeArea,
 		"small_area_perf":      smallArea,
 		"team_perf":            teamPerf,
+		"team_active_subscribe_principal": teamActiveSubscribe,
 		"server_time":          serverTime,
 		"next_release_at":      nextReleaseAt,
 		"aix_price":            aixPriceStr,

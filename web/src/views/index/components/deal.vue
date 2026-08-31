@@ -217,7 +217,7 @@ const transferUsdt = async (count: number, id: number) => {
         title: lang('提示'),
         message: lang(`USDT 转账成功！`),
         theme: 'round-button',
-        confirmButtonColor: "#0A1724",
+        confirmButtonColor: "#1A1C1E",
         confirmButtonText: lang('我知道了！'),
       })
   }).catch(() => loading.value = false);
@@ -236,7 +236,7 @@ const changePopup = (value: boolean) => {
 /* 按钮样式 */
 .shop-btn {
   padding: 5px 15px;
-  background-color: #21B6EA;
+  background-color: var(--accent-bright);
   color: #000;
   border: none;
   border-radius: 4px;

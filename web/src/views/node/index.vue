@@ -22,21 +22,21 @@
         </div>
         <div class="staking-box-content content-line">
           <div class="staking-box-content-item">
-            <div class="staking-box-content-data" style="color: #21B6EA">KEY</div>
+            <div class="staking-box-content-data" style="color: var(--accent-bright)">KEY</div>
             <div class="staking-box-content-title">{{lang('赚取')}}</div>
           </div>
           <div class="staking-box-content-item">
-            <div class="staking-box-content-data" style="color: #21B6EA">0/s</div>
+            <div class="staking-box-content-data" style="color: var(--accent-bright)">0/s</div>
             <div class="staking-box-content-title">{{lang('产出速度')}}</div>
           </div>
         </div>
         <div class="staking-box-content">
           <div class="staking-box-content-item">
-            <div class="staking-box-content-data" style="color: #21B6EA">isPay</div>
+            <div class="staking-box-content-data" style="color: var(--accent-bright)">isPay</div>
             <div class="staking-box-content-title">{{lang('赚取')}}</div>
           </div>
           <div class="staking-box-content-item">
-            <div class="staking-box-content-data" style="color: #21B6EA">0/s</div>
+            <div class="staking-box-content-data" style="color: var(--accent-bright)">0/s</div>
             <div class="staking-box-content-title">{{lang('产出速度')}}</div>
           </div>
         </div>
@@ -72,7 +72,7 @@ const showToastTop = () => {
 
 .staking-button {
   padding: 5px 15px;
-  background-color: #21B6EA;
+  background-color: var(--accent-bright);
   color: #000;
   border: none;
   border-radius: 4px;

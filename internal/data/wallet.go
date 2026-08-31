@@ -499,7 +499,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 }
 
 // createManagementRewards 下级认购时按级差发放管理奖。
-// 规则：等级仍由小区业绩门槛决定；管理奖对大区、小区来源均发放（不再排除大区分支）。
+// 规则：等级由大区+小区业绩共同达标决定（同一门槛）；管理奖对大区、小区来源均发放。
 // 向上级差：仅正 gap 产生奖励；平级不发。
 // 可释放部分进 usdt_reward 并计入出局，超出进 overflow_reward，待本人下次认购释放。
 func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, sourceOrder *OrderPO) error {
@@ -1513,6 +1513,17 @@ func (r *walletRepo) GetMgmtRewardSummary(ctx context.Context, userID int64) (*b
 		Pending:  pending.Round(8).String(),
 		Total:    result.Total.Round(8).String(),
 	}, nil
+}
+
+func (r *walletRepo) GetDirectRewardTotal(ctx context.Context, userID int64) (string, error) {
+	var total decimal.Decimal
+	if err := r.data.db.WithContext(ctx).Model(&RewardLogPO{}).
+		Select("COALESCE(SUM(amount),0)").
+		Where("user_id = ? AND type IN ?", userID, []string{biz.RewardTypeDynamicUsdt, biz.RewardTypeDirectPoolRelease}).
+		Scan(&total).Error; err != nil {
+		return "0", err
+	}
+	return total.Round(8).String(), nil
 }
 
 func (r *walletRepo) ListMgmtRewardsByUser(ctx context.Context, userID int64) ([]*biz.MgmtReward, error) {

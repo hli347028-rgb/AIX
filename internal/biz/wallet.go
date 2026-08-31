@@ -434,6 +434,7 @@ type WalletRepo interface {
 	CreateRewardLog(ctx context.Context, log *RewardLog) error
 	ListRewardLogsByUser(ctx context.Context, userID int64) ([]*RewardLog, error)
 	GetMgmtRewardSummary(ctx context.Context, userID int64) (*MgmtRewardSummary, error)
+	GetDirectRewardTotal(ctx context.Context, userID int64) (string, error)
 	ListMgmtRewardsByUser(ctx context.Context, userID int64) ([]*MgmtReward, error)
 
 	GetAixPrice(ctx context.Context, date string) (string, error)

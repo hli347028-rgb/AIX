@@ -49,6 +49,7 @@
             <p>{{ $t('recharge.minWinRecharge', { amount: minWinRecharge }) }}</p>
           </div>
         </template>
+
       </div>
 
       <a-button class="withdraw-btn" :disabled="loading" size="large" @click="handleSubmit" type="primary">
@@ -195,7 +196,7 @@ const finishUsdtSuccess = async () => {
     title: $t('common.prompt'),
     message: $t('recharge.success'),
     theme: 'round-button',
-    confirmButtonColor: '#0A1724',
+    confirmButtonColor: 'var(--surface-1)',
     confirmButtonText: $t('common.gotIt'),
   })
 
@@ -305,7 +306,7 @@ const submitWinRecharge = async () => {
     title: $t('common.prompt'),
     message: `${successMessage}\n${$t('recharge.txHash')}: ${hash.slice(0, 10)}…${hash.slice(-8)}`,
     theme: 'round-button',
-    confirmButtonColor: '#0A1724',
+    confirmButtonColor: 'var(--surface-1)',
     confirmButtonText: $t('common.gotIt'),
   })
 
@@ -324,6 +325,7 @@ const handleSubmit = async () => {
   try {
     if (assetType.value === 'usdt') {
       await submitUsdtRecharge()
+
     } else {
       await submitWinRecharge()
     }
@@ -363,7 +365,7 @@ defineExpose({ open })
   font-size: 18px;
   font-weight: 600;
   line-height: 1.2;
-  color: #fff;
+  color: var(--text);
   letter-spacing: 0.02em;
   background: linear-gradient(90deg, #fff 0%, $brand-primary-light 100%);
   -webkit-background-clip: text;
@@ -382,7 +384,7 @@ defineExpose({ open })
     line-height: 36px;
     text-align: center;
     font-size: 14px;
-    border-color: rgba(21, 151, 229, 0.25);
+    border-color: var(--text-3);
     background: rgba(3, 10, 17, 0.45);
     color: $text-muted;
 

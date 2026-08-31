@@ -38,7 +38,10 @@
         <van-icon class="flow-icon" name="arrow" aria-hidden="true" />
         <div class="wallet-summary wallet-summary-target">
           <strong>{{ targetWalletName }}</strong>
-          <span class="wallet-balance">{{ mode === 'self' ? `${rewardBalance} USDT` : '' }}</span>
+          <!-- 这里原本写成 mode === 'self' ? `${rewardBalance} USDT` : ''，
+               但整个 <section> 的 v-if 就是 mode === 'self'，条件恒为真，
+               false 分支永远取不到。 -->
+          <span class="wallet-balance">{{ rewardBalance }} USDT</span>
         </div>
       </section>
       <div v-else class="reward-balance-row">
@@ -80,7 +83,7 @@
 
         <button
           type="button"
-          class="submit-btn"
+          class="aix-btn transfer-submit"
           :disabled="!canSubmit || loading"
           @click="submitTransfer"
         >
@@ -118,7 +121,9 @@
           </div>
 
           <div v-if="recordLoading" class="record-loading">
-            <van-loading type="spinner" color="#1597E5" />
+            <!-- 原来硬编码 var(--accent)，那正是设计令牌里被换掉的旧电光蓝。
+                 改为读取当前品牌色令牌，不再各处留一份旧色。 -->
+            <van-loading type="spinner" color="var(--accent)" />
           </div>
           <div v-else-if="recordError" class="empty-state record-error">
             <p>{{ $t('transfer.fetchRecordsFailed') }}</p>
@@ -440,29 +445,40 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
+/* 本页原先 @use variables.scss，用 $brand-primary-light / $text-muted /
+   $border-color / $radius-md / $gradient-primary 等旧变量，
+   与全站令牌体系并行两套颜色；现已全部改为 var(--*)。
 
+   另外去掉了两处 !important（.wallet-direction / .time-cell）——
+   它们是在跟同文件里自己写的 .table-row > span 抢权重，
+   把选择器理顺后就不需要了。 */
+
+/* 原先这里铺了 linear-gradient(180deg,#030a11,#071421,#020508)：
+   三个硬编码 hex 拼出的页面级渐变，本站其它页面都没有，
+   于是从别的页跳进来会看到底色突变。改为统一底色。 */
 .transfer-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #030a11 0%, #071421 48%, #020508 100%);
+  background: var(--ink);
 }
 
 .page-main {
   width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 76px 16px 40px;
+  /* 不设 max-width：polish.less 把 body > #app 限死在 414px，
+     这里的 520px 永远不会生效。 */
+  padding: 76px 20px 40px;
   box-sizing: border-box;
 }
 
+/* ---------------------------- 模式切换 ---------------------------- */
 .transfer-mode {
   width: 100%;
   height: 40px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
   padding: 3px;
-  border: 1px solid $border-color;
-  border-radius: $radius-md;
-  background: rgba(3, 10, 17, 0.72);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, var(--ink) 0%, var(--surface-1) 100%);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   box-sizing: border-box;
@@ -470,108 +486,109 @@ onMounted(async () => {
   button {
     min-width: 0;
     border: 0;
-    border-radius: $radius-sm;
+    border-radius: 6px;
     background: transparent;
-    color: $text-muted;
+    color: var(--text-3);
     font-size: 13px;
     cursor: pointer;
-    transition: background $transition-fast, color $transition-fast;
+    transition: color var(--t-fast) var(--ease);
 
     &.active {
-      background: $gradient-primary;
-      color: $text-inverse;
+      background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
+      color: var(--text);
       font-weight: 600;
+      box-shadow: var(--shadow-1);
     }
   }
 }
 
+/* ---------------------------- 流向摘要 ----------------------------
+   原先左右两个 .wallet-summary 各自带描边、圆角和半透明底色 ——
+   两张小卡片夹一个箭头，卡面比"从哪到哪"这件事本身更显眼。
+   现在去掉卡面，用一条发丝线框住整体，箭头居中分隔。 */
 .wallet-flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin-bottom: 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.wallet-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  strong {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* 目标钱包原先靠一圈 rgba(255, 255, 255, .3) 的浅蓝描边来区分，
+   那是个不在调色板里的颜色。方向已由中间的箭头表达清楚，
+   这里只把目标侧的文字右对齐即可。 */
+.wallet-summary-target {
+  text-align: right;
+}
+
+.wallet-balance {
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.flow-icon {
+  color: var(--text-3);
+  font-size: 18px;
+  text-align: center;
 }
 
 .reward-balance-row {
-  min-height: 36px;
-  margin-bottom: 16px;
-  padding: 0 14px;
+  margin-bottom: 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  box-sizing: border-box;
-  color: $text-muted;
+  color: var(--text-3);
   font-size: 13px;
 
   strong {
     min-width: 0;
-    color: $brand-primary-light;
-    font-size: 14px;
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: 17px;
     font-weight: 500;
+    color: var(--text);
     overflow-wrap: anywhere;
     text-align: right;
   }
 }
 
-.wallet-summary {
-  min-width: 0;
-  padding: 10px 14px;
-  border: 1px solid $border-color;
-  border-radius: $radius-md;
-  background: rgba(8, 19, 30, 0.84);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  box-sizing: border-box;
-
-  strong,
-  span {
-    overflow-wrap: anywhere;
-  }
-
-  strong {
-    color: $text-primary;
-    font-size: 15px;
-    font-weight: 500;
-  }
-}
-
-.wallet-summary-target {
-  border-color: rgba(143, 223, 255, 0.3);
-}
-
-.wallet-label {
-  color: $text-muted;
-  font-size: 12px;
-}
-
-.wallet-balance {
-  margin-top: 6px;
-  color: $brand-primary-light;
-  font-size: 12px;
-}
-
-.flow-icon {
-  color: $brand-primary;
-  font-size: 22px;
-  text-align: center;
-}
-
+/* ------------------------------ 表单 ------------------------------
+   原先整块表单套在一张 rgba(8,19,30,.9) + 描边 + $shadow-md 的卡片里，
+   而它本来就是页面上唯一的输入区域，不需要再用卡片把它"圈出来"。 */
 .transfer-form {
-  padding: 20px 16px;
-  border: 1px solid $border-color;
-  border-radius: $radius-md;
-  background: rgba(8, 19, 30, 0.9);
-  box-shadow: $shadow-md;
+  padding: 0;
 }
 
 .field-label {
   display: block;
   margin-bottom: 9px;
-  color: $text-primary;
-  font-size: 13px;
+  color: var(--text-3);
+  font-size: 12px;
 }
 
 .amount-heading {
@@ -593,31 +610,35 @@ onMounted(async () => {
   padding: 0 0 9px;
   border: 0;
   background: transparent;
-  color: $brand-primary-light;
-  font-size: 13px;
+  color: var(--accent-bright);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
 }
 
+/* 输入框保留"凹槽"质感 —— 这是少数应该有内陷感的地方，
+   它提示这里可以键入，而不是一块展示区。 */
 .input-shell {
   width: 100%;
   height: 46px;
   padding: 0 13px;
-  border: 1px solid $border-light;
-  border-radius: $radius-md;
-  background: rgba(3, 10, 17, 0.82);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, var(--ink-deep) 0%, var(--surface-1) 100%);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
   display: flex;
   align-items: center;
   gap: 9px;
   box-sizing: border-box;
-  transition: border-color $transition-fast;
+  transition: border-color var(--t-fast) var(--ease);
 
   &:focus-within {
-    border-color: $brand-primary;
+    border-color: var(--accent);
   }
 
   .van-icon {
     flex: 0 0 auto;
-    color: $text-muted;
+    color: var(--text-3);
     font-size: 18px;
   }
 
@@ -627,189 +648,162 @@ onMounted(async () => {
     border: 0;
     outline: 0;
     background: transparent;
-    color: $text-primary;
+    color: var(--text);
     font-size: 14px;
 
     &::placeholder {
-      color: rgba(159, 179, 200, 0.55);
+      color: var(--text-3);
     }
   }
 }
 
+/* 金额是本页要输入的核心数字，用展示字体放大。 */
 .amount-shell input {
-  font-size: 18px;
+  font-family: var(--aix-font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .currency {
   flex: 0 0 auto;
-  color: $text-muted;
-  font-size: 13px;
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 0.08em;
 }
 
-.submit-btn {
-  width: 100%;
-  height: 44px;
+/* 外观（含禁用态）来自 .aix-btn 原语，这里只留本页的外边距。
+
+   刻意不叫 .submit-btn：polish.less 第 9e 节的过渡补丁用
+   `.submit-btn { ... !important }` 接管旧页面按钮，而 pledge.vue 和
+   exchange.vue 还在依赖它，所以那段补丁暂时不能删。沿用同名类会让本页
+   按钮被 !important 抢走、绕过新原语；换个类名即可干净退出补丁范围。 */
+.transfer-submit {
   margin-top: 24px;
-  border: 0;
-  border-radius: $radius-md;
-  background: $gradient-primary;
-  color: $text-inverse;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity $transition-fast, transform $transition-fast;
-
-  &:active:not(:disabled) {
-    transform: translateY(1px);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.4;
-  }
 }
 
 .security-note {
   margin-top: 16px;
-  color: $text-muted;
+  color: var(--text-3);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.6;
 
   .van-icon {
     margin-top: 2px;
-    color: $brand-primary;
+    color: var(--text-3);
     font-size: 14px;
   }
 }
 
+/* ------------------------------ 记录 ------------------------------ */
 .record-section {
-  margin-top: 28px;
-}
-
-.section-title-wrap {
-  min-height: 30px;
-  margin: 0 0 10px 10px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .title-bar {
-    position: absolute;
-    left: -10px;
-    top: 50%;
-    width: 4px;
-    height: 16px;
-    border-radius: 2px;
-    background: $gradient-primary-vertical;
-    transform: translateY(-50%);
-  }
-
-  .section-title {
-    margin: 0 0 0 8px;
-    color: $text-primary;
-    font-size: 16px;
-    font-weight: 600;
-  }
+  margin-top: 32px;
 }
 
 .direction-filter {
-  height: 28px;
+  height: 26px;
   margin-left: auto;
-  padding: 2px;
-  border: 1px solid $border-color;
-  border-radius: $radius-sm;
   display: flex;
+  gap: 4px;
   box-sizing: border-box;
 
   button {
     min-width: 42px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: 3px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
     background: transparent;
-    color: $text-muted;
+    color: var(--text-3);
     font-size: 11px;
     cursor: pointer;
+    transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 
+    /* 原先选中态是一块旧品牌蓝的半透明填充，调色板里已经没有那个蓝了。 */
     &.active {
-      background: rgba(21, 151, 229, 0.2);
-      color: $brand-primary-light;
+      border-color: var(--hair-2);
+      color: var(--text);
     }
   }
 }
 
+/* 原先是一张 min-height:300px、带描边圆角和 backdrop-filter: blur(10px)
+   的卡片 —— 它背后是纯色底，模糊滤镜没有任何可模糊的东西，
+   纯粹在耗 GPU。改为与其它三页一致的发丝线账目表。 */
 .table-card {
-  min-height: 300px;
-  padding: 11px 0;
-  border: 1px solid $border-color;
-  border-radius: 8px;
-  overflow: hidden;
-  background: rgba(8, 19, 30, 0.6);
-  backdrop-filter: blur(10px);
+  padding: 0;
 
   .table-header,
   .table-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(82px, 0.85fr) minmax(0, 1fr);
-    align-items: center;
-
-    > span {
-      min-width: 0;
-      text-align: center;
-    }
+    grid-template-columns: minmax(0, 1.35fr) minmax(82px, 0.85fr) minmax(0, 0.9fr);
+    gap: 10px;
+    align-items: baseline;
   }
 
+  /* 表头原先是一条 #030a11 的实色带，比表体还深，像一根横杠压在上面。
+     改为发丝线 + 小型大写标签。 */
   .table-header {
-    margin: -11px 0 0;
-    padding: 9px 6px;
-    background: #030a11;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--hair);
 
     span {
-      color: $text-muted;
+      min-width: 0;
+      color: var(--text-3);
       font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
   }
 
   .order-list {
     .table-row {
-      min-height: 58px;
-      padding: 10px 6px;
-      border-bottom: 1px solid $border-light;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--hair);
       box-sizing: border-box;
 
       > span {
-        color: $text-primary;
+        min-width: 0;
+        color: var(--text-2);
         font-size: 12px;
       }
     }
 
     &:last-of-type .table-row {
-      border-bottom: none;
+      border-bottom: 0;
     }
   }
 
+  /* 金额与时间列右对齐：原先三列全部居中，数字居中最难扫读 ——
+     小数点对不齐，视线要在每行左右找位置。 */
+  .table-header span:nth-child(2),
+  .table-header span:nth-child(3),
+  .amount-cell,
+  .time-cell {
+    text-align: right;
+  }
+
   .counterparty-cell {
-    padding: 0 4px;
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 3px;
 
     strong {
-      color: $text-primary;
+      color: var(--text);
       font-size: 12px;
       font-weight: 500;
     }
 
     small {
       max-width: 100%;
-      color: $text-muted;
+      color: var(--text-3);
       font-size: 10px;
+      font-variant-numeric: tabular-nums;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -817,33 +811,41 @@ onMounted(async () => {
   }
 
   .wallet-direction {
-    color: $brand-primary-light !important;
+    color: var(--text-2);
   }
 
   .amount-cell {
-    padding: 0 3px;
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
     overflow-wrap: anywhere;
 
+    /* 原先用 #54d6a0 / #ff8d8d 两个就地写死的颜色，
+       而令牌里本来就有 --up / --down 这对涨跌语义色。 */
     &.income {
-      color: #54d6a0;
+      color: var(--up);
     }
 
     &.outcome {
-      color: #ff8d8d;
+      color: var(--down);
     }
   }
 
   .time-cell {
-    padding: 0 4px;
-    color: $text-muted !important;
-    font-size: 10px !important;
+    color: var(--text-3);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
     line-height: 1.4;
     overflow-wrap: anywhere;
   }
 
+  /* 原先加载态与空状态都硬撑 250px 高、外层卡片再 min-height:300px，
+     于是"暂无记录"是一行字浮在一个 300px 的空盒子中央。 */
   .record-loading,
   .empty-state {
-    height: 250px;
+    padding: 60px 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -851,29 +853,35 @@ onMounted(async () => {
 
   .empty-state p {
     margin: 0;
-    color: $text-muted;
+    color: var(--text-3);
     font-size: 12px;
   }
 
   .record-error {
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
   .retry-btn {
     min-width: 76px;
     height: 30px;
     padding: 0 16px;
-    border: 1px solid $brand-primary;
-    border-radius: $radius-sm;
-    background: rgba(21, 151, 229, 0.12);
-    color: $brand-primary-light;
+    border: 1px solid var(--hair-2);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-2);
     font-size: 12px;
     cursor: pointer;
+    transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--hair-3);
+    }
   }
 
   .pagination-wrapper {
-    padding: 16px 0 5px;
+    padding: 18px 0 5px;
     display: flex;
     justify-content: center;
   }
@@ -881,23 +889,19 @@ onMounted(async () => {
 
 @media (max-width: 350px) {
   .page-main {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .wallet-summary {
-    padding: 12px 10px;
+    padding-right: 14px;
+    padding-left: 14px;
   }
 
   .direction-filter button {
     min-width: 36px;
-    padding: 0 5px;
+    padding: 0 6px;
   }
 
   .table-card {
     .table-header,
     .table-row {
-      grid-template-columns: minmax(0, 1.2fr) minmax(72px, 0.8fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.2fr) minmax(72px, 0.8fr) minmax(0, 0.9fr);
     }
   }
 }
