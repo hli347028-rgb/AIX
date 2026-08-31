@@ -1,4 +1,5 @@
 import "lib-flexible/flexible.js";
+import "./tools/polyfills";
 import { createApp } from 'vue';
 import 'vant/lib/index.css';
 import "./style/index.less";

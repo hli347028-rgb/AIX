@@ -80,7 +80,8 @@ const error = ref('')
 const hoverIndex = ref<number | null>(null)
 let requestId = 0
 
-const latest = computed(() => candles.value.at(-1))
+// Array.prototype.at 直到较新的 WebView 才提供；索引写法兼容旧内核。
+const latest = computed(() => candles.value[candles.value.length - 1])
 const first = computed(() => candles.value[0])
 const change = computed(() => latest.value && first.value ? ((latest.value.close - first.value.open) / first.value.open) * 100 : 0)
 const dayHigh = computed(() => Math.max(...candles.value.map((item) => item.high), 0))
