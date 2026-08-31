@@ -768,14 +768,15 @@ onMounted(async () => {
   padding: 0 0 4px;
 
   .table-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
     align-items: center;
     background: var(--ink-deep);
-    padding: 10px 0;
+    padding: 10px 8px;
     border-bottom: 1px solid var(--hair);
 
     span {
-      flex: 1;
+      min-width: 0;
       text-align: center;
       font-size: var(--fs-micro);
       letter-spacing: var(--ls-caps);
@@ -786,7 +787,8 @@ onMounted(async () => {
 
   .order-list {
     .table-row {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
       align-items: center;
       padding: 12px 8px;
       border-bottom: 1px solid var(--hair);
@@ -801,7 +803,6 @@ onMounted(async () => {
       }
 
       span {
-        flex: 1;
         min-width: 0;
         text-align: center;
         font-size: var(--fs-sm);
@@ -820,7 +821,6 @@ onMounted(async () => {
          （截图里三行金额全是两行），把整张表撑得很松散。
          这一列信息量最大，理应分到更宽的份额。 */
       span:first-child {
-        flex: 1.5;
         white-space: nowrap;
         font-family: var(--aix-font-display);
         font-variant-numeric: tabular-nums;
@@ -878,4 +878,3 @@ onMounted(async () => {
    而其中那句"全页唯一的主操作"注释指向的 DOM 早就不存在了 ——
    过期注释比没有注释更误导人。 */
 </style>
-

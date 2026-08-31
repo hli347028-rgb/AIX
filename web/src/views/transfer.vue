@@ -457,6 +457,10 @@ onMounted(async () => {
    三个硬编码 hex 拼出的页面级渐变，本站其它页面都没有，
    于是从别的页跳进来会看到底色突变。改为统一底色。 */
 .transfer-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #003ec4;
+  --accent-dim: rgba(0, 82, 255, .10);
   min-height: 100vh;
   background: var(--ink);
 }
@@ -475,10 +479,9 @@ onMounted(async () => {
   height: 40px;
   margin-bottom: 24px;
   padding: 3px;
-  border: 1px solid var(--hair);
-  border-radius: var(--r-sm);
-  background: linear-gradient(180deg, var(--ink) 0%, var(--surface-1) 100%);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-pill);
+  background: #f2f5ff;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   box-sizing: border-box;
@@ -486,18 +489,22 @@ onMounted(async () => {
   button {
     min-width: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--r-pill);
     background: transparent;
-    color: var(--text-3);
+    color: #0052ff;
     font-size: 13px;
     cursor: pointer;
     transition: color var(--t-fast) var(--ease);
 
     &.active {
-      background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
-      color: var(--text);
+      background: #0052ff;
+      color: var(--on-accent);
       font-weight: 600;
-      box-shadow: var(--shadow-1);
+    }
+
+    &:focus-visible {
+      outline: 2px solid #0052ff;
+      outline-offset: 2px;
     }
   }
 }
@@ -512,9 +519,10 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   margin-bottom: 24px;
-  padding: 14px 0;
-  border-top: 1px solid var(--hair);
-  border-bottom: 1px solid var(--hair);
+  padding: 16px;
+  border: 1px solid rgba(0, 82, 255, .20);
+  border-radius: var(--r-lg);
+  background: #f2f5ff;
 }
 
 .wallet-summary {
@@ -524,7 +532,7 @@ onMounted(async () => {
   gap: 5px;
 
   strong {
-    color: var(--text);
+    color: #0052ff;
     font-size: 14px;
     font-weight: 500;
     overflow-wrap: anywhere;
@@ -543,26 +551,27 @@ onMounted(async () => {
   font-variant-numeric: tabular-nums;
   font-size: 15px;
   font-weight: 500;
-  color: var(--text-2);
+  color: var(--text);
   overflow-wrap: anywhere;
 }
 
 .flow-icon {
-  color: var(--text-3);
+  color: #0052ff;
   font-size: 18px;
   text-align: center;
 }
 
 .reward-balance-row {
   margin-bottom: 24px;
-  padding: 14px 0;
-  border-top: 1px solid var(--hair);
-  border-bottom: 1px solid var(--hair);
+  padding: 16px;
+  border: 1px solid rgba(0, 82, 255, .20);
+  border-radius: var(--r-lg);
+  background: #f2f5ff;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  color: var(--text-3);
+  color: #0052ff;
   font-size: 13px;
 
   strong {
@@ -571,7 +580,7 @@ onMounted(async () => {
     font-variant-numeric: tabular-nums;
     font-size: 17px;
     font-weight: 500;
-    color: var(--text);
+    color: #0052ff;
     overflow-wrap: anywhere;
     text-align: right;
   }
@@ -581,13 +590,16 @@ onMounted(async () => {
    原先整块表单套在一张 rgba(8,19,30,.9) + 描边 + $shadow-md 的卡片里，
    而它本来就是页面上唯一的输入区域，不需要再用卡片把它"圈出来"。 */
 .transfer-form {
-  padding: 0;
+  padding: 18px;
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
 }
 
 .field-label {
   display: block;
   margin-bottom: 9px;
-  color: var(--text-3);
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -607,13 +619,24 @@ onMounted(async () => {
 }
 
 .all-btn {
-  padding: 0 0 9px;
-  border: 0;
-  background: transparent;
-  color: var(--accent-bright);
+  min-height: 28px;
+  margin-bottom: 7px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 82, 255, .24);
+  border-radius: 14px;
+  background: #f2f5ff;
+  color: #0052ff;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    outline: none;
+    border-color: #0052ff;
+    background: #0052ff;
+    color: var(--on-accent);
+  }
 }
 
 /* 输入框保留"凹槽"质感 —— 这是少数应该有内陷感的地方，
@@ -622,10 +645,9 @@ onMounted(async () => {
   width: 100%;
   height: 46px;
   padding: 0 13px;
-  border: 1px solid var(--hair);
-  border-radius: var(--r-sm);
-  background: linear-gradient(180deg, var(--ink-deep) 0%, var(--surface-1) 100%);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
+  border: 1px solid rgba(0, 82, 255, .24);
+  border-radius: var(--r-md);
+  background: #f7f9ff;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -633,12 +655,13 @@ onMounted(async () => {
   transition: border-color var(--t-fast) var(--ease);
 
   &:focus-within {
-    border-color: var(--accent);
+    border-color: #0052ff;
+    box-shadow: 0 0 0 3px rgba(0, 82, 255, .10);
   }
 
   .van-icon {
     flex: 0 0 auto;
-    color: var(--text-3);
+    color: #0052ff;
     font-size: 18px;
   }
 
@@ -668,7 +691,7 @@ onMounted(async () => {
 
 .currency {
   flex: 0 0 auto;
-  color: var(--text-3);
+  color: #0052ff;
   font-size: 12px;
   letter-spacing: 0.08em;
 }
@@ -681,11 +704,29 @@ onMounted(async () => {
    按钮被 !important 抢走、绕过新原语；换个类名即可干净退出补丁范围。 */
 .transfer-submit {
   margin-top: 24px;
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 1px solid #0052ff;
+  border-radius: 18px;
+  background: #0052ff;
+  color: var(--on-accent);
+
+  &:hover:not(:disabled) {
+    border-color: #003ec4;
+    background: #003ec4;
+    filter: none;
+  }
+
+  &:disabled {
+    border-color: var(--hair);
+    background: var(--surface-3);
+    color: var(--text-2);
+  }
 }
 
 .security-note {
   margin-top: 16px;
-  color: var(--text-3);
+  color: var(--text-2);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -695,7 +736,7 @@ onMounted(async () => {
 
   .van-icon {
     margin-top: 2px;
-    color: var(--text-3);
+    color: #0052ff;
     font-size: 14px;
   }
 }
@@ -725,8 +766,10 @@ onMounted(async () => {
 
     /* 原先选中态是一块旧品牌蓝的半透明填充，调色板里已经没有那个蓝了。 */
     &.active {
-      border-color: var(--hair-2);
-      color: var(--text);
+      border-color: rgba(0, 82, 255, .24);
+      background: #f2f5ff;
+      color: #0052ff;
+      font-weight: 600;
     }
   }
 }
@@ -735,25 +778,33 @@ onMounted(async () => {
    的卡片 —— 它背后是纯色底，模糊滤镜没有任何可模糊的东西，
    纯粹在耗 GPU。改为与其它三页一致的发丝线账目表。 */
 .table-card {
+  min-height: 220px;
   padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
 
   .table-header,
   .table-row {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(82px, 0.85fr) minmax(0, 0.9fr);
     gap: 10px;
-    align-items: baseline;
+    align-items: center;
   }
 
   /* 表头原先是一条 #030a11 的实色带，比表体还深，像一根横杠压在上面。
      改为发丝线 + 小型大写标签。 */
   .table-header {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--hair);
+    min-height: 42px;
+    padding: 0 10px;
+    border-bottom: 1px solid rgba(0, 82, 255, .18);
+    background: #f2f5ff;
 
     span {
       min-width: 0;
-      color: var(--text-3);
+      text-align: center;
+      color: #0052ff;
       font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.1em;
@@ -763,9 +814,13 @@ onMounted(async () => {
 
   .order-list {
     .table-row {
-      padding: 14px 0;
+      min-height: 62px;
+      padding: 10px;
       border-bottom: 1px solid var(--hair);
       box-sizing: border-box;
+      transition: background-color var(--t-fast) var(--ease);
+
+      &:hover { background: #f7f9ff; }
 
       > span {
         min-width: 0;
@@ -781,8 +836,6 @@ onMounted(async () => {
 
   /* 金额与时间列右对齐：原先三列全部居中，数字居中最难扫读 ——
      小数点对不齐，视线要在每行左右找位置。 */
-  .table-header span:nth-child(2),
-  .table-header span:nth-child(3),
   .amount-cell,
   .time-cell {
     text-align: right;
@@ -825,7 +878,7 @@ onMounted(async () => {
     /* 原先用 #54d6a0 / #ff8d8d 两个就地写死的颜色，
        而令牌里本来就有 --up / --down 这对涨跌语义色。 */
     &.income {
-      color: var(--up);
+      color: var(--up-readable);
     }
 
     &.outcome {
@@ -866,17 +919,18 @@ onMounted(async () => {
     min-width: 76px;
     height: 30px;
     padding: 0 16px;
-    border: 1px solid var(--hair-2);
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: var(--text-2);
+    border: 1px solid rgba(0, 82, 255, .24);
+    border-radius: 15px;
+    background: #f2f5ff;
+    color: #0052ff;
     font-size: 12px;
     cursor: pointer;
     transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 
     &:hover {
-      color: var(--text);
-      border-color: var(--hair-3);
+      color: var(--on-accent);
+      border-color: #0052ff;
+      background: #0052ff;
     }
   }
 

@@ -233,6 +233,8 @@
      #34D399 对白只有 1.8:1、#FB6E62 约 2.7:1，在白底上都读不出来。
      压深到对白 4.5:1 以上（分别约 4.6 与 4.8）。 */
   --up: #0F8A5F;
+  /* 小字号状态文字使用的高对比度正向色；对白约 5.87:1。 */
+  --up-readable: #08734F;
   --down: #D22D20;
 
   /* —— 发丝线：高级感几乎全在这几条线的克制程度上。
@@ -241,9 +243,11 @@
      Base 的卡片边界就是这一条极细灰线（实测 rgba(0,0,0,.1) 一档），
      浅色版里它承担了原本由明度差承担的全部分层职责，所以比深色版
      略微加重一点。 */
-  --hair: rgba(0, 0, 0, 0.10);
-  --hair-2: rgba(0, 0, 0, 0.16);
-  --hair-3: rgba(0, 0, 0, 0.28);
+  /* 分隔线承担浅色页面的主要层级，不再使用接近不可见的 10% 黑。
+     第一档用于行与卡片，第二档用于区块边界，第三档用于聚焦/强调边界。 */
+  --hair: rgba(0, 0, 0, 0.16);
+  --hair-2: rgba(0, 0, 0, 0.26);
+  --hair-3: rgba(0, 0, 0, 0.40);
 
   /* —— 旧强调色令牌别名 ——
         pledge / exchange / node 等尚未重写的页面仍在引用 --gold* 与 --cyan*
@@ -1134,8 +1138,8 @@ body::after {
   font-weight: 600 !important;
   }
 
-/* 9e. 按钮 */
-.wallet-actions .wallet-action,
+/* 9e. 按钮。wallet-actions 已在钱包页按顶栏 wallet 控件独立定义，
+   不再由这段旧版深色按钮补丁覆盖。 */
 .exchange-entry {
   border: 1px solid var(--hair-2) !important;
   border-radius: var(--r-pill) !important;
@@ -1145,7 +1149,6 @@ body::after {
     border-color 0.25s var(--ease) !important;
 }
 
-.wallet-actions .wallet-action:active,
 .exchange-entry:active {
   background: rgba(255, 255, 255, 0.26) !important;
   border-color: var(--hair-3) !important;
@@ -1271,7 +1274,7 @@ body::after {
 }
 
 .subscribe-table .income-list-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid var(--hair) !important;
   transition: background-color 0.25s var(--ease);
 }
 
@@ -1345,9 +1348,12 @@ body::after {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 32px 0 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--hair);
+  margin: 32px 0 16px;
+  padding: 0 0 11px;
+  /* 标题区保持透明，让它自然融入页面；结构关系交给单像素分隔线。 */
+  background: transparent !important;
+  border-bottom: 1px solid var(--hair-2);
+  box-shadow: none;
 }
 
 /* 区块标题走"铭牌"处理：极小字号 + 很开的字距 + 全大写。
@@ -1451,9 +1457,9 @@ body::after {
      空出一格带边框的死单元。auto-fit 会自动���起空轨道。 */
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 1px;
-  background: var(--hair);
-  border-top: 1px solid var(--hair);
-  border-bottom: 1px solid var(--hair);
+  background: var(--hair-2);
+  border-top: 1px solid var(--hair-2);
+  border-bottom: 1px solid var(--hair-2);
 }
 
 .aix-metrics > * {

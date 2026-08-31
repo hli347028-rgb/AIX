@@ -278,9 +278,17 @@
         -moz-box-sizing:border-box;
         -webkit-box-sizing:border-box;
         padding: 10px;
-        border-bottom: 1px solid var(--surface-1);
+        border-bottom: 1px solid var(--hair);
+        background: var(--surface-1);
+        transition: background-color var(--t-fast) var(--ease);
         &:nth-child(2n) {
-          background: #0D1B2A;
+          background: var(--surface-2);
+        }
+        &:last-of-type {
+          border-bottom: 0;
+        }
+        &:hover {
+          background: var(--surface-2);
         }
         .income-list-item-info {
           width: 100%;

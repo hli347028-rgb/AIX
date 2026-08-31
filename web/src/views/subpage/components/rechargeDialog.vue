@@ -22,7 +22,6 @@
         <template v-if="assetType === 'usdt'">
           <a-input-number
             autofocus
-            style="width: 100%; margin-top: 20px;"
             v-model:value="amount"
             :min="minUsdtRecharge"
             size="large"
@@ -36,7 +35,6 @@
         <template v-else-if="assetType === 'win'">
           <a-input-number
             autofocus
-            style="width: 100%; margin-top: 20px;"
             v-model:value="amount"
             :min="minWinRecharge"
             :precision="0"
@@ -196,7 +194,7 @@ const finishUsdtSuccess = async () => {
     title: $t('common.prompt'),
     message: $t('recharge.success'),
     theme: 'round-button',
-    confirmButtonColor: 'var(--surface-1)',
+    confirmButtonColor: '#0052ff',
     confirmButtonText: $t('common.gotIt'),
   })
 
@@ -306,7 +304,7 @@ const submitWinRecharge = async () => {
     title: $t('common.prompt'),
     message: `${successMessage}\n${$t('recharge.txHash')}: ${hash.slice(0, 10)}…${hash.slice(-8)}`,
     theme: 'round-button',
-    confirmButtonColor: 'var(--surface-1)',
+    confirmButtonColor: '#0052ff',
     confirmButtonText: $t('common.gotIt'),
   })
 
@@ -348,10 +346,12 @@ defineExpose({ open })
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
-
 .withdraw-dialog {
-  height: 280px;
+  --dialog-blue: #0052ff;
+  --dialog-blue-deep: #003ec4;
+  --dialog-soft: #f2f5ff;
+  min-height: 310px;
+  padding: 24px 22px 20px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -359,53 +359,50 @@ defineExpose({ open })
 }
 
 .dialog-heading {
-  margin: 0 0 16px;
-  padding-bottom: 14px;
-  text-align: center;
-  font-size: 18px;
+  margin: 0 0 18px;
+  padding: 0 32px 14px;
+  border-bottom: 1px solid rgba(0, 82, 255, .18);
+  text-align: left;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.2;
-  color: var(--text);
+  color: var(--dialog-blue);
   letter-spacing: 0.02em;
-  background: linear-gradient(90deg, #fff 0%, $brand-primary-light 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .asset-tabs {
   width: 100%;
   display: flex;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  padding: 4px;
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-pill);
+  background: var(--dialog-soft);
+  box-sizing: border-box;
 
   :deep(.ant-radio-button-wrapper) {
     flex: 1;
     height: 38px;
     line-height: 36px;
     text-align: center;
-    font-size: 14px;
-    border-color: var(--text-3);
-    background: rgba(3, 10, 17, 0.45);
-    color: $text-muted;
+    font-size: 13px;
+    font-weight: 500;
+    border: 0;
+    border-radius: var(--r-pill) !important;
+    background: transparent;
+    color: var(--dialog-blue);
+    box-shadow: none;
 
     &::before {
       display: none;
     }
-
-    &:first-child {
-      border-radius: 10px 0 0 10px;
-    }
-
-    &:last-child {
-      border-radius: 0 10px 10px 0;
-    }
   }
 
   :deep(.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled)) {
-    background: $gradient-primary;
-    border-color: transparent;
-    color: $text-inverse;
+    background: var(--dialog-blue);
+    color: var(--on-accent);
     font-weight: 600;
+    box-shadow: none;
   }
 }
 
@@ -415,6 +412,54 @@ defineExpose({ open })
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  :deep(.ant-input-number) {
+    width: 100%;
+    height: 48px;
+    margin-top: 16px;
+    border: 1px solid rgba(0, 82, 255, .24);
+    border-radius: var(--r-md);
+    background: #f7f9ff;
+    box-shadow: none;
+  }
+
+  :deep(.ant-input-number:hover),
+  :deep(.ant-input-number-focused) {
+    border-color: var(--dialog-blue);
+    box-shadow: 0 0 0 3px rgba(0, 82, 255, .10);
+  }
+
+  :deep(.ant-input-number-input-wrap) {
+    height: 100%;
+  }
+
+  :deep(.ant-input-number-input) {
+    height: 46px;
+    color: var(--text);
+    font-family: var(--aix-font-display);
+    font-size: 18px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :deep(.ant-input-number-input::placeholder) {
+    color: var(--text-3);
+  }
+
+  :deep(.ant-input-number-handler-wrap) {
+    border-left: 1px solid rgba(0, 82, 255, .18);
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+    background: var(--dialog-soft);
+  }
+
+  :deep(.ant-input-number-handler) {
+    border-color: rgba(0, 82, 255, .18);
+  }
+
+  :deep(.ant-input-number-handler-up-inner),
+  :deep(.ant-input-number-handler-down-inner) {
+    color: var(--dialog-blue);
+  }
 }
 
 .dialog-subtitle {
@@ -422,7 +467,7 @@ defineExpose({ open })
   min-height: 18px;
   font-size: 12px;
   line-height: 18px;
-  color: $text-muted;
+  color: var(--text-2);
 }
 
 .dialog-subtitle--placeholder {
@@ -431,8 +476,12 @@ defineExpose({ open })
 
 .dialog-payable {
   margin: 0;
-  font-size: 13px;
-  color: $brand-primary-light;
+  padding: 9px 12px;
+  border: 1px solid rgba(0, 82, 255, .16);
+  border-radius: var(--r-md);
+  background: var(--dialog-soft);
+  font-size: 12px;
+  color: var(--dialog-blue);
 }
 
 .dialog-info {
@@ -442,7 +491,7 @@ defineExpose({ open })
   p {
     margin: 0;
     text-align: right;
-    color: $text-muted;
+    color: var(--text-2);
     font-size: 12px;
   }
 }
@@ -458,7 +507,7 @@ defineExpose({ open })
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: $text-muted;
+    color: var(--text-2);
     text-align: center;
   }
 }
@@ -467,26 +516,56 @@ defineExpose({ open })
   width: 100%;
   height: 44px;
   margin-top: 10px;
-  background: $gradient-primary;
-  border: none;
-  color: $text-inverse;
-  border-radius: 22px;
+  background: var(--dialog-blue);
+  border: 1px solid var(--dialog-blue);
+  color: var(--on-accent);
+  border-radius: 18px;
   font-size: 15px;
   font-weight: 600;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, $brand-primary-light 0%, $brand-primary 100%);
+    border-color: var(--dialog-blue-deep);
+    background: var(--dialog-blue-deep);
   }
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 1;
+    border-color: var(--hair);
+    background: var(--surface-3);
+    color: var(--text-2);
   }
 }
 </style>
 
 <style lang="scss">
 .recharge-modal .ant-modal-content {
+  padding: 0;
+  border: 1px solid rgba(0, 82, 255, .20);
   border-radius: 16px;
+  background: #fff;
   overflow: hidden;
+  box-shadow: 0 18px 54px rgba(12, 23, 48, .16);
+}
+
+.recharge-modal .ant-modal-close {
+  top: 17px;
+  right: 17px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(0, 82, 255, .20);
+  border-radius: 50%;
+  background: #f2f5ff;
+  color: #0052ff;
+}
+
+.recharge-modal .ant-modal-close:hover {
+  background: #0052ff;
+  color: #fff;
+}
+
+.recharge-modal .ant-modal-body {
+  background: #fff;
 }
 </style>

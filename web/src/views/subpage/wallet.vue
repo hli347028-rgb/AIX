@@ -158,13 +158,13 @@
           <div class="income-list-main">
             <div class="income-list-item" v-for="(item, index) in rewardList" :key="item.id || `${active}-${page}-${index}`">
               <div class="income-list-item-info">
-                <p>{{ item.name || $t('wallet.income') }}</p>
+                <p class="income-list-item-name">{{ item.name || $t('wallet.income') }}</p>
                 <p class="income-list-item-time">
                   <span>{{ item.createdAt }}</span>
                   <span class="income-list-item-money">{{ item.reward }}</span>
                 </p>
-                <p v-if="item.address" style="font-size: 12px; opacity: .7;">{{ formatShortAddr(item.address) }}</p>
-                <p v-if="active === '5'" style="font-size: 12px; opacity: .7;">
+                <p v-if="item.address" class="income-list-item-note">{{ formatShortAddr(item.address) }}</p>
+                <p v-if="active === '5'" class="income-list-item-note">
                   {{ $t('wallet.releasedManagementReward') }}: {{ item.released || 0 }} / {{ $t('wallet.pendingManagementReward') }}: {{ item.pending || 0 }}
                 </p>
               </div>
@@ -579,26 +579,24 @@ const handleBack = () => {
       width: 100%;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
 
-      /* 三个操作是次级动作（主操作是下方的认购/提现流程），
-         所以用"描边 + 中性文字"而不是填充蓝 —— 按用色铁律，
-         满饱和蓝填充只留给唯一的主操作。
-         原本这里是硬编码的 rgba(52,174,247)/#b9e5ff/#39b7ff，
-         那是初版青蓝配色的残留，和新的品牌蓝不是同一个色相。 */
+      /* 与顶栏 .wallet 完全同一套配色：浅蓝底、品牌蓝文字和低强度蓝框。 */
       .wallet-action {
-        height: 40px;
+        min-width: 0;
+        height: 42px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
+        gap: 6px;
+        padding: 0 10px;
         box-sizing: border-box;
-        border: 1px solid var(--hair-2);
-        border-radius: var(--r-md);
-        color: var(--text-2);
-        background: var(--surface-1);
-        font-size: var(--fs-sm);
-        font-weight: 500;
+        border: 1px solid rgba(0, 82, 255, .24);
+        border-radius: 18px;
+        color: #0052ff;
+        background: #f2f5ff;
+        font-size: 11px;
+        font-weight: 600;
         line-height: 1;
         cursor: pointer;
         transition: color var(--t-fast) var(--ease),
@@ -607,23 +605,30 @@ const handleBack = () => {
           transform var(--t-fast) var(--ease-spring);
 
         .van-icon {
-          color: var(--text-3);
+          color: currentColor;
           font-size: 15px;
           transition: color var(--t-fast) var(--ease);
         }
 
-        /* hover 时才引入蓝色：这是"交互反馈"，属于激活态语义 */
-        &:hover {
-          color: var(--text);
-          border-color: var(--accent);
-          background: var(--accent-dim);
+        span {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
 
-          .van-icon {
-            color: var(--accent-bright);
-          }
+        &:hover,
+        &:focus-visible {
+          outline: none;
+          color: var(--on-accent);
+          border-color: #0052ff;
+          background: #0052ff;
         }
 
         &:active {
+          color: var(--on-accent);
+          border-color: var(--accent-deep);
+          background: var(--accent-deep);
           transform: scale(.97);
         }
       }
@@ -833,6 +838,7 @@ const handleBack = () => {
           padding: 10px 8px;
           border-bottom: 1px solid var(--hair);
           box-sizing: border-box;
+          background: var(--surface-1);
           transition: background-color var(--t-fast) var(--ease);
 
           /* 斑马纹改用中性白。原本是 rgba(8,123,193,.06) —— 初版青蓝残留，
@@ -1209,18 +1215,31 @@ const handleBack = () => {
               width: 100%;
               color: var(--text-2);
             }
+            .income-list-item-name {
+              color: var(--text);
+              font-weight: 600;
+            }
             .income-list-item-time {
               font-size: 12px;
               display: flex;
               align-items: center;
               justify-content: space-between;
               gap: 8px;
+
+              > span:first-child {
+                color: var(--text-3);
+              }
             }
             .income-list-item-money {
               flex-shrink: 0;
-              color: var(--text-2);
+              color: var(--text);
               font-size: 15px;
-              font-weight: 500;
+              font-weight: 600;
+              font-variant-numeric: tabular-nums;
+            }
+            .income-list-item-note {
+              color: var(--text-3);
+              font-size: 12px;
             }
           }
         }

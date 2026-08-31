@@ -81,10 +81,16 @@
           </div>
           <div class="order-list" v-for="item in filteredRecords" :key="item.id">
             <div class="table-row table-row-4">
-              <span>{{ displayAmount(item.amount) }} {{ recordAssetLabel(item.asset) }}</span>
-              <span>{{ displayAmount(item.net_amount) }} {{ recordAssetLabel(item.asset) }}</span>
+              <span class="amount-cell">
+                <strong>{{ displayAmount(item.amount) }}</strong>
+                <small>{{ recordAssetLabel(item.asset) }}</small>
+              </span>
+              <span class="amount-cell">
+                <strong>{{ displayAmount(item.net_amount) }}</strong>
+                <small>{{ recordAssetLabel(item.asset) }}</small>
+              </span>
               <span class="address-cell">{{ formatAddress(item.to_address) }}</span>
-              <span class="status-cell">
+              <span class="status-cell" :class="`is-${String(item.status || '').toLowerCase()}`">
                 {{ withdrawStatusText(item.status) }}
                 <small v-if="item.tx_hash" class="tx-hint">{{ String(item.tx_hash).slice(0, 10) }}…</small>
                 <small class="muted">{{ formatTime(item.created_at) }}</small>
@@ -95,7 +101,7 @@
             <p>{{ $t('withdraw.noRecords') }}</p>
           </div>
           <div class="state-box" v-if="recordLoading">
-            <van-loading color="#8A9096" />
+            <van-loading color="#0052ff" />
           </div>
         </div>
       </div>
@@ -329,9 +335,11 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/style/variables.scss' as *;
-
 .withdrawal-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #003ec4;
+  --accent-dim: rgba(0, 82, 255, .10);
   min-height: 100vh;
   background: var(--ink);
 }
@@ -342,18 +350,15 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-/* 资产切换：原本是三个各自独立、彼此有 10px 间距的方块按钮，
-   和 node / wallet / transfer 里的分段控件是两种语言，同一个 App 里
-   出现两种切换器就显得没人统一收口。这里改成同一套"凹槽 + 抬起滑块"。 */
+/* 资产切换沿用顶栏 wallet 的浅蓝底、蓝字、蓝框。 */
 .asset-tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 18px;
   padding: 4px;
-  border: 1px solid var(--hair);
+  border: 1px solid rgba(0, 82, 255, .18);
   border-radius: 999px;
-  background: var(--surface-2);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07);
+  background: #f2f5ff;
 }
 
 .asset-tab {
@@ -362,7 +367,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-3);
+  color: #0052ff;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -371,12 +376,15 @@ onUnmounted(() => {
     background-color .18s var(--ease);
 
   &.active {
-    background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
-    border-color: var(--hair-2);
-    color: var(--text);
+    background: #0052ff;
+    border-color: #0052ff;
+    color: var(--on-accent);
     font-weight: 600;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.07);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #0052ff;
+    outline-offset: 2px;
   }
 }
 
@@ -384,13 +392,17 @@ onUnmounted(() => {
    改成左对齐 + 余额放大：可提现余额是这一页唯一需要"一眼看到"的数字。 */
 .page-header {
   text-align: left;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid rgba(0, 82, 255, .20);
+  border-radius: var(--r-lg);
+  background: #f2f5ff;
 
   .page-title {
     font-size: 11.5px;
     font-weight: 500;
     letter-spacing: .04em;
-    color: var(--text-3);
+    color: #0052ff;
     margin-bottom: 6px;
   }
 
@@ -400,7 +412,7 @@ onUnmounted(() => {
     font-weight: 300;
     line-height: 1.1;
     letter-spacing: -0.02em;
-    color: var(--text);
+    color: #0052ff;
     font-variant-numeric: tabular-nums;
     margin-top: 0;
 
@@ -411,7 +423,7 @@ onUnmounted(() => {
       font-size: 13px;
       font-weight: 500;
       letter-spacing: .02em;
-      color: var(--text-3);
+      color: var(--text-2);
     }
   }
 
@@ -427,13 +439,17 @@ onUnmounted(() => {
     padding: 0;
     border: 0;
     background: transparent;
-    color: $brand-primary;
+    color: #0052ff;
     cursor: pointer;
   }
 }
 
 .withdraw-form {
   margin-bottom: 40px;
+  padding: 18px;
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
 
   .form-hint-row {
     display: flex;
@@ -449,12 +465,23 @@ onUnmounted(() => {
   }
 
   .all-btn {
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: $brand-primary;
-    font-size: 13px;
+    min-height: 28px;
+    padding: 0 12px;
+    border: 1px solid rgba(0, 82, 255, .24);
+    border-radius: 14px;
+    background: #f2f5ff;
+    color: #0052ff;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      outline: none;
+      border-color: #0052ff;
+      background: #0052ff;
+      color: var(--on-accent);
+    }
   }
 
   .form-row {
@@ -465,19 +492,20 @@ onUnmounted(() => {
 
   .form-input {
     flex: 1;
+    min-width: 0;
     height: 44px;
     padding: 0 14px;
-    border: 1px solid var(--hair);
+    border: 1px solid rgba(0, 82, 255, .24);
     border-radius: var(--r-md);
     /* 原为 rgba(0,0,0,.25) 配 color: var(--text)（近黑）——
        25% 黑底压近黑字，这个提现金额输入框此前几乎读不出来。
        提现是资金操作，输入内容必须清楚可读。
        改为浅灰底（--surface-2）+ 近黑字，与全站输入框统一。 */
-    background: var(--surface-2);
+    background: #f7f9ff;
     color: var(--text);
     font-size: 15px;
     outline: none;
-    caret-color: $brand-primary;
+    caret-color: #0052ff;
     -webkit-text-fill-color: var(--text);
 
     &::placeholder {
@@ -486,19 +514,25 @@ onUnmounted(() => {
     }
 
     &:focus {
-      border-color: $brand-primary;
+      border-color: #0052ff;
+      box-shadow: 0 0 0 3px rgba(0, 82, 255, .10);
     }
   }
 
   .asset-tag {
     flex-shrink: 0;
-    color: var(--accent-bright);
+    padding: 7px 10px;
+    border: 1px solid rgba(0, 82, 255, .18);
+    border-radius: 14px;
+    background: #f2f5ff;
+    color: #0052ff;
+    font-size: 11px;
     font-weight: 600;
   }
 
   .error-text {
     margin: 8px 0 0;
-    color: #f17b7b;
+    color: var(--down);
     font-size: 12px;
   }
 
@@ -518,109 +552,128 @@ onUnmounted(() => {
 
 .subscribe-btn {
   width: 100%;
+  min-height: 44px;
   margin-top: 18px;
   padding: 8px 20px;
-  background: $gradient-primary;
-  color: $text-inverse;
-  border: none;
-  border-radius: 12px;
+  background: #0052ff;
+  color: var(--on-accent);
+  border: 1px solid #0052ff;
+  border-radius: 18px;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, $brand-primary-light 0%, $brand-primary 100%);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-1);
+    border-color: #003ec4;
+    background: #003ec4;
   }
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 1;
     cursor: not-allowed;
-    background: var(--surface-2);
+    border-color: var(--hair);
+    background: var(--surface-3);
     color: var(--text-2);
   }
+
+  &:active:not(:disabled) { transform: scale(.985); }
 }
 
 .record-section {
   margin-top: 20px;
 
   .section-title-wrap {
-    position: relative;
-    margin-bottom: 10px;
-    margin-left: 10px;
-    display: flex;
-    align-items: center;
-
-    .title-bar {
-      position: absolute;
-      left: -10px;
-      top: 50%;
-      width: 4px;
-      height: 16px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, var(--accent) 0%, var(--text-3) 100%);
-      transform: translateY(-50%);
-    }
-
-    .section-title {
-      margin: 0 0 0 8px;
-      font-size: 16px;
-      font-weight: bold;
-      color: var(--text);
-    }
+    margin: 0 0 12px;
   }
 }
 
 .table-card {
   margin-top: 10px;
-  min-height: 300px;
-  overflow: hidden;
-  border: 1px solid $border-color;
-  border-radius: 11px;
+  min-height: 220px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(0, 82, 255, .18);
+  border-radius: var(--r-lg);
   background: var(--surface-1);
-  backdrop-filter: blur(10px);
-  padding: 11px 0;
+  padding: 0;
 
   .table-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr .9fr 1.1fr;
+    gap: 6px;
     align-items: center;
-    background: var(--ink-deep);
-    padding: 8px 0;
-    margin: -11px 0 0;
+    min-height: 42px;
+    padding: 0 8px;
+    background: #f2f5ff;
+    border-bottom: 1px solid rgba(0, 82, 255, .18);
 
     span {
-      flex: 1;
+      min-width: 0;
       text-align: center;
       font-size: 10px;
-      color: $text-muted;
+      color: #0052ff;
+      font-weight: 600;
+      letter-spacing: .04em;
     }
   }
 
   .order-list {
     .table-row {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr .9fr 1.1fr;
+      gap: 6px;
       align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid $border-light;
+      min-height: 62px;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--hair);
+      transition: background-color var(--t-fast) var(--ease);
 
-      &:last-child {
-        border-bottom: none;
-      }
+      &:hover { background: #f7f9ff; }
 
       span {
-        flex: 1;
+        min-width: 0;
         text-align: center;
-        font-size: 13px;
-        color: $text-primary;
+        font-size: 12px;
+        color: var(--text);
       }
     }
+
+    &:last-of-type .table-row { border-bottom: 0; }
   }
 
   .address-cell {
     font-size: 11px !important;
-    color: $text-muted !important;
+    color: var(--text-2) !important;
+    overflow-wrap: anywhere;
+  }
+
+  .amount-cell {
+    font-family: var(--aix-font-display);
+    font-variant-numeric: tabular-nums;
+
+    strong,
+    small {
+      display: block;
+    }
+
+    strong {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    small {
+      margin-top: 3px;
+      font-family: var(--aix-font);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
   }
 
   .status-cell {
@@ -628,16 +681,27 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
     gap: 2px;
+    color: var(--text-2) !important;
+    font-size: 11px !important;
+
+    &.is-review,
+    &.is-pending,
+    &.is-doing { color: #0052ff !important; }
+
+    &.is-completed { color: var(--up-readable) !important; }
+
+    &.is-rejected,
+    &.is-failed { color: var(--down) !important; }
 
     .tx-hint {
       font-size: 10px;
-      color: $text-muted;
+      color: var(--text-2);
     }
   }
 
   .muted {
     font-size: 11px;
-    color: $text-muted;
+    color: var(--text-3);
   }
 
   .empty-state {
@@ -650,7 +714,7 @@ onUnmounted(() => {
     p {
       margin-top: 8px;
       font-size: 12px;
-      color: $text-muted;
+      color: var(--text-3);
     }
   }
 
@@ -659,6 +723,16 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .table-card {
+    .table-header,
+    .table-row {
+      min-width: 460px;
+      grid-template-columns: minmax(92px, 1fr) minmax(92px, 1fr) minmax(86px, .9fr) minmax(108px, 1.1fr);
+    }
   }
 }
 </style>

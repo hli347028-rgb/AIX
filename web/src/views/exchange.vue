@@ -64,7 +64,7 @@
 
         <button
           type="button"
-          class="submit-btn"
+          class="exchange-submit"
           :disabled="!canSubmit || submitting"
           @click="submitExchange"
         >
@@ -73,9 +73,11 @@
       </section>
 
       <section class="record-section">
-        <h2>{{ $t('exchange.records') }}</h2>
+        <div class="section-title-wrap">
+          <h2 class="section-title">{{ $t('exchange.records') }}</h2>
+        </div>
         <div class="record-card" :aria-busy="recordLoading">
-          <div v-if="recordLoading" class="state-box"><van-loading color="#8A9096" /></div>
+          <div v-if="recordLoading" class="state-box"><van-loading color="#0052ff" /></div>
           <van-empty v-else-if="records.length === 0" :description="$t('exchange.noRecords')" :image="emptyImage" />
           <div v-else class="record-list">
             <article v-for="item in records" :key="item.id">
@@ -241,11 +243,13 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-@use '@/style/variables.scss' as *;
-
 /* 全项目最后一处 a3.png 引用（暖橄榄黄底 + 3D 服务器渲染图，418KB）。
    与 wallet.vue 统一为冷色渐晕 + 仪器刻度网格，纯渐变生成，不再拉位图。 */
 .exchange-page {
+  --accent: #0052ff;
+  --accent-bright: #0052ff;
+  --accent-deep: #003ec4;
+  --accent-dim: rgba(0, 82, 255, .10);
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -261,29 +265,31 @@ onMounted(async () => {
         与 Base 干净的白底相冲；
      2. 它不承载任何信息，纯装饰 —— 留着只会稀释真正要读的数据。 */
 }
-.page-main { padding: 70px 15px 30px; display: flex; flex-direction: column; gap: 20px; }
+.page-main { padding: 76px 20px 40px; display: flex; flex-direction: column; gap: 16px; }
 /* 这一页原本大量写死高饱和蓝（#8A9096 / #34aef7）与带蓝的描边（#1d4059），
    与其他页统一后的钢青体系不一致。改为复用发丝描边与卡面渐变。 */
 /* 拍平为 Base 的卡片配方：纯白 + 发丝边 + 12px 圆角。
    原本那句 box-shadow 里有 `0 10px 28px rgba(0, 0, 0, 0.07)` —— 50% 的黑，
    在白底上会糊出一大团脏灰，是深色版遗留里危害最大的一类写法。 */
-.balance-card { min-height: 80px; padding: 14px 20px; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--surface-1); }
-.balance-card > .van-icon { color: var(--accent-bright); font-size: 24px; }
+.balance-card { min-height: 94px; padding: 16px 18px; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; border: 1px solid rgba(0,82,255,.20); border-radius: var(--r-lg); background: #f2f5ff; }
+.balance-card > .van-icon { color: #0052ff; font-size: 24px; }
 .balance-card div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.balance-card span { color: var(--text-3); font-size: 12px; }
+.balance-card span { color: #0052ff; font-size: 11px; }
+.balance-card strong { color: #0052ff; font-family: var(--aix-font-display); font-size: 18px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 /* 数值列右对齐 + 等宽数��，小数点成一条基准线 */
 .balance-card .target-balance { text-align: right; }
 .balance-card div { font-variant-numeric: tabular-nums; }
-.exchange-form, .record-card { padding: 20px; border: 1px solid var(--hair); border-radius: 16px; background: linear-gradient(180deg, var(--surface-1) 0%, var(--ink) 100%); }
+.exchange-form, .record-card { padding: 18px; border: 1px solid rgba(0,82,255,.18); border-radius: var(--r-lg); background: var(--surface-1); }
 .amount-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--text-2); font-size: 14px; }
-.amount-heading button { border: 0; color: var(--accent-bright); background: transparent; font-size: 13px; cursor: pointer; }
+.amount-heading button { min-height:28px;padding:0 12px;border:1px solid rgba(0,82,255,.24);border-radius:14px;color:#0052ff;background:#f2f5ff;font-size:12px;font-weight:600;cursor:pointer; }
+.amount-heading button:hover,.amount-heading button:focus-visible{outline:none;border-color:#0052ff;background:#0052ff;color:var(--on-accent)}
 /* 输入框做成内凹槽，和分段控件同一套语言 */
-.input-shell { height: 58px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--hair); border-radius: 12px; background: var(--ink-deep); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07); }
-.input-shell:focus-within { border-color: var(--accent); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.07), 0 0 0 3px var(--accent-dim); }
-.input-shell.invalid { border-color: #e65f5f; }
+.input-shell { height: 58px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(0,82,255,.24); border-radius: var(--r-md); background: #f7f9ff; }
+.input-shell:focus-within { border-color: #0052ff; box-shadow: 0 0 0 3px rgba(0,82,255,.10); }
+.input-shell.invalid { border-color: var(--down); }
 .input-shell input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.input-shell span { color: var(--text-3); font-size: 13px; font-weight: 500; }
-.error-text { margin: 7px 2px 0; color: #f17b7b; font-size: 12px; }
+.input-shell span { padding:7px 10px;border:1px solid rgba(0,82,255,.18);border-radius:14px;background:#f2f5ff;color:#0052ff;font-size:11px;font-weight:600; }
+.error-text { margin: 7px 2px 0; color: var(--down); font-size: 12px; }
 .rate-row { margin-top: 18px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .rate-row + .rate-row { margin-top: 10px; }
 .rate-row span { color: var(--text-3); }
@@ -293,20 +299,23 @@ onMounted(async () => {
 /* 次级价格（AIX 价格按业务要求固定 15 位小数，这里靠字号和弱化色降权，
    避免一长串尾随零抢走主汇率的注意力） */
 .rate-row.rate-sub strong { font-size: 11px; color: var(--text-3); font-weight: 400; }
-.estimate-box { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); color: var(--accent-bright); font-size: 12px; line-height: 1.6; }
+.estimate-box { margin: 12px 0 0; padding: 10px 12px; border:1px solid rgba(0,82,255,.16);border-radius: var(--r-md); background: #f2f5ff; color: #0052ff; font-size: 12px; line-height: 1.6; }
 .rate-note { margin: 10px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
 /* 主按钮改为近白实底 + 近黑字，与全站主操作统一。
    字色必须同时从 #fff 改掉 —— 底色转近白后再用白字就是白底白字。 */
-.submit-btn { width: 100%; height: 46px; margin-top: 22px; border: 0; border-radius: 24px; color: var(--ink-deep); background: var(--accent); font-size: 15px; font-weight: 600; }
-.submit-btn:disabled { opacity: .4; }
-.record-section h2 { margin: 0 0 12px; font-size: 17px; font-weight: 600; }
-.record-card { padding: 0 16px; }
+.exchange-submit { width:100%;height:46px;margin-top:22px;border:1px solid #0052ff;border-radius:18px;color:var(--on-accent);background:#0052ff;font-size:15px;font-weight:600;cursor:pointer;transition:background-color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease) }
+.exchange-submit:hover:not(:disabled){border-color:#003ec4;background:#003ec4}.exchange-submit:active:not(:disabled){transform:scale(.985)}
+.exchange-submit:disabled{border-color:var(--hair);background:var(--surface-3);color:var(--text-2);cursor:not-allowed}
+.record-section .section-title-wrap{margin:4px 0 12px}
+.record-card { min-height:180px;padding: 0 16px; }
 .state-box { height: 120px; display: flex; align-items: center; justify-content: center; }
-.record-list article { padding: 16px 0; border-bottom: 1px solid var(--hair-2); }
+.record-list article { padding: 16px 0; border-bottom: 1px solid var(--hair);transition:background-color var(--t-fast) var(--ease) }
+.record-list article:hover{background:#f7f9ff}
 .record-list article:last-child { border-bottom: 0; }
 .record-assets { display: flex; align-items: center; gap: 10px; }
-.record-assets .van-icon { color: var(--text-3); }
-.record-assets .usdt-value { color: var(--text); }
-.record-meta { margin-top: 8px; display: flex; justify-content: space-between; color: var(--text-3); font-size: 11px; }
+.record-assets strong{color:var(--text);font-family:var(--aix-font-display);font-variant-numeric:tabular-nums}.record-assets .van-icon { color: #0052ff; }.record-assets .usdt-value { color: #0052ff; }
+.record-meta { margin-top: 8px; display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap:6px 16px; color: var(--text-3); font-size: 11px; }
+.record-meta span{min-width:0;overflow-wrap:anywhere}.record-meta span:last-child{text-align:right}
 .record-fee { margin-top: 4px; color: var(--text-3); font-size: 11px; }
+@media(max-width:360px){.record-meta{grid-template-columns:1fr}.record-meta span:last-child{text-align:left}}
 </style>

@@ -28,11 +28,7 @@
 
       <!-- 这是本页唯一的主操作，给它实心填充；其余一切保持安静。 -->
       <button class="aix-btn recharge-btn" type="button" @click="showRecharge">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 4v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-          <path d="M7.8 10.2 12 14.4l4.2-4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M4.6 17.2v1.2a1.6 1.6 0 0 0 1.6 1.6h11.6a1.6 1.6 0 0 0 1.6-1.6v-1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-        </svg>
+        <van-icon name="gold-coin-o" aria-hidden="true" />
         {{ $t('recharge.recharge') }}
       </button>
     </header>
@@ -305,6 +301,10 @@ getUsdtRecords()
 /* 外观全部来自 .aix-btn 原语，这里只留本页需要的外边距。 */
 .recharge-btn {
   margin-top: 22px;
+
+  .van-icon {
+    font-size: 18px;
+  }
 }
 
 /* ----------------------------- 标签页 ----------------------------- */
@@ -441,7 +441,7 @@ getUsdtRecords()
     color: var(--text-3);
 
     &.is-confirmed {
-      color: var(--up);
+      color: var(--up-readable);
     }
 
     &.is-rejected {
