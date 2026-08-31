@@ -5,7 +5,7 @@
                 type="info"
                 show-icon
                 style="margin-bottom: 16px"
-                message="每日结算当前只发放静态奖（金本位发 AIX）。管理奖在下级认购时即时产生：等级须大区与小区业绩同时达标，大区与小区认购均可按级差发放，可在「订单奖励」中按类型筛选查看。"
+                message="每日结算当前只发放静态奖（金本位发 AIX）。管理奖在下级认购时即时产生：等级由小区业绩决定（不要求大区达标），大区与小区认购均可按级差发放，可在「订单奖励」中按类型筛选查看。"
             />
             <a-row :gutter="10" class="inputGroup" style="margin-bottom: 16px">
                 <a-col :xs="24" :md="8" :lg="6" :xl="5">

@@ -23,7 +23,7 @@ type SystemConfigSnapshot struct {
 	StaticRate            float64   `json:"static_rate"`             // 日静态利率（%），默认 0.5
 	ExitMultiplier        float64   `json:"exit_multiplier"`         // 出局倍数，默认 4
 	DirectRate            float64   `json:"direct_rate"`             // 直推比例，默认 0.5
-	MgmtThresholds        []float64 `json:"mgmt_thresholds"`         // W1–W10 大区/小区业绩门槛（须同时达标）
+	MgmtThresholds        []float64 `json:"mgmt_thresholds"`         // W1–W10 小区业绩门槛
 	MgmtRates             []float64 `json:"mgmt_rates"`              // W1–W10 管理奖比例
 	AixPriceInitial       float64   `json:"aix_price_initial"`       // 初始 AIX 价格
 	WinPrice              float64   `json:"win_price"`               // WIN 代币价格（USDT/枚）
@@ -86,7 +86,7 @@ const (
 	DefaultExchangeReviewThresholdPercent = "100"
 )
 
-// DefaultMgmtThresholds W1→W10 大区/小区业绩门槛（USDT，须同时达标）
+// DefaultMgmtThresholds W1→W10 小区业绩门槛（USDT）
 func DefaultMgmtThresholds() []float64 {
 	return []float64{5000, 20000, 50000, 200000, 500000, 1500000, 4000000, 8000000, 15000000, 30000000}
 }

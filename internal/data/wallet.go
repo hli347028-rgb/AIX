@@ -499,7 +499,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 }
 
 // createManagementRewards 下级认购时按级差发放管理奖。
-// 规则：等级由大区+小区业绩共同达标决定（同一门槛）；管理奖对大区、小区来源均发放。
+// 规则：等级由小区业绩门槛决定（不要求大区达标）；管理奖对大区、小区来源均发放。
 // 向上级差：仅正 gap 产生奖励；平级不发。
 // 可释放部分进 usdt_reward 并计入出局，超出进 overflow_reward，待本人下次认购释放。
 func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, sourceOrder *OrderPO) error {

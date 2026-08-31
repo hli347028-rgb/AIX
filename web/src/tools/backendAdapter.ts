@@ -306,7 +306,7 @@ async function fetchUserInfo() {
       })(),
       locationNum: String(inviteeCount),
       communityStake: p.community_stake || '0',
-      // 总业绩=伞下；小区=community_stake；大区=总-小区；等级须大区+小区同时达标
+      // 总业绩=伞下；小区=community_stake；大区=总-小区；等级仅看小区业绩
       total: p.team_stake || '0',
       max: String(Math.max(0, numOrZero(p.team_stake) - numOrZero(p.community_stake))),
       min: p.community_stake || '0',

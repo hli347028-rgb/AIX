@@ -6,30 +6,27 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestMgmtLevelByAreas(t *testing.T) {
-	// Default thresholds: W1=5000, W2=20000, ...
+func TestMgmtLevelByPerf(t *testing.T) {
+	// Thresholds: W1=5000, W2=20000, W3=50000
 	prev := MgmtThresholds
 	MgmtThresholds = []float64{5000, 20000, 50000}
 	t.Cleanup(func() { MgmtThresholds = prev })
 
 	tests := []struct {
-		name        string
-		large, small string
-		want        int32
+		name  string
+		small string
+		want  int32
 	}{
-		{name: "both below W1", large: "1000", small: "1000", want: 0},
-		{name: "only small meets W1", large: "1000", small: "5000", want: 0},
-		{name: "only large meets W1", large: "5000", small: "1000", want: 0},
-		{name: "both meet W1", large: "5000", small: "5000", want: 1},
-		{name: "large W2 small W1 -> W1", large: "20000", small: "5000", want: 1},
-		{name: "large W1 small W2 -> W1", large: "5000", small: "20000", want: 1},
-		{name: "both W2", large: "20000", small: "25000", want: 2},
+		{name: "below W1", small: "1000", want: 0},
+		{name: "meets W1", small: "5000", want: 1},
+		{name: "between W1 and W2", small: "19999", want: 1},
+		{name: "meets W2", small: "20000", want: 2},
+		{name: "meets W3", small: "50000", want: 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			large, _ := decimal.NewFromString(tt.large)
 			small, _ := decimal.NewFromString(tt.small)
-			got := MgmtLevelByAreas(large, small)
+			got := MgmtLevelByPerf(small)
 			if got != tt.want {
 				t.Fatalf("got %d want %d", got, tt.want)
 			}

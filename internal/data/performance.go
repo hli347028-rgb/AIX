@@ -130,8 +130,8 @@ func refreshPerformance(db *gorm.DB, seedMode string, seedIDs ...int64) error {
 			branches = append(branches, value)
 		}
 		large, small, team := biz.CalcAreaPerformance(branches)
-		// 晋级：大区与小区须同时达到同一门槛；取两者可晋级等级的较低者
-		level := biz.MgmtLevelByAreas(large, small)
+		// 晋级：仅看小区业绩门槛（不要求大区达标）
+		level := biz.MgmtLevelByPerf(small)
 		updates := map[string]interface{}{
 			"large_area_perf": large,
 			"small_area_perf": small,
