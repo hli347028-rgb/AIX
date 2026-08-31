@@ -1,35 +1,35 @@
 <template>
-  <Teleport to="body">
-    <div v-if="announcement" class="notice-overlay" role="presentation" @click.self="requestClose">
-      <article class="notice-modal" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="forced ? instructionId : undefined">
-        <header class="notice-head">
-          <div>
-            <span v-if="announcement.priority === 'important'" class="notice-level notice-level--important">!!! {{ $t('announcement.important') }}</span>
-            <span v-else-if="announcement.priority === 'new'" class="notice-level notice-level--new">NEW {{ $t('announcement.latest') }}</span>
-            <span v-else class="notice-level">{{ $t('announcement.notice') }}</span>
-            <h2 :id="titleId">{{ announcement.title || $t('announcement.details') }}</h2>
-            <time v-if="noticeTime">{{ noticeTime }}</time>
-          </div>
-          <button v-if="!forced" type="button" class="notice-close" :aria-label="$t('announcement.close')" @click="requestClose">×</button>
-        </header>
-
-        <p v-if="forced" :id="instructionId" class="notice-instruction">{{ $t('announcement.readBeforeConfirm') }}</p>
-        <div class="notice-body">
-          <img
-            v-if="announcement.image_url"
-            class="notice-image"
-            :src="announcement.image_url"
-            :alt="announcement.title || $t('announcement.imageAlt')"
-          />
-          <div v-if="announcement.content" class="notice-content" v-html="announcement.content"></div>
-          <p v-else-if="announcement.summary" class="notice-summary">{{ announcement.summary }}</p>
+  <!-- Header 已经把本组件传送到 body。这里不再嵌套 Teleport：部分钱包的旧
+       WebView 在同一目标上嵌套传送时会留下一个遮罩，却没有挂载弹窗内容。 -->
+  <div v-if="announcement" class="notice-overlay" role="presentation" @click.self="requestClose">
+    <article class="notice-modal" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="forced ? instructionId : undefined">
+      <header class="notice-head">
+        <div>
+          <span v-if="announcement.priority === 'important'" class="notice-level notice-level--important">!!! {{ $t('announcement.important') }}</span>
+          <span v-else-if="announcement.priority === 'new'" class="notice-level notice-level--new">NEW {{ $t('announcement.latest') }}</span>
+          <span v-else class="notice-level">{{ $t('announcement.notice') }}</span>
+          <h2 :id="titleId">{{ announcement.title || $t('announcement.details') }}</h2>
+          <time v-if="noticeTime">{{ noticeTime }}</time>
         </div>
-        <footer>
-          <button type="button" @click="acknowledge">{{ $t('announcement.gotIt') }}</button>
-        </footer>
-      </article>
-    </div>
-  </Teleport>
+        <button v-if="!forced" type="button" class="notice-close" :aria-label="$t('announcement.close')" @click="requestClose">×</button>
+      </header>
+
+      <p v-if="forced" :id="instructionId" class="notice-instruction">{{ $t('announcement.readBeforeConfirm') }}</p>
+      <div class="notice-body">
+        <img
+          v-if="announcement.image_url"
+          class="notice-image"
+          :src="announcement.image_url"
+          :alt="announcement.title || $t('announcement.imageAlt')"
+        />
+        <div v-if="announcement.content" class="notice-content" v-html="announcement.content"></div>
+        <p v-else-if="announcement.summary" class="notice-summary">{{ announcement.summary }}</p>
+      </div>
+      <footer>
+        <button type="button" @click="acknowledge">{{ $t('announcement.gotIt') }}</button>
+      </footer>
+    </article>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -55,6 +55,11 @@ onBeforeUnmount(() => { document.body.style.overflow = '' })
 .notice-overlay {
   position: fixed;
   z-index: 13000;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  /* inset 是增强项；四方向定位保证旧 Android WebView 也能铺满。 */
   inset: 0;
   display: flex;
   align-items: center;
@@ -68,8 +73,9 @@ onBeforeUnmount(() => { document.body.style.overflow = '' })
 .notice-modal {
   display: flex;
   flex-direction: column;
-  width: min(92vw, 520px);
-  max-height: min(82vh, 720px);
+  width: 92vw;
+  max-width: 520px;
+  max-height: 82vh;
   overflow: hidden;
   border: 1px solid rgba(0, 82, 255, 0.18);
   border-radius: 24px;
@@ -238,6 +244,7 @@ footer button:not(:disabled):active {
 
   .notice-modal {
     width: 100%;
+    max-height: 88vh;
     max-height: 88dvh;
     border-radius: 24px 24px 0 0;
   }
