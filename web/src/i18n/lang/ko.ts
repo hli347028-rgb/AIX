@@ -346,7 +346,8 @@ const local = {
     predictionZone: '예측 존',
     cloudChat: '클라우드 채팅',
     faq: 'FAQ',
-    exchangeDownload: '거래소 다운로드'
+    exchangeDownload: '거래소 다운로드',
+    customerService: '고객센터'
   },
   route: {
     community: '커뮤니티',
@@ -431,6 +432,19 @@ const local = {
     fetchFailed: '공지사항을 불러오지 못했습니다', important: '중요 공지', latest: '최신 공지', notice: '공지 알림', details: '공지 상세', close: '공지 닫기', readBeforeConfirm: '공지 내용을 읽은 후 확인해 주세요', imageAlt: '공지 이미지',
     viewImportant: '중요 공지 보기', viewLatest: '최신 공지 보기', view: '공지 보기',
     pinnedTitle: 'WIN-AIX 이체 및 AIX 시스템 기능 오픈 안내', pinnedSummary: 'WIN-AIX 이체 청약, AIX-USDT 출금과 엔진 구매, AIX 입출금 및 청약 기능이 오픈되었습니다.', pinnedContent: '오픈 일정, 이체 요건과 이용 방법은 전체 공지 이미지를 확인해 주세요.'
+  },
+  support: {
+    title: '고객센터',
+    intro: '문제나 의견을 작성해 주세요. 답장은 하지 않으며, 백엔드에서 확인합니다.',
+    contentLabel: '피드백',
+    contentPlaceholder: '충전, 출금, 계정 관련 내용을 적어 주세요…',
+    contentRequired: '피드백을 입력해 주세요',
+    contentTooShort: '최소 4자 이상 입력해 주세요',
+    submit: '피드백 제출',
+    submitting: '제출 중...',
+    success: '피드백을 받았습니다',
+    failed: '제출에 실패했습니다. 잠시 후 다시 시도해 주세요',
+    notice: '이 페이지에서는 답장하지 않습니다. 모르는 계정으로 송금하지 마세요.'
   }
 }
 

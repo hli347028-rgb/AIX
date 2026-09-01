@@ -349,7 +349,8 @@ const local = {
     predictionZone: 'โซนทำนาย',
     cloudChat: 'Cloud Chat',
     faq: 'คำถามที่พบบ่อย',
-    exchangeDownload: 'ดาวน์โหลด Exchange'
+    exchangeDownload: 'ดาวน์โหลด Exchange',
+    customerService: 'ติดต่อฝ่ายบริการ'
   },
   route: {
     community: 'ชุมชน',
@@ -434,6 +435,19 @@ const local = {
     fetchFailed: 'โหลดประกาศไม่สำเร็จ', important: 'ประกาศสำคัญ', latest: 'ประกาศล่าสุด', notice: 'ประกาศแจ้งเตือน', details: 'รายละเอียดประกาศ', close: 'ปิดประกาศ', readBeforeConfirm: 'กรุณาอ่านประกาศก่อนยืนยัน', imageAlt: 'รูปประกาศ',
     viewImportant: 'ดูประกาศสำคัญ', viewLatest: 'ดูประกาศล่าสุด', view: 'ดูประกาศ',
     pinnedTitle: 'ประกาศการโอน WIN-AIX และการเปิดฟังก์ชันระบบ AIX', pinnedSummary: 'เปิดใช้งานการสมัครโอน WIN-AIX การถอน AIX-USDT การซื้อเอนจิน รวมถึงการฝาก ถอน และสมัคร AIX แล้ว', pinnedContent: 'โปรดดูรูปประกาศฉบับเต็มสำหรับเวลาเปิด เงื่อนไขการโอน และวิธีใช้งาน'
+  },
+  support: {
+    title: 'ติดต่อฝ่ายบริการ',
+    intro: 'กรุณากรอกปัญหาหรือข้อเสนอแนะ ไม่ต้องรอการตอบกลับ เราจะตรวจสอบที่แบ็กเอนด์',
+    contentLabel: 'เนื้อหาความคิดเห็น',
+    contentPlaceholder: 'อธิบายปัญหาการฝาก ถอน หรือบัญชี…',
+    contentRequired: 'กรุณากรอกความคิดเห็น',
+    contentTooShort: 'กรุณากรอกอย่างน้อย 4 ตัวอักษร',
+    submit: 'ส่งความคิดเห็น',
+    submitting: 'กำลังส่ง...',
+    success: 'ได้รับความคิดเห็นแล้ว',
+    failed: 'ส่งไม่สำเร็จ กรุณาลองใหม่ภายหลัง',
+    notice: 'ฝ่ายบริการจะไม่ตอบกลับในหน้านี้ ห้ามโอนเงินไปยังบัญชีที่ไม่รู้จัก'
   }
 }
 

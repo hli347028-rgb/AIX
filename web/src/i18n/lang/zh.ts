@@ -372,7 +372,8 @@ export default {
     predictionZone: '预测专区',
     cloudChat: '云聊专区',
     faq: '百问百答',
-    exchangeDownload: '交易所下载'
+    exchangeDownload: '交易所下载',
+    customerService: '联系客服'
   },
   route: {
     community: '社区',
@@ -458,5 +459,18 @@ export default {
     fetchFailed: '获取公告失败', important: '重要公告', latest: '最新公告', notice: '公告通知', details: '公告详情', close: '关闭公告', readBeforeConfirm: '请阅读公告内容后确认', imageAlt: '公告图片',
     viewImportant: '查看重要公告', viewLatest: '查看最新公告', view: '查看公告',
     pinnedTitle: '关于 WIN-AIX 划转及 AIX 系统功能开放的公告', pinnedSummary: 'WIN-AIX 划转报单、AIX-USDT 提现与引擎购买、AIX 充值提现及认购功能现已开放。', pinnedContent: '请查看完整公告图片了解功能开放时间、划转要求及操作说明。'
+  },
+  support: {
+    title: '联系客服',
+    intro: '请填写遇到的问题或建议。提交后无需等待回复，我们会在后台查收。',
+    contentLabel: '反馈内容',
+    contentPlaceholder: '请描述充值、提现、账户等问题…',
+    contentRequired: '请填写反馈内容',
+    contentTooShort: '反馈内容至少 4 个字',
+    submit: '提交反馈',
+    submitting: '提交中...',
+    success: '已收到你的反馈',
+    failed: '提交失败，请稍后重试',
+    notice: '客服不会在此页回复。请勿向陌生账号转账。'
   }
 }

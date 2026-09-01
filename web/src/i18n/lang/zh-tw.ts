@@ -347,7 +347,8 @@ const local = {
     predictionZone: '預測專區',
     cloudChat: '雲聊專區',
     faq: '百問百答',
-    exchangeDownload: '交易所下載'
+    exchangeDownload: '交易所下載',
+    customerService: '聯繫客服'
   },
   route: {
     community: '社區',
@@ -433,6 +434,19 @@ const local = {
     fetchFailed: '獲取公告失敗', important: '重要公告', latest: '最新公告', notice: '公告通知', details: '公告詳情', close: '關閉公告', readBeforeConfirm: '請閱讀公告內容後確認', imageAlt: '公告圖片',
     viewImportant: '查看重要公告', viewLatest: '查看最新公告', view: '查看公告',
     pinnedTitle: '關於 WIN-AIX 劃轉及 AIX 系統功能開放的公告', pinnedSummary: 'WIN-AIX 劃轉報單、AIX-USDT 提現與引擎購買，以及 AIX 充值、提現與認購功能現已開放。', pinnedContent: '請查看完整公告圖片，了解功能開放時間、劃轉要求及操作說明。'
+  },
+  support: {
+    title: '聯繫客服',
+    intro: '請填寫遇到的問題或建議。提交後無需等待回覆，我們會在後台查收。',
+    contentLabel: '回饋內容',
+    contentPlaceholder: '請描述充值、提現、帳戶等問題…',
+    contentRequired: '請填寫回饋內容',
+    contentTooShort: '回饋內容至少 4 個字',
+    submit: '提交回饋',
+    submitting: '提交中...',
+    success: '已收到你的回饋',
+    failed: '提交失敗，請稍後重試',
+    notice: '客服不會在此頁回覆。請勿向陌生帳號轉帳。'
   }
 }
 

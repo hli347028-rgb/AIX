@@ -119,6 +119,7 @@ const navItems = computed(() => [
   { key: 'bridge', label: $t('tab.crossChain'), href: BRIDGE_URL },
   { key: 'bitwinex', label: $t('tab.bitwinex'), href: BITWINEX_URL },
   { key: 'announcements', label: $t('announcement.title'), path: '/announcements' },
+  { key: 'support', label: $t('tab.customerService'), path: '/support' },
   { key: 'launch', label: $t('tab.globalLaunch'), upcoming: true },
   { key: 'bank', label: $t('tab.digitalBank'), upcoming: true },
   { key: 'games', label: $t('tab.chainGameZone'), upcoming: true },
@@ -334,6 +335,11 @@ const handleNav = (item, event) => {
 .nav-row:nth-child(5) { animation-delay: 0.24s; }
 .nav-row:nth-child(6) { animation-delay: 0.28s; }
 .nav-row:nth-child(7) { animation-delay: 0.32s; }
+.nav-row:nth-child(8) { animation-delay: 0.36s; }
+.nav-row:nth-child(9) { animation-delay: 0.4s; }
+.nav-row:nth-child(10) { animation-delay: 0.44s; }
+.nav-row:nth-child(11) { animation-delay: 0.48s; }
+.nav-row:nth-child(12) { animation-delay: 0.52s; }
 .nav-row:hover { padding-left: 10px; color: var(--panel-text); background: linear-gradient(90deg, rgba(101, 184, 243, 0.08), transparent 78%); }
 .nav-row.active { color: var(--panel-text); background: linear-gradient(90deg, rgba(101, 184, 243, 0.12), transparent 80%); }
 .nav-row.active .nav-index { color: var(--panel-blue); }

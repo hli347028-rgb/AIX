@@ -346,7 +346,8 @@ const local = {
     predictionZone: '予測エリア',
     cloudChat: 'クラウドチャット',
     faq: 'よくある質問',
-    exchangeDownload: '取引所ダウンロード'
+    exchangeDownload: '取引所ダウンロード',
+    customerService: 'カスタマーサポート'
   },
   route: {
     community: 'コミュニティ',
@@ -431,6 +432,19 @@ const local = {
     fetchFailed: 'お知らせの取得に失敗しました', important: '重要なお知らせ', latest: '最新のお知らせ', notice: 'お知らせ', details: 'お知らせの詳細', close: 'お知らせを閉じる', readBeforeConfirm: '内容を読んでから確認してください', imageAlt: 'お知らせ画像',
     viewImportant: '重要なお知らせを見る', viewLatest: '最新のお知らせを見る', view: 'お知らせを見る',
     pinnedTitle: 'WIN-AIX振替およびAIXシステム機能公開のお知らせ', pinnedSummary: 'WIN-AIX振替申込、AIX-USDT出金とエンジン購入、AIX入出金および申込機能が利用可能になりました。', pinnedContent: '公開日時、振替条件、操作方法はお知らせ画像でご確認ください。'
+  },
+  support: {
+    title: 'カスタマーサポート',
+    intro: 'ご不明点やご意見をご記入ください。返信は不要です。バックエンドで確認します。',
+    contentLabel: 'フィードバック',
+    contentPlaceholder: '入金、出金、アカウントに関する内容をご記入ください…',
+    contentRequired: 'フィードバックを入力してください',
+    contentTooShort: '4文字以上入力してください',
+    submit: '送信する',
+    submitting: '送信中...',
+    success: 'フィードバックを受け付けました',
+    failed: '送信に失敗しました。しばらくしてから再試行してください',
+    notice: 'このページでは返信しません。不明なアカウントへ送金しないでください。'
   }
 }
 

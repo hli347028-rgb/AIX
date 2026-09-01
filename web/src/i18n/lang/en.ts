@@ -386,7 +386,8 @@ export default {
     predictionZone: 'Prediction Zone',
     cloudChat: 'Cloud Chat',
     faq: 'FAQ',
-    exchangeDownload: 'Exchange Download'
+    exchangeDownload: 'Exchange Download',
+    customerService: 'Contact Support'
   },
   route: {
     community: 'Community',
@@ -472,5 +473,18 @@ export default {
     fetchFailed: 'Failed to load announcements', important: 'Important Announcement', latest: 'Latest Announcement', notice: 'Announcement Notice', details: 'Announcement Details', close: 'Close announcement', readBeforeConfirm: 'Please read the announcement before confirming', imageAlt: 'Announcement image',
     viewImportant: 'View important announcement', viewLatest: 'View latest announcement', view: 'View announcement',
     pinnedTitle: 'WIN-AIX Transfers and AIX Feature Availability', pinnedSummary: 'WIN-AIX transfer subscriptions, AIX-USDT withdrawals and engine purchases, plus AIX deposits, withdrawals, and subscriptions are now available.', pinnedContent: 'View the full announcement image for launch times, transfer requirements, and instructions.'
+  },
+  support: {
+    title: 'Contact Support',
+    intro: 'Describe the issue or suggestion. No reply is needed; we will review it in the backend.',
+    contentLabel: 'Feedback',
+    contentPlaceholder: 'Describe deposit, withdrawal, or account issues…',
+    contentRequired: 'Please enter your feedback',
+    contentTooShort: 'Please enter at least 4 characters',
+    submit: 'Submit feedback',
+    submitting: 'Submitting...',
+    success: 'We have received your feedback',
+    failed: 'Submission failed. Please try again later',
+    notice: 'Support will not reply on this page. Do not transfer funds to unknown accounts.'
   }
 }

@@ -349,7 +349,8 @@ const local = {
     predictionZone: 'Zona Prediksi',
     cloudChat: 'Cloud Chat',
     faq: 'FAQ',
-    exchangeDownload: 'Unduh Exchange'
+    exchangeDownload: 'Unduh Exchange',
+    customerService: 'Hubungi Layanan'
   },
   route: {
     community: 'Komunitas',
@@ -434,6 +435,19 @@ const local = {
     fetchFailed: 'Gagal memuat pengumuman', important: 'Pengumuman Penting', latest: 'Pengumuman Terbaru', notice: 'Pemberitahuan', details: 'Detail Pengumuman', close: 'Tutup pengumuman', readBeforeConfirm: 'Baca pengumuman sebelum mengonfirmasi', imageAlt: 'Gambar pengumuman',
     viewImportant: 'Lihat pengumuman penting', viewLatest: 'Lihat pengumuman terbaru', view: 'Lihat pengumuman',
     pinnedTitle: 'Pengumuman Transfer WIN-AIX dan Pembukaan Fitur Sistem AIX', pinnedSummary: 'Langganan transfer WIN-AIX, penarikan AIX-USDT, pembelian engine, serta fitur deposit, penarikan, dan langganan AIX kini tersedia.', pinnedContent: 'Lihat gambar pengumuman lengkap untuk jadwal pembukaan, persyaratan transfer, dan petunjuk penggunaan.'
+  },
+  support: {
+    title: 'Hubungi Layanan',
+    intro: 'Tuliskan masalah atau saran. Tidak perlu menunggu balasan; kami akan memeriksanya di backend.',
+    contentLabel: 'Isi umpan balik',
+    contentPlaceholder: 'Jelaskan masalah deposit, penarikan, atau akun…',
+    contentRequired: 'Masukkan umpan balik',
+    contentTooShort: 'Masukkan minimal 4 karakter',
+    submit: 'Kirim umpan balik',
+    submitting: 'Mengirim...',
+    success: 'Umpan balik Anda telah diterima',
+    failed: 'Pengiriman gagal, coba lagi nanti',
+    notice: 'Dukungan tidak membalas di halaman ini. Jangan transfer ke akun yang tidak dikenal.'
   }
 }
 

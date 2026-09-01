@@ -346,7 +346,8 @@ const local = {
     predictionZone: 'Khu dự đoán',
     cloudChat: 'Cloud Chat',
     faq: 'Hỏi đáp',
-    exchangeDownload: 'Tải sàn giao dịch'
+    exchangeDownload: 'Tải sàn giao dịch',
+    customerService: 'Liên hệ hỗ trợ'
   },
   route: {
     community: 'Cộng đồng',
@@ -431,6 +432,19 @@ const local = {
     fetchFailed: 'Không tải được thông báo', important: 'Thông báo quan trọng', latest: 'Thông báo mới nhất', notice: 'Thông báo', details: 'Chi tiết thông báo', close: 'Đóng thông báo', readBeforeConfirm: 'Vui lòng đọc thông báo trước khi xác nhận', imageAlt: 'Hình ảnh thông báo',
     viewImportant: 'Xem thông báo quan trọng', viewLatest: 'Xem thông báo mới nhất', view: 'Xem thông báo',
     pinnedTitle: 'Thông báo chuyển WIN-AIX và mở các tính năng hệ thống AIX', pinnedSummary: 'Đăng ký chuyển WIN-AIX, rút AIX-USDT, mua engine, cùng các tính năng nạp, rút và đăng ký AIX hiện đã mở.', pinnedContent: 'Vui lòng xem toàn bộ hình ảnh thông báo để biết thời gian mở, yêu cầu chuyển và hướng dẫn thao tác.'
+  },
+  support: {
+    title: 'Liên hệ hỗ trợ',
+    intro: 'Hãy mô tả vấn đề hoặc góp ý. Không cần chờ phản hồi, chúng tôi sẽ xem trên backend.',
+    contentLabel: 'Nội dung phản hồi',
+    contentPlaceholder: 'Mô tả vấn đề nạp, rút hoặc tài khoản…',
+    contentRequired: 'Vui lòng nhập nội dung phản hồi',
+    contentTooShort: 'Vui lòng nhập ít nhất 4 ký tự',
+    submit: 'Gửi phản hồi',
+    submitting: 'Đang gửi...',
+    success: 'Đã nhận phản hồi của bạn',
+    failed: 'Gửi thất bại, vui lòng thử lại sau',
+    notice: 'Hỗ trợ sẽ không trả lời trên trang này. Không chuyển tiền đến tài khoản lạ.'
   }
 }
 

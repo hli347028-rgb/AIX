@@ -6,6 +6,7 @@ import Node from "@/views/node.vue";
 import Community from "@/views/community.vue";
 import Wallet from "@/views/subpage/wallet.vue";
 import Recharge from "@/views/recharge.vue";
+import Support from "@/views/support.vue";
 import Mine from "@/views/mine.vue";
 
 /**
@@ -25,6 +26,7 @@ const mainRoutes = [
   { path: "/profile", component: () => import("@/views/profile/index.vue") },
   { path: "/mine", component: Mine },
   { path: "/announcements", component: () => import("@/views/announcements.vue") },
+  { path: "/support", component: Support },
   { path: "/rules", component: () => import("@/views/rules.vue") },
   { path: "/futurefi", component: () => import("@/views/futurefi.vue") },
 ];
@@ -37,7 +39,7 @@ const redirects: Array<{ path: string; redirect: string }> = [
   { path: "/idoDetails", redirect: "/" },
   { path: "/payment", redirect: "/" },
   { path: "/trade", redirect: "/" },
-  { path: "/contact", redirect: "/" },
+  { path: "/contact", redirect: "/support" },
   { path: "/address", redirect: "/" },
   { path: "/shop", redirect: "/" },
   { path: "/Web3Shop", redirect: "/" },

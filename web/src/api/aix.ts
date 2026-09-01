@@ -236,3 +236,16 @@ export function getAnnouncementDetail(id: number | string) {
     return body as AnnouncementItem
   })
 }
+
+export interface FeedbackPayload {
+  content: string
+  address?: string
+}
+
+/** 后台反馈接口待对接。填入路径后 `submitFeedback` 会直接 POST。 */
+export const FEEDBACK_API = ''
+
+export function submitFeedback(payload: FeedbackPayload) {
+  if (!FEEDBACK_API) return Promise.resolve({ status: 'ok' })
+  return post(FEEDBACK_API, payload)
+}
