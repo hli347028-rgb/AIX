@@ -31,7 +31,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	if err := db.AutoMigrate(
 		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
-		&ExchangeRecordPO{}, &AnnouncementPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
+		&ExchangeRecordPO{}, &AnnouncementPO{}, &FeedbackPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
 	); err != nil {
 		return nil, nil, err
 	}

@@ -242,8 +242,8 @@ export interface FeedbackPayload {
   address?: string
 }
 
-/** 后台反馈接口待对接。填入路径后 `submitFeedback` 会直接 POST。 */
-export const FEEDBACK_API = ''
+/** 用户端联系客服提交反馈 */
+export const FEEDBACK_API = '/v1/feedback'
 
 export function submitFeedback(payload: FeedbackPayload) {
   if (!FEEDBACK_API) return Promise.resolve({ status: 'ok' })

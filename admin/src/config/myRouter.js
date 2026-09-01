@@ -93,6 +93,12 @@ export const asyncRouterMap = [
                 meta: { title: '编辑公告', keepAlive: false, permission: ['dashboard'] },
             },
             {
+                path: '/feedbackList',
+                name: 'feedbackList',
+                component: () => import('@/views/public/feedbackList'),
+                meta: { title: '问题反馈', keepAlive: true, icon: "message", permission: ['dashboard'] },
+            },
+            {
                 path: '/lookChildren',
                 name: 'lookChildren',
                 component: () => import('@/views/member/lookChildren'),

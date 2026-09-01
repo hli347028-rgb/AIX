@@ -67,6 +67,10 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.GET("/v1/announcements", legacy.HandlePublicAnnouncementList)
 	r.GET("/v1/announcement/detail", legacy.HandlePublicAnnouncementDetail)
 
+	r.GET(p+"/feedback_list", legacy.HandleFeedbackList)
+	r.POST(p+"/feedback_status", legacy.HandleFeedbackStatus)
+	r.POST("/v1/feedback", legacy.HandlePublicFeedbackSubmit)
+
 	stub := legacy.HandleStubOK
 	stubRewards := legacy.HandleStubRewards
 	stubLocations := legacy.HandleStubLocations

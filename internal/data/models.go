@@ -257,6 +257,18 @@ type AnnouncementPO struct {
 
 func (AnnouncementPO) TableName() string { return "announcements" }
 
+// FeedbackPO 用户问题反馈（用户端提交，管理端查看）
+type FeedbackPO struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement"`
+	UserID      *int64    `gorm:"column:user_id;index"`
+	Address     string    `gorm:"column:address;size:128;not null;index"`
+	Content     string    `gorm:"column:content;type:text;not null"`
+	Status      int32     `gorm:"column:status;default:0;not null;index"` // 0=待处理 1=已读 2=已处理
+	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime;index"`
+}
+
+func (FeedbackPO) TableName() string { return "feedbacks" }
+
 // AdminOperationLogPO 管理后台操作审计日志。
 type AdminOperationLogPO struct {
 	ID           int64     `gorm:"primaryKey;autoIncrement"`

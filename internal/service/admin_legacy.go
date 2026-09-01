@@ -14,6 +14,7 @@ import (
 	"backend/internal/conf"
 	"backend/internal/data"
 	authmw "backend/internal/middleware"
+	"backend/internal/pkg/eth"
 	jwtpkg "backend/internal/pkg/token"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -50,7 +51,7 @@ func NewAdminLegacyService(
 var legacyMenuPaths = []string{
 	"/home", "/member", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
-	"/exchangeTransfer", "/settlement", "/news", "/newsEdit", "/lookChildren",
+	"/exchangeTransfer", "/settlement", "/news", "/newsEdit", "/feedbackList", "/lookChildren",
 }
 
 var legacyMainOnlyMenuPaths = []string{
@@ -1512,6 +1513,159 @@ func (s *AdminLegacyService) HandlePublicAnnouncementDetail(ctx khttp.Context) e
 		"content":    po.Content,
 		"created_at": formatLegacyTime(po.CreatedTime),
 		"add_time":   po.CreatedTime.Unix(),
+	})
+}
+
+func feedbackStatusText(status int32) string {
+	switch status {
+	case 1:
+		return "已读"
+	case 2:
+		return "已处理"
+	default:
+		return "待处理"
+	}
+}
+
+func mapFeedbackItem(po data.FeedbackPO) map[string]interface{} {
+	item := map[string]interface{}{
+		"id":          po.ID,
+		"address":     po.Address,
+		"content":     po.Content,
+		"status":      po.Status,
+		"status_text": feedbackStatusText(po.Status),
+		"add_time":    po.CreatedTime.Unix(),
+		"created_at":  formatLegacyTime(po.CreatedTime),
+	}
+	if po.UserID != nil {
+		item["user_id"] = *po.UserID
+	}
+	return item
+}
+
+func (s *AdminLegacyService) HandlePublicFeedbackSubmit(ctx khttp.Context) error {
+	var req struct {
+		Content string `json:"content"`
+		Address string `json:"address"`
+	}
+	body, _ := io.ReadAll(ctx.Request().Body)
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			return errors.BadRequest("INVALID_JSON", "请求格式错误")
+		}
+	}
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		return errors.BadRequest("INVALID_CONTENT", "反馈内容不能为空")
+	}
+	if len([]rune(content)) < 4 {
+		return errors.BadRequest("INVALID_CONTENT", "反馈内容至少 4 个字")
+	}
+	if len([]rune(content)) > 500 {
+		return errors.BadRequest("INVALID_CONTENT", "反馈内容不能超过 500 字")
+	}
+
+	address := strings.TrimSpace(req.Address)
+	if token := s.token(ctx); token != "" {
+		if addr, err := jwtpkg.Parse(token, s.authCfg.GetJwtSecret()); err == nil && strings.TrimSpace(addr) != "" {
+			address = strings.TrimSpace(addr)
+		}
+	}
+	if address != "" {
+		if normalized, err := eth.NormalizeAddress(address); err == nil {
+			address = normalized
+		}
+	}
+
+	var userID *int64
+	if address != "" {
+		if user, err := s.userRepo.FindByAddress(ctx, address); err == nil && user != nil {
+			id := user.ID
+			userID = &id
+		}
+	}
+
+	po := data.FeedbackPO{
+		UserID:  userID,
+		Address: address,
+		Content: content,
+		Status:  0,
+	}
+	if err := s.data.DB().WithContext(ctx).Create(&po).Error; err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"status": "ok",
+		"id":     po.ID,
+	})
+}
+
+func (s *AdminLegacyService) HandleFeedbackList(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	q := ctx.Request().URL.Query()
+	page, pageSize, offset := parsePage(q)
+	if num := strings.TrimSpace(q.Get("num")); num != "" {
+		if v, err := strconv.Atoi(num); err == nil && v > 0 && v <= 1000 {
+			pageSize = v
+			offset = (page - 1) * pageSize
+		}
+	}
+	db := s.data.DB().WithContext(ctx).Model(&data.FeedbackPO{})
+	if address := strings.TrimSpace(q.Get("address")); address != "" {
+		db = db.Where("address LIKE ?", "%"+address+"%")
+	}
+	if statusStr := strings.TrimSpace(q.Get("status")); statusStr != "" {
+		if status, err := strconv.ParseInt(statusStr, 10, 32); err == nil {
+			db = db.Where("status = ?", int32(status))
+		}
+	}
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return err
+	}
+	var rows []data.FeedbackPO
+	if err := db.Order("id desc").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
+		return err
+	}
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, mapFeedbackItem(row))
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"data":  items,
+		"count": total,
+		"page":  page,
+	})
+}
+
+func (s *AdminLegacyService) HandleFeedbackStatus(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	if err != nil || id <= 0 {
+		return errors.BadRequest("INVALID_ID", "反馈ID无效")
+	}
+	status, err := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("status")), 10, 32)
+	if err != nil || status < 0 || status > 2 {
+		return errors.BadRequest("INVALID_STATUS", "状态无效")
+	}
+	var po data.FeedbackPO
+	if err := s.data.DB().WithContext(ctx).First(&po, id).Error; err != nil {
+		return errors.NotFound("NOT_FOUND", "反馈不存在")
+	}
+	po.Status = int32(status)
+	if err := s.data.DB().WithContext(ctx).Save(&po).Error; err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"status": "ok",
+		"data":   mapFeedbackItem(po),
 	})
 }
 

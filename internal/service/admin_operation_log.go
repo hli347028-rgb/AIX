@@ -54,6 +54,8 @@ var adminActionLabels = map[string]string{
 	"/api/admin_dhb/announcement_detail":   "查看公告详情",
 	"/api/admin_dhb/announcement_save":     "保存公告",
 	"/api/admin_dhb/announcement_delete":   "删除公告",
+	"/api/admin_dhb/feedback_list":       "查看问题反馈",
+	"/api/admin_dhb/feedback_status":     "更新反馈状态",
 	"/api/admin_dhb/operation_log_list":    "查看操作记录",
 }
 
