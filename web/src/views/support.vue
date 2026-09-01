@@ -36,9 +36,17 @@
 
       <section class="contact-card">
         <p class="chat-hint">{{ $t('support.chatHint') }}</p>
-        <button type="button" class="agent-id" @click="copyId">
-          {{ chatIdDisplay }}
-        </button>
+        <div class="agent-id">
+          <button
+            v-for="part in chatIdParts"
+            :key="part"
+            type="button"
+            class="agent-id-part"
+            @click="copyId(part)"
+          >
+            {{ part }}
+          </button>
+        </div>
       </section>
     </main>
   </div>
@@ -56,15 +64,14 @@ import userPerson from '@/pinia/person'
 const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson()
-const chatId = '10424102891138710082'
-const chatIdDisplay = '10424 10289 11387 10082'
+const chatIdParts = ['10424', '10289', '11387', '10082']
 
 const content = ref('')
 const submitting = ref(false)
 const canSubmit = computed(() => content.value.trim().length >= 4)
 
-const copyId = () => {
-  copy(chatId)
+const copyId = (part: string) => {
+  copy(part)
   showToast($t('common.copiedToClipboard'))
 }
 
@@ -138,19 +145,39 @@ const onSubmit = async () => {
 }
 
 .agent-id {
-  display: inline;
-  width: auto;
-  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.agent-id-part {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 0;
   background: none;
   color: #0052ff;
   font-family: var(--aix-font-display);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.08em;
   cursor: pointer;
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 1px;
+    height: 12px;
+    background: var(--hair);
+    transform: translateY(-50%);
+  }
 }
 
 .feedback-form {
