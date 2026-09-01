@@ -447,7 +447,8 @@ const local = {
     submitting: 'Mengirim...',
     success: 'Umpan balik Anda telah diterima',
     failed: 'Pengiriman gagal, coba lagi nanti',
-    notice: 'Dukungan tidak membalas di halaman ini. Jangan transfer ke akun yang tidak dikenal.'
+    notice: 'Dukungan tidak membalas di halaman ini. Jangan transfer ke akun yang tidak dikenal.',
+    chatHint: 'Untuk layanan langsung, hubungi dukungan Cloud Chat.',
   }
 }
 

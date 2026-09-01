@@ -444,7 +444,8 @@ const local = {
     submitting: 'Đang gửi...',
     success: 'Đã nhận phản hồi của bạn',
     failed: 'Gửi thất bại, vui lòng thử lại sau',
-    notice: 'Hỗ trợ sẽ không trả lời trên trang này. Không chuyển tiền đến tài khoản lạ.'
+    notice: 'Hỗ trợ sẽ không trả lời trên trang này. Không chuyển tiền đến tài khoản lạ.',
+    chatHint: 'Nếu cần hỗ trợ trực tiếp, vui lòng liên hệ Cloud Chat.',
   }
 }
 

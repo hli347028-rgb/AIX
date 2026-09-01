@@ -33,6 +33,13 @@
       </form>
 
       <p class="notice">{{ $t('support.notice') }}</p>
+
+      <section class="contact-card">
+        <p class="chat-hint">{{ $t('support.chatHint') }}</p>
+        <button type="button" class="agent-id" @click="copyId">
+          {{ chatIdDisplay }}
+        </button>
+      </section>
     </main>
   </div>
 </template>
@@ -42,16 +49,24 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { showFailToast, showSuccessToast, showToast } from 'vant'
+import copy from 'copy-to-clipboard'
 import { errMsg, submitFeedback } from '@/api/aix'
 import userPerson from '@/pinia/person'
 
 const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson()
+const chatId = '10424102891138710082'
+const chatIdDisplay = '10424 10289 11387 10082'
 
 const content = ref('')
 const submitting = ref(false)
 const canSubmit = computed(() => content.value.trim().length >= 4)
+
+const copyId = () => {
+  copy(chatId)
+  showToast($t('common.copiedToClipboard'))
+}
 
 const onSubmit = async () => {
   const text = content.value.trim()
@@ -85,12 +100,15 @@ const onSubmit = async () => {
 
 .support-page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--ink);
   color: var(--text);
 }
 
 .page-main {
-  padding: 76px 20px 40px;
+  flex: 1;
+  padding: 76px 20px 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -101,6 +119,38 @@ const onSubmit = async () => {
   color: var(--text-2);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.contact-card {
+  margin-top: auto;
+  padding: 18px 0 calc(20px + env(safe-area-inset-bottom, 0px));
+  border: 0;
+  border-top: 1px solid var(--hair);
+  border-radius: 0;
+  background: transparent;
+}
+
+.chat-hint {
+  margin: 0 0 8px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.agent-id {
+  display: inline;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #0052ff;
+  font-family: var(--aix-font-display);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  cursor: pointer;
 }
 
 .feedback-form {

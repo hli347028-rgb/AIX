@@ -485,6 +485,7 @@ export default {
     submitting: 'Submitting...',
     success: 'We have received your feedback',
     failed: 'Submission failed. Please try again later',
-    notice: 'Support will not reply on this page. Do not transfer funds to unknown accounts.'
+    notice: 'Support will not reply on this page. Do not transfer funds to unknown accounts.',
+    chatHint: 'For live support, contact Cloud Chat customer service.',
   }
 }

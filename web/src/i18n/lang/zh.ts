@@ -471,6 +471,7 @@ export default {
     submitting: '提交中...',
     success: '已收到你的反馈',
     failed: '提交失败，请稍后重试',
-    notice: '客服不会在此页回复。请勿向陌生账号转账。'
+    notice: '客服不会在此页回复。请勿向陌生账号转账。',
+    chatHint: '如需要实时客服沟通，请联系云聊客服。'
   }
 }
