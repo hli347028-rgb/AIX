@@ -2092,81 +2092,49 @@ func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrde
 	return r.FindOrder(ctx, update.OrderID)
 }
 
-// payUSDTRechargeRoleRewards 下级 USDT 充值时，向上查找首个开通对应角色的上级并发放奖励（入账可提 U 余额）。
-// 仅 USDT 充值触发；WIN / WIN-A 充值不发放零号账户与社区补贴奖励。
-// 0号账户与社区补贴分别独立向上查找：各自找到最近一位开通者后发放并停止，互不影响。
-// 注册赠送入充值钱包同样走这里，因此不绑定在 walletRepo 上。
+// payUSDTRechargeRoleRewards 下级 USDT 充值时，按社区补贴级差向上发放（5%/10%/15%）。
+// 仅 USDT 充值触发；WIN / WIN-A 充值不发放。
+// 充值者自身档位作为起点：若下级已设 15%，则其上方所有人拿不到该笔补贴。
+// 平级不发：上级档位 ≤ 下级已占用档位时不发；更高档位发差额。
 func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
 	if !amount.GreaterThan(decimal.Zero) {
 		return nil
 	}
-	zeroRate := decimal.NewFromFloat(biz.ZeroAccountRechargeRate)
-	subsRate := decimal.NewFromFloat(biz.CommunitySubsidyRechargeRate)
-
-	var child UserPO
-	if err := tx.Select("id", "inviter_id").First(&child, fromUserID).Error; err != nil {
+	var recharger UserPO
+	if err := tx.Select("id", "inviter_id", "is_community_subsidy", "community_subsidy_rate").
+		First(&recharger, fromUserID).Error; err != nil {
 		return err
 	}
-	if child.InviterID == nil {
+	if recharger.InviterID == nil {
 		return nil
 	}
 
-	startInviterID := *child.InviterID
+	rechargerPct := biz.EffectiveSubsidyRatePercent(recharger.IsCommunitySubsidy, recharger.CommunitySubsidyRate)
+	highestLowerPct := rechargerPct
 
-	// 0号账户：向上找首个开通者
-	for currentInviterID := startInviterID; currentInviterID > 0; {
+	currentID := *recharger.InviterID
+	seen := map[int64]bool{fromUserID: true}
+	for currentID > 0 {
+		if seen[currentID] {
+			return fmt.Errorf("invite relationship contains a cycle at user %d", currentID)
+		}
+		seen[currentID] = true
+
 		var ancestor UserPO
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ancestor, currentInviterID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id", "inviter_id", "is_community_subsidy", "community_subsidy_rate",
+				"usdt_withdrawable", "community_subsidy_total").
+			First(&ancestor, currentID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				break
 			}
 			return err
 		}
-		if ancestor.IsZeroAccount {
-			reward := amount.Mul(zeroRate).Round(8)
-			if reward.IsPositive() {
-				ancestor.UsdtWithdrawable = ancestor.UsdtWithdrawable.Add(reward)
-				ancestor.ZeroAccountRewardTotal = ancestor.ZeroAccountRewardTotal.Add(reward)
-				if err := tx.Model(&ancestor).Updates(map[string]interface{}{
-					"usdt_withdrawable":         ancestor.UsdtWithdrawable,
-					"zero_account_reward_total": ancestor.ZeroAccountRewardTotal,
-				}).Error; err != nil {
-					return err
-				}
-				base := amount
-				rate := zeroRate
-				fromID := fromUserID
-				if err := tx.Create(&RewardLogPO{
-					UserID:     ancestor.ID,
-					FromUserID: &fromID,
-					Type:       biz.RewardTypeZeroAccount,
-					Asset:      biz.TokenUSDT,
-					Amount:     reward,
-					BaseAmount: &base,
-					Rate:       &rate,
-				}).Error; err != nil {
-					return err
-				}
-			}
-			break
-		}
-		if ancestor.InviterID == nil {
-			break
-		}
-		currentInviterID = *ancestor.InviterID
-	}
 
-	// 社区补贴：向上找首个开通者
-	for currentInviterID := startInviterID; currentInviterID > 0; {
-		var ancestor UserPO
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&ancestor, currentInviterID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				break
-			}
-			return err
-		}
-		if ancestor.IsCommunitySubsidy {
-			reward := amount.Mul(subsRate).Round(8)
+		ancestorPct := biz.EffectiveSubsidyRatePercent(ancestor.IsCommunitySubsidy, ancestor.CommunitySubsidyRate)
+		gap := biz.SubsidyGapRate(ancestorPct, highestLowerPct)
+		if gap.IsPositive() {
+			reward := amount.Mul(gap).Round(8)
 			if reward.IsPositive() {
 				ancestor.UsdtWithdrawable = ancestor.UsdtWithdrawable.Add(reward)
 				ancestor.CommunitySubsidyTotal = ancestor.CommunitySubsidyTotal.Add(reward)
@@ -2177,7 +2145,7 @@ func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.De
 					return err
 				}
 				base := amount
-				rate := subsRate
+				rate := gap
 				fromID := fromUserID
 				if err := tx.Create(&RewardLogPO{
 					UserID:     ancestor.ID,
@@ -2191,13 +2159,14 @@ func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.De
 					return err
 				}
 			}
-			break
+		}
+		if ancestorPct > highestLowerPct {
+			highestLowerPct = ancestorPct
 		}
 		if ancestor.InviterID == nil {
 			break
 		}
-		currentInviterID = *ancestor.InviterID
+		currentID = *ancestor.InviterID
 	}
-
 	return nil
 }

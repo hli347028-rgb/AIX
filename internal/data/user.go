@@ -521,13 +521,51 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 		updates["inviter_id"] = update.InviterID
 	}
 	if update.SetIsZeroAccount {
+		if update.IsZeroAccount {
+			return fmt.Errorf("zero account deprecated: use community subsidy rate 5/10/15 instead")
+		}
+		var po UserPO
+		if err := r.data.db.WithContext(ctx).Select(
+			"id", "is_zero_account", "is_community_subsidy", "community_subsidy_rate",
+			"zero_account_reward_total", "community_subsidy_total",
+		).First(&po, update.UserID).Error; err != nil {
+			return err
+		}
 		now := time.Now()
-		updates["is_zero_account"] = update.IsZeroAccount
+		updates["is_zero_account"] = false
 		updates["zero_account_set_at"] = now
+		if po.IsZeroAccount {
+			newRate := biz.MergeZeroAccountIntoSubsidyRate(po.CommunitySubsidyRate, po.IsCommunitySubsidy)
+			updates["is_community_subsidy"] = true
+			updates["community_subsidy_rate"] = newRate
+			updates["community_subsidy_set_at"] = now
+			mergedTotal := po.CommunitySubsidyTotal.Add(po.ZeroAccountRewardTotal)
+			updates["community_subsidy_total"] = mergedTotal
+			updates["zero_account_reward_total"] = decimal.Zero
+		}
 	}
 	if update.SetIsCommunitySubsidy {
 		now := time.Now()
 		updates["is_community_subsidy"] = update.IsCommunitySubsidy
+		updates["community_subsidy_set_at"] = now
+		if !update.IsCommunitySubsidy {
+			updates["community_subsidy_rate"] = 0
+		}
+	}
+	if update.SetCommunitySubsidyRate {
+		now := time.Now()
+		rate := update.CommunitySubsidyRate
+		if rate < 0 {
+			rate = 0
+		}
+		if rate > biz.SubsidyRateMax {
+			rate = biz.SubsidyRateMax
+		}
+		if rate > 0 && rate != biz.SubsidyRateMin && rate != biz.SubsidyRateMid && rate != biz.SubsidyRateMax {
+			return fmt.Errorf("invalid community subsidy rate %d", rate)
+		}
+		updates["community_subsidy_rate"] = rate
+		updates["is_community_subsidy"] = rate > 0
 		updates["community_subsidy_set_at"] = now
 	}
 	if update.SetIsFrozen {
@@ -715,6 +753,7 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		TeamPerf:             po.TeamPerf.String(),
 		IsZeroAccount:          po.IsZeroAccount,
 		IsCommunitySubsidy:     po.IsCommunitySubsidy,
+		CommunitySubsidyRate:   po.CommunitySubsidyRate,
 		ZeroAccountSetAt:       po.ZeroAccountSetAt,
 		CommunitySubsidySetAt:  po.CommunitySubsidySetAt,
 		ZeroAccountRewardTotal: po.ZeroAccountRewardTotal.String(),

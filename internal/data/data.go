@@ -215,6 +215,10 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 			ddl:  "ALTER TABLE users ADD COLUMN community_subsidy_set_at datetime(3) DEFAULT NULL",
 		},
 		{
+			name: "community_subsidy_rate",
+			ddl:  "ALTER TABLE users ADD COLUMN community_subsidy_rate int NOT NULL DEFAULT 0",
+		},
+		{
 			name: "usdt_withdrawable",
 			ddl:  "ALTER TABLE users ADD COLUMN usdt_withdrawable decimal(36,18) NOT NULL DEFAULT 0",
 		},
@@ -259,6 +263,10 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 		UPDATE users SET community_subsidy_set_at = updated_time
 		WHERE is_community_subsidy = 1 AND community_subsidy_set_at IS NULL
 	`).Error; err != nil {
+		return err
+	}
+	// 0 号账户合并进社区补贴档位；无档位用户不默认 5%
+	if err := migrateZeroAccountIntoSubsidy(db); err != nil {
 		return err
 	}
 	return nil

@@ -375,6 +375,7 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"frozen_at":           formatLegacyTimePtr(u.FrozenAt),
 			"is_zero_account":     u.IsZeroAccount,
 			"is_community_subsidy": u.IsCommunitySubsidy,
+			"community_subsidy_rate": u.CommunitySubsidyRate,
 			"zero_account_set_at": formatLegacyTimePtr(u.ZeroAccountSetAt),
 			"community_subsidy_set_at": formatLegacyTimePtr(u.CommunitySubsidySetAt),
 			"zero_account_reward_total": u.ZeroAccountRewardTotal,
@@ -770,13 +771,18 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 	for _, r := range rows {
 		items = append(items, rewardRowToItem(r))
 	}
-	return ctx.Result(200, map[string]interface{}{
+	teamSummary, _ := s.buildTeamSummary(ctx, q)
+	resp := map[string]interface{}{
 		"rewards": items,
 		"list":    items,
 		"count":   total,
 		"page":    page,
 		"stats":   stats,
-	})
+	}
+	if teamSummary != nil {
+		resp["teamSummary"] = teamSummary
+	}
+	return ctx.Result(200, resp)
 }
 
 func normalizeRewardType(t string) string {
@@ -814,14 +820,19 @@ func (s *AdminLegacyService) HandleRecordList(ctx khttp.Context) error {
 	for _, r := range rows {
 		items = append(items, rechargeRowToItem(r))
 	}
-	return ctx.Result(200, map[string]interface{}{
+	teamSummary, _ := s.buildTeamSummary(ctx, q)
+	resp := map[string]interface{}{
 		"rewards":   items,
 		"list":      items,
 		"locations": items,
 		"count":     total,
 		"page":      page,
 		"stats":     stats,
-	})
+	}
+	if teamSummary != nil {
+		resp["teamSummary"] = teamSummary
+	}
+	return ctx.Result(200, resp)
 }
 
 func (s *AdminLegacyService) HandleRecordListExport(ctx khttp.Context) error {
@@ -1059,8 +1070,11 @@ func (s *AdminLegacyService) HandleSetZeroAccount(ctx khttp.Context) error {
 	if userID <= 0 {
 		return errors.BadRequest("INVALID_USER", "用户无效")
 	}
+	if enabled {
+		return errors.BadRequest("DEPRECATED", "0号账户已废弃，请使用「设置社区补贴」选择 5%/10%/15%")
+	}
 	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
-		UserID: userID, SetIsZeroAccount: true, IsZeroAccount: enabled,
+		UserID: userID, SetIsZeroAccount: true, IsZeroAccount: false,
 	}); err != nil {
 		return err
 	}
@@ -1102,13 +1116,24 @@ func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error 
 		ctx.Request().Form.Get("user_id"),
 		ctx.Request().Form.Get("userId"),
 	), 10, 64)
-	enabled := strings.TrimSpace(ctx.Request().Form.Get("enabled")) == "1" ||
-		strings.EqualFold(strings.TrimSpace(ctx.Request().Form.Get("enabled")), "true")
+	rateStr := firstNonEmpty(
+		ctx.Request().Form.Get("rate"),
+		ctx.Request().Form.Get("subsidy_rate"),
+		ctx.Request().Form.Get("enabled"),
+	)
+	rate, _ := strconv.ParseInt(strings.TrimSpace(rateStr), 10, 32)
+	// 兼容旧接口 enabled=1/0：1 视为 5%
+	if strings.EqualFold(strings.TrimSpace(rateStr), "true") {
+		rate = int64(biz.SubsidyRateMin)
+	}
 	if userID <= 0 {
 		return errors.BadRequest("INVALID_USER", "用户无效")
 	}
+	if rate != 0 && rate != int64(biz.SubsidyRateMin) && rate != int64(biz.SubsidyRateMid) && rate != int64(biz.SubsidyRateMax) {
+		return errors.BadRequest("INVALID_RATE", "补贴档位须为 0、5、10 或 15")
+	}
 	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
-		UserID: userID, SetIsCommunitySubsidy: true, IsCommunitySubsidy: enabled,
+		UserID: userID, SetCommunitySubsidyRate: true, CommunitySubsidyRate: int32(rate),
 	}); err != nil {
 		return err
 	}
@@ -1254,13 +1279,31 @@ func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
 	}
 	start, end := parseLegacyTimeRange(q)
 
+	teamIDs, teamMode, err := s.teamUserIDsForQuery(ctx, q)
+	if err != nil {
+		return err
+	}
+	teamIDSet := map[int64]struct{}{}
+	if teamMode {
+		for _, id := range teamIDs {
+			teamIDSet[id] = struct{}{}
+		}
+	}
+
 	orders, err := s.walletRepo.ListAllOrders(ctx)
 	if err != nil {
 		return err
 	}
 	filtered := make([]*biz.AdminOrderDetail, 0, len(orders))
 	for _, o := range orders {
-		if addressFilter != "" && !strings.Contains(strings.ToLower(o.UserAddress), strings.ToLower(addressFilter)) {
+		if teamMode {
+			if o == nil || o.Order == nil {
+				continue
+			}
+			if _, ok := teamIDSet[o.Order.UserID]; !ok {
+				continue
+			}
+		} else if addressFilter != "" && !strings.Contains(strings.ToLower(o.UserAddress), strings.ToLower(addressFilter)) {
 			continue
 		}
 		if statusFilter != "" && strings.ToLower(strings.TrimSpace(o.Order.Status)) != statusFilter {
@@ -1281,13 +1324,18 @@ func (s *AdminLegacyService) handleOrderList(ctx khttp.Context) error {
 	for _, o := range pageItems {
 		rewards = append(rewards, mapLegacyBuyOrder(o))
 	}
-	return ctx.Result(200, map[string]interface{}{
+	teamSummary, _ := s.buildTeamSummary(ctx, q)
+	resp := map[string]interface{}{
 		"rewards":  rewards,
 		"count":    total,
 		"page":     page,
 		"pageSize": pageSize,
 		"stats":    stats,
-	})
+	}
+	if teamSummary != nil {
+		resp["teamSummary"] = teamSummary
+	}
+	return ctx.Result(200, resp)
 }
 
 func (s *AdminLegacyService) triggerSettlement(ctx khttp.Context, settlementDate string) error {

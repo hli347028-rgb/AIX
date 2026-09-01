@@ -144,6 +144,8 @@ type AdminUserUpdate struct {
 	IsZeroAccount            bool
 	SetIsCommunitySubsidy    bool
 	IsCommunitySubsidy       bool
+	SetCommunitySubsidyRate  bool
+	CommunitySubsidyRate     int32
 	SetIsFrozen              bool
 	IsFrozen                 bool
 	Address                  string // 非空时更新钱包地址（及 invite_code）

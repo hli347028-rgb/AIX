@@ -40,6 +40,7 @@ type User struct {
 	TeamPerf        string
 	IsZeroAccount          bool
 	IsCommunitySubsidy     bool
+	CommunitySubsidyRate   int32 // 补贴档位 5/10/15
 	ZeroAccountSetAt       *time.Time
 	CommunitySubsidySetAt  *time.Time
 	ZeroAccountRewardTotal string

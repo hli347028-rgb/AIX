@@ -3,7 +3,13 @@
         <a-card title="充值列表">
             <a-row :gutter="10" class="inputGroup">
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
-                    <a-input v-model="searchData.address" placeholder="账户" @keyup.enter="getListTwo" />
+                    <a-input v-model="searchData.address" placeholder="账户地址" @keyup.enter="getListTwo" />
+                </a-col>
+                <a-col :xs="12" :md="6" :lg="6" :xl="5">
+                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
+                        <a-radio-button :value="false">查本人</a-radio-button>
+                        <a-radio-button :value="true">查全团队</a-radio-button>
+                    </a-radio-group>
                 </a-col>
                 <a-col :xs="12" :md="6" :lg="5" :xl="4">
                     <a-select v-model="searchData.type" allowClear placeholder="充值类型" style="width:100%" @change="getListTwo">
@@ -31,12 +37,15 @@
                     </a-button-group>
                 </a-col>
             </a-row>
+            <div class="stats-bar stats-bar-team" v-if="teamSummary && searchData.teamQuery">
+                <span>团队概览：<b>{{ teamSummaryText(teamSummary) }}</b></span>
+            </div>
             <div class="stats-bar" v-if="stats">
                 <span>总笔数：<b>{{ stats.totalCount || 0 }}</b></span>
-                <span>USDT充值：<b>{{ stats.usdtTotal || 0 }}</b></span>
-                <span>WIN充值：<b>{{ stats.winTotal || 0 }}</b></span>
-                <span>WIN-A充值：<b>{{ stats.winATotal || 0 }}</b></span>
-                <span>后台充值：<b>{{ stats.adminTotal || 0 }}</b></span>
+                <span>USDT充值：<b>{{ formatAmount4(stats.usdtTotal) }}</b></span>
+                <span>WIN充值：<b>{{ formatAmount4(stats.winTotal) }}</b></span>
+                <span>WIN-A充值：<b>{{ formatAmount4(stats.winATotal) }}</b></span>
+                <span>后台充值：<b>{{ formatAmount4(stats.adminTotal) }}</b></span>
             </div>
             <a-table :loading="loading" :columns="columns" :dataSource="data" :pagination="{ total, pageSize, current }"
                 @change="changePagination" bordered :scroll="{ x: true }">
@@ -48,15 +57,18 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import teamQueryMixin from '../mixin/teamQueryMixin'
+import { formatAmount4 } from '../../utils/formatAmount'
 import moment from 'moment'
 
 export default {
     name: 'recharge',
-    mixins: [listMixin],
+    mixins: [listMixin, teamQueryMixin],
     data() {
         return {
             exporting: false,
             stats: null,
+            teamSummary: null,
             columns: [
                 {
                     title: '账户',
@@ -91,17 +103,18 @@ export default {
             searchData: {
                 address: '',
                 type: '',
+                teamQuery: false,
                 dateRange: [],
             },
         }
     },
     methods: {
         buildParams() {
-            const params = {
+            const params = this.appendTeamQueryParams({
                 page: this.current,
                 pageSize: this.pageSize,
                 address: this.searchData.address || '',
-            }
+            })
             if (this.searchData.type) {
                 params.type = this.searchData.type
             }
@@ -119,6 +132,7 @@ export default {
                     return { ...value, key }
                 })
                 this.stats = (res && res.stats) || null
+                this.teamSummary = (res && res.teamSummary) || null
                 this.loading = false
                 this.total = parseInt(res.count || 0)
             }).catch(() => {
@@ -214,6 +228,13 @@ export default {
             color: #1890ff;
             font-weight: 600;
         }
+    }
+}
+.stats-bar-team {
+    background: #fff7e6;
+    border-color: #ffd591;
+    b {
+        color: #d46b08;
     }
 }
 </style>

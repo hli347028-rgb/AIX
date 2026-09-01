@@ -48,6 +48,61 @@ func parseLegacyTimeRange(q url.Values) (start, end *time.Time) {
 	return parseOne(q.Get("startTime"), false), parseOne(q.Get("endTime"), true)
 }
 
+func parseTeamQuery(q url.Values) bool {
+	v := strings.ToLower(strings.TrimSpace(firstNonEmpty(q.Get("teamQuery"), q.Get("team_query"))))
+	return v == "1" || v == "true" || v == "yes"
+}
+
+func (s *AdminLegacyService) teamUserIDsForQuery(ctx context.Context, q url.Values) ([]int64, bool, error) {
+	if !parseTeamQuery(q) {
+		return nil, false, nil
+	}
+	address := strings.TrimSpace(q.Get("address"))
+	if address == "" {
+		return []int64{-1}, true, nil
+	}
+	user, err := s.userRepo.FindByAddress(ctx, address)
+	if err != nil {
+		return nil, true, err
+	}
+	if user == nil {
+		return []int64{-1}, true, nil
+	}
+	ids, err := s.userRepo.ListUserIDsUnder(ctx, user.ID)
+	if err != nil {
+		return nil, true, err
+	}
+	ids = append(ids, user.ID)
+	return ids, true, nil
+}
+
+func (s *AdminLegacyService) buildTeamSummary(ctx context.Context, q url.Values) (map[string]interface{}, error) {
+	ids, teamMode, err := s.teamUserIDsForQuery(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	if !teamMode {
+		return nil, nil
+	}
+	address := strings.TrimSpace(q.Get("address"))
+	summary := map[string]interface{}{
+		"memberCount": len(ids),
+		"rootAddress": address,
+	}
+	user, err := s.userRepo.FindByAddress(ctx, address)
+	if err != nil {
+		return summary, err
+	}
+	if user != nil {
+		summary["teamPerformance"] = user.TeamPerf
+		summary["smallAreaPerformance"] = user.SmallAreaPerf
+		summary["largeAreaPerformance"] = user.LargeAreaPerf
+		summary["communitySubsidyTotal"] = user.CommunitySubsidyTotal
+		summary["communitySubsidyRate"] = user.CommunitySubsidyRate
+	}
+	return summary, nil
+}
+
 func (s *AdminLegacyService) sumChainRecharge(ctx context.Context, asset string, since *time.Time) (decimal.Decimal, error) {
 	db := s.data.DB().WithContext(ctx).Table("recharges r").
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
@@ -189,7 +244,10 @@ func (s *AdminLegacyService) rechargeListDB(ctx context.Context, q url.Values) *
 			r.asset, r.amount, r.tx_hash, COALESCE(r.message,'') as message, r.created_time`).
 		Joins("JOIN users u ON u.id = r.user_id").
 		Where("r.status = ?", biz.RechargeStatusConfirmed)
-	if addressFilter != "" {
+	teamIDs, teamMode, err := s.teamUserIDsForQuery(ctx, q)
+	if err == nil && teamMode {
+		db = db.Where("r.user_id IN ?", teamIDs)
+	} else if addressFilter != "" {
 		db = db.Where("(r.from_address LIKE ? OR u.address LIKE ?)", "%"+addressFilter+"%", "%"+addressFilter+"%")
 	}
 	switch typeFilter {
@@ -265,7 +323,10 @@ func (s *AdminLegacyService) rewardListDB(ctx context.Context, q url.Values) *go
 		Table("reward_logs rl").
 		Joins("JOIN users u ON u.id = rl.user_id").
 		Joins("LEFT JOIN users fu ON fu.id = rl.from_user_id")
-	if addressFilter != "" {
+	teamIDs, teamMode, err := s.teamUserIDsForQuery(ctx, q)
+	if err == nil && teamMode {
+		db = db.Where("rl.user_id IN ?", teamIDs)
+	} else if addressFilter != "" {
 		db = db.Where("u.address LIKE ?", "%"+addressFilter+"%")
 	}
 	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
@@ -274,6 +335,12 @@ func (s *AdminLegacyService) rewardListDB(ctx context.Context, q url.Values) *go
 			db = db.Where("rl.type IN ?", mgmtRewardTypes)
 		case "dynamic_usdt", "direct_pool_release", "直推奖":
 			db = db.Where("rl.type IN ?", dynamicRewardTypes)
+		case "community_subsidy_5":
+			db = db.Where("rl.type = ? AND u.community_subsidy_rate = ?", biz.RewardTypeCommunitySubsidy, biz.SubsidyRateMin)
+		case "community_subsidy_10":
+			db = db.Where("rl.type = ? AND u.community_subsidy_rate = ?", biz.RewardTypeCommunitySubsidy, biz.SubsidyRateMid)
+		case "community_subsidy_15":
+			db = db.Where("rl.type = ? AND u.community_subsidy_rate = ?", biz.RewardTypeCommunitySubsidy, biz.SubsidyRateMax)
 		default:
 			db = db.Where("rl.type = ?", typeFilter)
 		}

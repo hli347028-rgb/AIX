@@ -3,7 +3,7 @@
         <a-card title="订单奖励">
             <a-row :gutter="10" class="inputGroup">
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
-                    <a-input v-model="searchData.address" placeholder="账户" @keyup.enter="getListTwo" />
+                    <a-input v-model="searchData.address" placeholder="账户地址" @keyup.enter="getListTwo" />
                 </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select allowClear v-model="searchData.type" style="width:100%" placeholder="类型"
@@ -12,6 +12,12 @@
                             {{ item.label }}
                         </a-select-option>
                     </a-select>
+                </a-col>
+                <a-col :xs="12" :md="6" :lg="6" :xl="4">
+                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
+                        <a-radio-button :value="false">查本人</a-radio-button>
+                        <a-radio-button :value="true">查全团队</a-radio-button>
+                    </a-radio-group>
                 </a-col>
                 <a-col :xs="24" :md="12" :lg="10" :xl="8">
                     <a-range-picker
@@ -29,16 +35,19 @@
                     </a-button-group>
                 </a-col>
             </a-row>
+            <div class="stats-bar stats-bar-team" v-if="teamSummary && searchData.teamQuery">
+                <span>团队概览：<b>{{ teamSummaryText(teamSummary) }}</b></span>
+            </div>
             <div class="stats-bar stats-bar-total" v-if="stats">
                 <span>筛选合计：<b>{{ filteredTotalText }}</b></span>
                 <span>总笔数：<b>{{ stats.totalCount || 0 }}</b></span>
             </div>
             <div class="stats-bar" v-if="stats">
-                <span>静态奖(AIX)：<b>{{ stats.staticAixTotal || 0 }}</b></span>
-                <span>直推奖(USDT)：<b>{{ stats.dynamicTotal || 0 }}</b></span>
-                <span>管理奖(USDT)：<b>{{ stats.mgmtTotal || 0 }}</b></span>
-                <span>零号账户(USDT)：<b>{{ stats.zeroAccountTotal || 0 }}</b></span>
-                <span>社区补贴(USDT)：<b>{{ stats.communitySubsidyTotal || 0 }}</b></span>
+                <span>静态奖(AIX)：<b>{{ formatAmount4(stats.staticAixTotal) }}</b></span>
+                <span>直推奖(USDT)：<b>{{ formatAmount4(stats.dynamicTotal) }}</b></span>
+                <span>管理奖(USDT)：<b>{{ formatAmount4(stats.mgmtTotal) }}</b></span>
+                <span>零号账户(USDT)：<b>{{ formatAmount4(stats.zeroAccountTotal) }}</b></span>
+                <span>社区补贴(USDT)：<b>{{ formatAmount4(stats.communitySubsidyTotal) }}</b></span>
             </div>
             <a-table :loading="loading" :columns="columns" :dataSource="data" :pagination="{ total, pageSize, current }"
                 @change="changePagination" bordered :scroll="{ x: true }">
@@ -50,6 +59,8 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import teamQueryMixin from '../mixin/teamQueryMixin'
+import { formatAmount4 } from '../../utils/formatAmount'
 import moment from 'moment'
 
 const typeLabel = {
@@ -64,6 +75,9 @@ const typeLabel = {
     transfer_out: '转出',
     zero_account: '零号账户(USDT)',
     community_subsidy: '社区补贴(USDT)',
+    community_subsidy_5: '社区补贴 5%',
+    community_subsidy_10: '社区补贴 10%',
+    community_subsidy_15: '社区补贴 15%',
 }
 
 const typeOptions = [
@@ -71,7 +85,10 @@ const typeOptions = [
     { value: 'dynamic_usdt', label: '直推奖(USDT)' },
     { value: 'mgmt', label: '管理奖(USDT)' },
     { value: 'zero_account', label: '零号账户(USDT)' },
-    { value: 'community_subsidy', label: '社区补贴(USDT)' },
+    { value: 'community_subsidy', label: '社区补贴(全部)' },
+    { value: 'community_subsidy_5', label: '社区补贴 5%' },
+    { value: 'community_subsidy_10', label: '社区补贴 10%' },
+    { value: 'community_subsidy_15', label: '社区补贴 15%' },
     { value: 'exit_accel', label: '出局加速' },
     { value: 'transfer_in', label: '转入' },
     { value: 'transfer_out', label: '转出' },
@@ -79,11 +96,12 @@ const typeOptions = [
 
 export default {
     name: 'ordersList',
-    mixins: [listMixin],
+    mixins: [listMixin, teamQueryMixin],
     data() {
         return {
             typeOptions,
             stats: null,
+            teamSummary: null,
             columns: [
                 {
                     title: '时间',
@@ -101,6 +119,7 @@ export default {
                 {
                     title: '金额',
                     dataIndex: 'amount',
+                    customRender: (v) => formatAmount4(v),
                 },
                 {
                     title: '地址',
@@ -121,6 +140,7 @@ export default {
             searchData: {
                 address: '',
                 type: undefined,
+                teamQuery: false,
                 dateRange: [],
             },
         }
@@ -128,17 +148,17 @@ export default {
     computed: {
         filteredTotalText() {
             const list = (this.stats && this.stats.assetTotals) || []
-            if (!list.length) return '0'
-            return list.map((v) => `${v.total} ${v.asset}`).join('  |  ')
+            if (!list.length) return '0.0000'
+            return list.map((v) => `${this.formatAmount4(v.total)} ${v.asset}`).join('  |  ')
         },
     },
     methods: {
         buildParams() {
-            const params = {
+            const params = this.appendTeamQueryParams({
                 page: this.current,
                 pageSize: this.pageSize,
                 address: this.searchData.address,
-            }
+            })
             if (this.searchData.type) {
                 params.type = this.searchData.type
             }
@@ -152,6 +172,7 @@ export default {
             this.searchData.address = ''
             this.searchData.type = undefined
             this.searchData.dateRange = []
+            this.resetTeamQuerySearch()
             this.getListTwo()
         },
         getList() {
@@ -162,6 +183,7 @@ export default {
                     return { ...value, key }
                 })
                 this.stats = (res && res.stats) || null
+                this.teamSummary = (res && res.teamSummary) || null
                 this.loading = false
                 this.total = parseInt(res.count || 0)
             }).catch(() => {
@@ -201,6 +223,13 @@ export default {
     border-color: #91d5ff;
     b {
         font-size: 16px;
+    }
+}
+.stats-bar-team {
+    background: #fff7e6;
+    border-color: #ffd591;
+    b {
+        color: #d46b08;
     }
 }
 </style>

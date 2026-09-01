@@ -88,8 +88,10 @@
             <div><span class="k">{{ $t('community.managementReward') }}</span><span class="v">{{ formatNum(managementReward) }}</span></div>
             <div><span class="k">{{ $t('wallet.overflowReward') }}</span><span class="v">{{ formatNum(overflowReward) }}</span></div>
             <div class="metric-total"><span class="k">{{ $t('community.incomeTotal') }}</span><span class="v">{{ formatNum(incomeTotal) }}</span></div>
-            <div v-if="showZeroAccount"><span class="k">{{ $t('community.zeroAccount') }}</span><span class="v">{{ formatNum(zeroAccountReward) }}</span></div>
-            <div v-if="showCommunitySubsidy"><span class="k">{{ $t('community.communitySubsidy') }}</span><span class="v">{{ formatNum(communitySubsidyReward) }}</span></div>
+            <div v-if="showCommunitySubsidy">
+              <span class="k">{{ $t('community.communitySubsidy') }}</span>
+              <span class="v">{{ formatNum(communitySubsidyReward) }}</span>
+            </div>
           </div>
         </div>
       </section>
@@ -273,20 +275,14 @@ const overflowReward = computed(() => {
   return u.overflowReward ?? u.overflow_reward ?? p.overflow_reward ?? p.overflowReward ?? p.pending_mgmt_reward ?? 0
 })
 const incomeTotal = computed(() => userinfo.value?.all ?? 0)
-const showZeroAccount = computed(() => {
-  const u = userinfo.value || {}
-  const p = person.profile || {}
-  return !!(u.is_zero_account ?? u.isZeroAccount ?? p.is_zero_account ?? p.isZeroAccount)
-})
+const communitySubsidyTiers = [5, 10, 15]
 const showCommunitySubsidy = computed(() => {
   const u = userinfo.value || {}
   const p = person.profile || {}
-  return !!(u.is_community_subsidy ?? u.isCommunitySubsidy ?? p.is_community_subsidy ?? p.isCommunitySubsidy)
-})
-const zeroAccountReward = computed(() => {
-  const u = userinfo.value || {}
-  const p = person.profile || {}
-  return u.zero_account_reward_total ?? u.zeroAccountRewardTotal ?? p.zero_account_reward_total ?? p.zeroAccountRewardTotal ?? 0
+  const enabled = !!(u.is_community_subsidy ?? u.isCommunitySubsidy ?? p.is_community_subsidy ?? p.isCommunitySubsidy)
+  const raw = u.community_subsidy_rate ?? u.communitySubsidyRate ?? p.community_subsidy_rate ?? p.communitySubsidyRate ?? 0
+  const rate = parseInt(String(raw), 10)
+  return enabled && communitySubsidyTiers.includes(rate)
 })
 const communitySubsidyReward = computed(() => {
   const u = userinfo.value || {}

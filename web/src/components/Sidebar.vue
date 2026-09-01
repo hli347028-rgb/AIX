@@ -11,7 +11,7 @@
             <span class="brand-mark-wrap">
               <img src="/assets/aix-logo-sm.png" alt="AIX" class="brand-mark" />
             </span>
-            <div class="brand-copy">
+          <div class="brand-copy">
               <span class="brand-name">AI PREDICTION EXCHANGE</span>
               <span class="brand-meta">FUTUREFI PROTOCOL</span>
             </div>
@@ -144,7 +144,7 @@ const handleNav = (item, event) => {
     return
   }
   if (item.href) {
-    close()
+  close()
     return
   }
   showToast($t('common.comingSoon'))

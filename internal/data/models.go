@@ -32,8 +32,9 @@ type UserPO struct {
 	LargeAreaPerf     decimal.Decimal `gorm:"column:large_area_perf;type:decimal(36,18);default:0;not null"`
 	SmallAreaPerf     decimal.Decimal `gorm:"column:small_area_perf;type:decimal(36,18);default:0;not null"`
 	TeamPerf          decimal.Decimal `gorm:"column:team_perf;type:decimal(36,18);default:0;not null"`
-	IsZeroAccount          bool            `gorm:"column:is_zero_account;default:false;not null"`
+	IsZeroAccount          bool            `gorm:"column:is_zero_account;default:false;not null"` // 已废弃，补贴合并后仅作历史迁移
 	IsCommunitySubsidy     bool            `gorm:"column:is_community_subsidy;default:false;not null"`
+	CommunitySubsidyRate   int32           `gorm:"column:community_subsidy_rate;default:0;not null"` // 补贴档位：5 / 10 / 15
 	ZeroAccountSetAt       *time.Time      `gorm:"column:zero_account_set_at"`
 	CommunitySubsidySetAt  *time.Time      `gorm:"column:community_subsidy_set_at"`
 	ZeroAccountRewardTotal decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`

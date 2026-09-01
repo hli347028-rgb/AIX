@@ -83,6 +83,7 @@ export default {
     staticIncomeRule: '静态：本金 × 0.5%/日，按价格换算为 AIX 代币',
     directReferralRule: '直推：仅充值钱包铸造产生，50% USDT 进入奖励钱包',
     managementRewardRule: '管理奖：A1–A10 级差（晋级仅看小区业绩）；可释放进奖励钱包，超出出局帽进溢出，下次认购再释放',
+    communitySubsidyRule: '社区补贴：后台开通后显示；下级 USDT 充值按 5%/10%/15% 级差发放，下级档位会阻断上级同档或更低档收益',
     exitRule: '出局目标按 USDT 计算；仅可提现 WIN',
     nodeOutput: '节点输出：',
     blockInterval: '块输出间隔：3 seconds/block',

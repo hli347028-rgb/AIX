@@ -472,6 +472,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"overflow_reward":      overflow,
 		"is_zero_account":          isZeroAccount,
 		"is_community_subsidy":     isCommunitySubsidy,
+		"community_subsidy_rate":   user.CommunitySubsidyRate,
 		"zero_account_reward_total": zeroAccountReward,
 		"community_subsidy_total":   communitySubsidyReward,
 		"points":               zeroIfEmpty(user.Points),

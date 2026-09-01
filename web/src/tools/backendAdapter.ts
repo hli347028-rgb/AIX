@@ -358,6 +358,9 @@ async function fetchUserInfo() {
       overflow_reward: String(overflowRewardAmt),
       is_zero_account: !!(aixProfile.is_zero_account ?? aixProfile.isZeroAccount),
       is_community_subsidy: !!(aixProfile.is_community_subsidy ?? aixProfile.isCommunitySubsidy),
+      community_subsidy_rate: Number(
+        aixProfile.community_subsidy_rate ?? aixProfile.communitySubsidyRate ?? 0,
+      ) || 0,
       zero_account_reward_total: firstText(
         aixProfile.zero_account_reward_total,
         aixProfile.zeroAccountRewardTotal,

@@ -17,6 +17,7 @@
 
 <script type="text/jsx">
 import Gai from '../../api/Gai'
+import { formatAmount4 } from '../../utils/formatAmount'
 
 // 四列布局，与需求表格一致（按行从左到右）
 const statRows = [
@@ -98,7 +99,8 @@ export default {
         },
         formatValue(key) {
             const value = this.data[key]
-            return value == null || value === '' ? 0 : value
+            if (value == null || value === '') return '0.0000'
+            return formatAmount4(value)
         },
     }
 }

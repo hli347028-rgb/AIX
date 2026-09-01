@@ -5,6 +5,12 @@
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-input v-model="searchData.address" placeholder="用户地址" allowClear @keyup.enter="getListTwo" />
                 </a-col>
+                <a-col :xs="12" :md="8" :lg="8" :xl="5">
+                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
+                        <a-radio-button :value="false">查本人</a-radio-button>
+                        <a-radio-button :value="true">查全团队</a-radio-button>
+                    </a-radio-group>
+                </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select allowClear v-model="searchData.status" style="width:100%" placeholder="状态"
                         @change="getListTwo">
@@ -35,9 +41,12 @@
                     </a-button-group>
                 </a-col>
             </a-row>
+            <div class="stats-bar stats-bar-team" v-if="teamSummary && searchData.teamQuery">
+                <span>团队概览：<b>{{ teamSummaryText(teamSummary) }}</b></span>
+            </div>
             <div class="stats-bar" v-if="stats">
                 <span>筛选笔数：<b>{{ stats.totalCount || 0 }}</b></span>
-                <span>报单总额：<b>{{ stats.principalTotal || 0 }}</b> USDT</span>
+                <span>报单总额：<b>{{ formatAmount4(stats.principalTotal) }}</b> USDT</span>
             </div>
             <a-table
                 rowKey="id"
@@ -56,6 +65,8 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import teamQueryMixin from '../mixin/teamQueryMixin'
+import { formatAmount4 } from '../../utils/formatAmount'
 import moment from 'moment'
 
 const statusText = {
@@ -84,10 +95,11 @@ const fundSourceOptions = Object.keys(fundSourceText).map((value) => ({
 
 export default {
     name: 'subscription',
-    mixins: [listMixin],
+    mixins: [listMixin, teamQueryMixin],
     data() {
         return {
             stats: null,
+            teamSummary: null,
             fundSourceOptions,
             columns: [
                 {
@@ -138,6 +150,7 @@ export default {
                 address: '',
                 status: undefined,
                 fund_source: undefined,
+                teamQuery: false,
                 dateRange: [],
             },
             pageSize: 50,
@@ -148,10 +161,10 @@ export default {
     },
     methods: {
         buildParams() {
-            const params = {
+            const params = this.appendTeamQueryParams({
                 page: this.current || 1,
                 pageSize: this.pageSize || 50,
-            }
+            })
             const address = (this.searchData.address || '').trim()
             if (address) params.address = address
             const status = this.searchData.status
@@ -175,6 +188,7 @@ export default {
                 }))
                 this.total = parseInt((res && res.count) || 0, 10) || 0
                 this.stats = (res && res.stats) || null
+                this.teamSummary = (res && res.teamSummary) || null
             }).catch(() => {
                 this.data = []
                 this.total = 0
@@ -207,6 +221,15 @@ export default {
 
     b {
         color: #389e0d;
+    }
+}
+
+.stats-bar-team {
+    background: #fff7e6;
+    border-color: #ffd591;
+
+    b {
+        color: #d46b08;
     }
 }
 </style>
