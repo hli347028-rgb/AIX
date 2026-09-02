@@ -148,7 +148,7 @@ const local = {
     generation: '代數',
     reward: '獎勵',
     time: '時間', directReferralReward: '直推獎勵', managementReward: '管理獎',
-    usdtAmount: 'USDT 數量', brc20Amount: 'BRC20 數量', myTeam: '我的團隊', refresh: '重新整理', teamTotalMembers: '團隊總人數', username: '使用者名稱', usernameSetting: '名稱設定', editUsername: '編輯', saveUsername: '儲存', cancelUsername: '取消', usernameSaved: '使用者名稱已儲存', usernameRequired: '請輸入使用者名稱', usernameTooLong: '使用者名稱最多 24 個字元', notSet: '未設定', teamMembers: '團隊成員資料', noTeamMembers: '暫無團隊成員', active: '有效', directMembers: '直屬人數', joinedAt: '加入時間'
+    usdtAmount: 'USDT 數量', subscribeAmount: '認購金額', subscribeType: '充值類型', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '復投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 數量', myTeam: '我的團隊', refresh: '重新整理', teamTotalMembers: '團隊總人數', username: '使用者名稱', usernameSetting: '名稱設定', editUsername: '編輯', saveUsername: '儲存', cancelUsername: '取消', usernameSaved: '使用者名稱已儲存', usernameRequired: '請輸入使用者名稱', usernameTooLong: '使用者名稱最多 24 個字元', notSet: '未設定', teamMembers: '團隊成員資料', noTeamMembers: '暫無團隊成員', active: '有效', directMembers: '直屬人數', joinedAt: '加入時間'
   },
   count: {
     myNodes: '我的節點', myIncome: '我的收益', matrix: '矩陣圖', level: '級別', sharedNodes: '分享節點',

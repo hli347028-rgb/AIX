@@ -168,7 +168,7 @@ export default {
     generation: '代数',
     reward: '奖励',
     time: '时间', directReferralReward: '直推奖励', managementReward: '管理奖',
-    usdtAmount: '充值USDT金额', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
+    usdtAmount: '充值USDT金额', subscribeAmount: '认购金额', subscribeType: '充值类型', subscribeTypeRecharge: 'USDT认购', subscribeTypeReward: '复投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
   },
   count: {
     myNodes: '我的节点', myIncome: '我的收益', matrix: '矩阵图', level: '级别', sharedNodes: '分享节点',

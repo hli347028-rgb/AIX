@@ -148,7 +148,7 @@ const local = {
     generation: 'Generasi',
     reward: 'Hadiah',
     time: 'Waktu', directReferralReward: 'Hadiah Rujukan Langsung', managementReward: 'Hadiah Manajemen',
-    usdtAmount: 'Jumlah USDT', brc20Amount: 'Jumlah BRC20', myTeam: 'Tim Saya', refresh: 'Segarkan', teamTotalMembers: 'Total Anggota Tim', username: 'Nama Pengguna', usernameSetting: 'Pengaturan Nama', editUsername: 'Edit', saveUsername: 'Simpan', cancelUsername: 'Batal', usernameSaved: 'Nama pengguna disimpan', usernameRequired: 'Masukkan nama pengguna', usernameTooLong: 'Nama pengguna maksimal 24 karakter', notSet: 'Belum diatur', teamMembers: 'Profil Anggota Tim', noTeamMembers: 'Belum ada anggota tim', active: 'Aktif', directMembers: 'Anggota Langsung', joinedAt: 'Tanggal Bergabung'
+    usdtAmount: 'Jumlah USDT', subscribeAmount: 'Jumlah Langganan', subscribeType: 'Jenis', subscribeTypeRecharge: 'Langganan USDT', subscribeTypeReward: 'Investasi Ulang', subscribeTypeWin: 'Bayar WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Jumlah BRC20', myTeam: 'Tim Saya', refresh: 'Segarkan', teamTotalMembers: 'Total Anggota Tim', username: 'Nama Pengguna', usernameSetting: 'Pengaturan Nama', editUsername: 'Edit', saveUsername: 'Simpan', cancelUsername: 'Batal', usernameSaved: 'Nama pengguna disimpan', usernameRequired: 'Masukkan nama pengguna', usernameTooLong: 'Nama pengguna maksimal 24 karakter', notSet: 'Belum diatur', teamMembers: 'Profil Anggota Tim', noTeamMembers: 'Belum ada anggota tim', active: 'Aktif', directMembers: 'Anggota Langsung', joinedAt: 'Tanggal Bergabung'
   },
   count: {
     myNodes: 'Node Saya', myIncome: 'Pendapatan Saya', matrix: 'Matriks', level: 'Level', sharedNodes: 'Node Bersama',

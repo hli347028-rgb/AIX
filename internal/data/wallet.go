@@ -294,7 +294,9 @@ func (r *walletRepo) ListRechargesByUser(ctx context.Context, userID int64) ([]*
 
 func (r *walletRepo) ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*biz.Recharge, error) {
 	asset = strings.ToUpper(strings.TrimSpace(asset))
-	q := r.data.db.WithContext(ctx).Where("user_id = ?", userID)
+	q := r.data.db.WithContext(ctx).Where("user_id = ?", userID).
+		// 交易所划转不在用户充值记录中展示
+		Where("tx_hash NOT LIKE ?", "partner:%")
 	if asset != "" {
 		q = q.Where("asset = ?", asset)
 	}
@@ -365,6 +367,68 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	return out, total, nil
 }
 
+func (r *walletRepo) ListOrdersByUserIDs(
+	ctx context.Context, userIDs []int64, offset, limit int,
+) ([]*biz.AdminOrderDetail, int64, error) {
+	if len(userIDs) == 0 {
+		return nil, 0, nil
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	base := r.data.db.WithContext(ctx).Model(&OrderPO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status <> ?", biz.OrderStatusCancelled)
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	type row struct {
+		ID          int64
+		UserID      int64
+		Principal   decimal.Decimal
+		FromWin     decimal.Decimal
+		FundSource  string
+		Status      string
+		CreatedTime time.Time
+		Address     string
+	}
+	var rows []row
+	err := r.data.db.WithContext(ctx).Table("orders AS o").
+		Select("o.id, o.user_id, o.principal, o.from_win, o.fund_source, o.status, o.created_time, COALESCE(u.address,'') AS address").
+		Joins("LEFT JOIN users AS u ON u.id = o.user_id").
+		Where("o.user_id IN ?", userIDs).
+		Where("o.status <> ?", biz.OrderStatusCancelled).
+		Order("o.id DESC").
+		Offset(offset).Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.AdminOrderDetail, 0, len(rows))
+	for _, rw := range rows {
+		o := &biz.Order{
+			ID:          rw.ID,
+			UserID:      rw.UserID,
+			Principal:   rw.Principal.String(),
+			FromWin:     rw.FromWin.String(),
+			FundSource:  rw.FundSource,
+			Status:      rw.Status,
+			CreatedTime: rw.CreatedTime,
+		}
+		o.SyncCompatFields()
+		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rw.Address})
+	}
+	return out, total, nil
+}
+
 func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.SubscribeInput) (*biz.Order, string, error) {
 	principal, err := decimal.NewFromString(in.Amount)
 	if err != nil {
@@ -397,6 +461,10 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 		updates := map[string]interface{}{}
 		fundSource := payFrom
 		skipMgmt := payFrom == biz.PayFromReward
+		orderPoints := principal
+		if payFrom == biz.PayFromReward {
+			orderPoints = decimal.Zero
+		}
 
 		if payFrom != biz.PayFromRecharge && payFrom != biz.PayFromReward && payFrom != biz.PayFromWin {
 			return fmt.Errorf("invalid pay_from")
@@ -453,20 +521,22 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 			FromReward:   fromReward,
 			FromWin:      fromWin,
 			FromWinA:     fromWinA,
-			Points:       principal, // 认购金额即本单积分（含 WIN-A）
+			Points:       orderPoints,
 			FundSource:   fundSource,
 			Status:       biz.OrderStatusActive,
 		}
 		if err := tx.Create(po).Error; err != nil {
 			return err
 		}
-		user.Points = user.Points.Add(principal)
-		user.PointsAll = user.PointsAll.Add(principal)
-		if err := tx.Model(&user).Updates(map[string]interface{}{
-			"points":     user.Points,
-			"points_all": user.PointsAll,
-		}).Error; err != nil {
-			return err
+		if orderPoints.IsPositive() {
+			user.Points = user.Points.Add(orderPoints)
+			user.PointsAll = user.PointsAll.Add(orderPoints)
+			if err := tx.Model(&user).Updates(map[string]interface{}{
+				"points":     user.Points,
+				"points_all": user.PointsAll,
+			}).Error; err != nil {
+				return err
+			}
 		}
 		created = r.orderToBiz(po)
 		if fromWin.IsPositive() && winPriceSnap.IsPositive() {

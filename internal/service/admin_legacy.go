@@ -1824,8 +1824,12 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	// 划转WIN数量：交易所（合作方）加款接口累计转入的 WIN，只增不减。
-	totalPartnerCreditWin, err := s.sumPartnerCreditWin(ctx)
+	// 总/今日 WIN-A 划转：交易所（合作方）加款接口转入的 WIN。
+	totalPartnerCreditWin, err := s.sumPartnerCreditWin(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	todayPartnerCreditWin, err := s.sumPartnerCreditWin(ctx, &todayStart)
 	if err != nil {
 		return nil, err
 	}
@@ -1895,6 +1899,7 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 		"totalAixAsset":          totalAixAsset.String(),
 		"todayAixAmount":         todayAixAmount.String(),
 		"totalPartnerCreditWin":  totalPartnerCreditWin.String(),
+		"todayPartnerCreditWin":  todayPartnerCreditWin.String(),
 		"totalRewardWallet":      totalRewardWallet.String(),
 		"totalOverflowWallet":    totalOverflowWallet.String(),
 		"totalAdminRecharge":     totalAdminRecharge.String(),

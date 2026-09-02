@@ -282,6 +282,8 @@ func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address st
 	if err != nil {
 		return nil, err
 	}
+	// 只建一次子树索引：原先对每个直推都 CountUsersUnder，会反复全表扫描用户关系，
+	// 大团队请求超时后前端表现为「团队成员档案显示不全」。
 	stakeMap, childrenMap, err := uc.buildPerfTree(ctx, user.ID)
 	if err != nil {
 		return nil, err
@@ -297,14 +299,8 @@ func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address st
 	memo := make(map[int64]decimal.Decimal)
 	result := make([]*DirectInvitee, 0, len(invitees))
 	for _, item := range invitees {
-		directCount, err := uc.userRepo.CountInvitees(ctx, item.ID)
-		if err != nil {
-			return nil, err
-		}
-		teamDownline, err := uc.userRepo.CountUsersUnder(ctx, item.ID)
-		if err != nil {
-			return nil, err
-		}
+		directCount := int32(len(childrenMap[item.ID]))
+		teamDownline := countDescendants(item.ID, childrenMap)
 		lineExit := CalcSubtreeStake(item.ID, stakeMap, childrenMap, memo)
 		result = append(result, &DirectInvitee{
 			Address:           item.Address,
@@ -322,6 +318,21 @@ func (uc *AuthUsecase) ListInvitees(ctx context.Context, tokenString, address st
 		})
 	}
 	return result, nil
+}
+
+// countDescendants 统计 root 之下全部后代人数（不含本人）。
+func countDescendants(root int64, children map[int64][]int64) int32 {
+	var n int32
+	queue := []int64{root}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, child := range children[cur] {
+			n++
+			queue = append(queue, child)
+		}
+	}
+	return n
 }
 
 func (uc *AuthUsecase) buildPerfTree(ctx context.Context, rootID int64) (map[int64]decimal.Decimal, map[int64][]int64, error) {

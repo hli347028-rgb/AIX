@@ -148,7 +148,7 @@ const local = {
     generation: 'Thế hệ',
     reward: 'Thưởng',
     time: 'Thời gian', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý',
-    usdtAmount: 'Số lượng USDT', brc20Amount: 'Số lượng BRC20', myTeam: 'Đội của tôi', refresh: 'Làm mới', teamTotalMembers: 'Tổng thành viên đội', username: 'Tên người dùng', usernameSetting: 'Cài đặt tên', editUsername: 'Sửa', saveUsername: 'Lưu', cancelUsername: 'Hủy', usernameSaved: 'Đã lưu tên người dùng', usernameRequired: 'Vui lòng nhập tên người dùng', usernameTooLong: 'Tên người dùng tối đa 24 ký tự', notSet: 'Chưa đặt', teamMembers: 'Hồ sơ thành viên đội', noTeamMembers: 'Chưa có thành viên đội', active: 'Hoạt động', directMembers: 'Thành viên trực tiếp', joinedAt: 'Ngày tham gia'
+    usdtAmount: 'Số lượng USDT', subscribeAmount: 'Số tiền đăng ký', subscribeType: 'Loại', subscribeTypeRecharge: 'USDT đăng ký', subscribeTypeReward: 'Tái đầu tư', subscribeTypeWin: 'Thanh toán WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Số lượng BRC20', myTeam: 'Đội của tôi', refresh: 'Làm mới', teamTotalMembers: 'Tổng thành viên đội', username: 'Tên người dùng', usernameSetting: 'Cài đặt tên', editUsername: 'Sửa', saveUsername: 'Lưu', cancelUsername: 'Hủy', usernameSaved: 'Đã lưu tên người dùng', usernameRequired: 'Vui lòng nhập tên người dùng', usernameTooLong: 'Tên người dùng tối đa 24 ký tự', notSet: 'Chưa đặt', teamMembers: 'Hồ sơ thành viên đội', noTeamMembers: 'Chưa có thành viên đội', active: 'Hoạt động', directMembers: 'Thành viên trực tiếp', joinedAt: 'Ngày tham gia'
   },
   count: {
     myNodes: 'Node của tôi', myIncome: 'Thu nhập của tôi', matrix: 'Ma trận', level: 'Cấp độ', sharedNodes: 'Node chia sẻ',

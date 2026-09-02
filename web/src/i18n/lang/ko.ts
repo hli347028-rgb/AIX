@@ -148,7 +148,7 @@ const local = {
     generation: '세대',
     reward: '보상',
     time: '시간', directReferralReward: '직접 추천 보상', managementReward: '관리 보상',
-    usdtAmount: 'USDT 수량', brc20Amount: 'BRC20 수량', myTeam: '내 팀', refresh: '새로고침', teamTotalMembers: '전체 팀원', username: '사용자 이름', usernameSetting: '이름 설정', editUsername: '편집', saveUsername: '저장', cancelUsername: '취소', usernameSaved: '사용자 이름이 저장되었습니다', usernameRequired: '사용자 이름을 입력하세요', usernameTooLong: '사용자 이름은 24자 이하여야 합니다', notSet: '미설정', teamMembers: '팀원 정보', noTeamMembers: '팀원이 없습니다', active: '활성', directMembers: '직속 인원', joinedAt: '가입일'
+    usdtAmount: 'USDT 수량', subscribeAmount: '구독 금액', subscribeType: '유형', subscribeTypeRecharge: 'USDT 구독', subscribeTypeReward: '재투자', subscribeTypeWin: 'WIN 결제', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 수량', myTeam: '내 팀', refresh: '새로고침', teamTotalMembers: '전체 팀원', username: '사용자 이름', usernameSetting: '이름 설정', editUsername: '편집', saveUsername: '저장', cancelUsername: '취소', usernameSaved: '사용자 이름이 저장되었습니다', usernameRequired: '사용자 이름을 입력하세요', usernameTooLong: '사용자 이름은 24자 이하여야 합니다', notSet: '미설정', teamMembers: '팀원 정보', noTeamMembers: '팀원이 없습니다', active: '활성', directMembers: '직속 인원', joinedAt: '가입일'
   },
   count: {
     myNodes: '내 노드', myIncome: '내 수익', matrix: '매트릭스', level: '등급', sharedNodes: '공유 노드',

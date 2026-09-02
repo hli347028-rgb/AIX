@@ -1017,6 +1017,25 @@ export async function adaptRequest(
         page: Number(body.page || page),
       }
     }
+    case 'app_server/downline_subscribe_orders': {
+      const page = Math.max(1, Number(mergedParams.page) || 1)
+      const res = await authGet('/v1/wallet/downline-subscribe-orders', { page, page_size: 10 })
+      const body = apiBody(res)
+      const records = (body.records || []).map((item: any) => ({
+        id: item.id,
+        address: item.address || '',
+        amount: trimAmountText(item.amount),
+        asset: String(item.asset || 'USDT').toUpperCase(),
+        fundSource: String(item.fund_source || item.fundSource || '').toLowerCase(),
+        status: item.status || '',
+        createdAt: formatUnixTime(item.created_at ?? item.createdAt),
+      }))
+      return {
+        count: Number(body.count || 0),
+        list: records,
+        page: Number(body.page || page),
+      }
+    }
     case 'app_server/amount_to': {
       const res = await authPost('/v1/wallet/claim', {
         amount: String(data?.amount || ''),

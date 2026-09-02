@@ -59,10 +59,18 @@ type WalletConfig struct {
 	SdtPrivateKeyFile                  string `json:"sdt_private_key_file" yaml:"sdt_private_key_file"`
 	WithdrawPayoutQueriesPerCycle      int32  `json:"withdraw_payout_queries_per_cycle" yaml:"withdraw_payout_queries_per_cycle"`
 	WithdrawPayoutQueryIntervalSeconds int64  `json:"withdraw_payout_query_interval_seconds" yaml:"withdraw_payout_query_interval_seconds"`
+	// AVE Cloud Data API（首页 K 线代理）
+	AveAPIKey          string `json:"ave_api_key" yaml:"ave_api_key"`
+	AveAPIKeyFile      string `json:"ave_api_key_file" yaml:"ave_api_key_file"`
+	AveKlineBaseURL    string `json:"ave_kline_base_url" yaml:"ave_kline_base_url"`
+	AveKlineTokenID    string `json:"ave_kline_token_id" yaml:"ave_kline_token_id"`
 }
 
 const (
-	DefaultWinPair                     = "0x15ad085fc866370b59936575565434b14d22281d"
+	DefaultAveKlineBaseURL = "https://prod.ave-api.com"
+	// WIN on WIN Chain (same link as futurefi.vue AVE page)
+	DefaultAveKlineTokenID = "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
+	DefaultWinPair         = "0x15ad085fc866370b59936575565434b14d22281d"
 	DefaultWinPricePollSeconds         = int64(60)
 	DefaultWinPriceQueriesPerCycle     = int32(10)
 	DefaultWinPriceQueryIntervalSeconds = int64(5)
@@ -392,4 +400,42 @@ func (w *WalletConfig) GetSdtPrivateKey() string {
 		}
 	}
 	return w.GetWithdrawPrivateKey()
+}
+
+// GetAveAPIKey reads AVE_API_KEY env, then ave_api_key_file, then config field.
+func (w *WalletConfig) GetAveAPIKey() string {
+	if env := strings.TrimSpace(os.Getenv("AVE_API_KEY")); env != "" {
+		return env
+	}
+	if w != nil {
+		if path := strings.TrimSpace(w.AveAPIKeyFile); path != "" {
+			if b, err := os.ReadFile(path); err == nil {
+				if key := strings.TrimSpace(string(b)); key != "" {
+					return key
+				}
+			}
+		}
+		if key := strings.TrimSpace(w.AveAPIKey); key != "" {
+			return key
+		}
+	}
+	return ""
+}
+
+func (w *WalletConfig) GetAveKlineBaseURL() string {
+	if w != nil {
+		if u := strings.TrimSpace(w.AveKlineBaseURL); u != "" {
+			return u
+		}
+	}
+	return DefaultAveKlineBaseURL
+}
+
+func (w *WalletConfig) GetAveKlineTokenID() string {
+	if w != nil {
+		if id := strings.TrimSpace(w.AveKlineTokenID); id != "" {
+			return id
+		}
+	}
+	return DefaultAveKlineTokenID
 }

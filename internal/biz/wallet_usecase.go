@@ -340,6 +340,31 @@ func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 	return uc.walletRepo.ListConfirmedUSDTRechargesByUserIDs(ctx, ids, offset, pageSize)
 }
 
+// ListDownlineSubscribeOrders 当前用户所有下级的认购订单（含复投 / WIN 支付）。
+func (uc *WalletUsecase) ListDownlineSubscribeOrders(
+	ctx context.Context, tokenString string, page, pageSize int,
+) ([]*AdminOrderDetail, int64, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return nil, 0, err
+	}
+	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	return uc.walletRepo.ListOrdersByUserIDs(ctx, ids, offset, pageSize)
+}
+
 func (uc *WalletUsecase) CreateWithdraw(ctx context.Context, tokenString, amount, toAddress, signature string, withdrawAt int64) (*Withdrawal, string, error) {
 	return nil, "", errors.BadRequest("USDT_WITHDRAW_FORBIDDEN", "仅支持提现 WIN 代币，不支持提现 USDT")
 }

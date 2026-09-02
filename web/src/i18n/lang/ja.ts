@@ -148,7 +148,7 @@ const local = {
     generation: '世代',
     reward: '報酬',
     time: '時間', directReferralReward: '直接紹介報酬', managementReward: '管理報酬',
-    usdtAmount: 'USDT 数量', brc20Amount: 'BRC20 数量', myTeam: 'マイチーム', refresh: '更新', teamTotalMembers: 'チーム総人数', username: 'ユーザー名', usernameSetting: '名前設定', editUsername: '編集', saveUsername: '保存', cancelUsername: 'キャンセル', usernameSaved: 'ユーザー名を保存しました', usernameRequired: 'ユーザー名を入力してください', usernameTooLong: 'ユーザー名は24文字以内で入力してください', notSet: '未設定', teamMembers: 'チームメンバー情報', noTeamMembers: 'チームメンバーはいません', active: '有効', directMembers: '直属人数', joinedAt: '参加日時'
+    usdtAmount: 'USDT 数量', subscribeAmount: '認購金額', subscribeType: 'タイプ', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '再投資', subscribeTypeWin: 'WIN支払', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: 'マイチーム', refresh: '更新', teamTotalMembers: 'チーム総人数', username: 'ユーザー名', usernameSetting: '名前設定', editUsername: '編集', saveUsername: '保存', cancelUsername: 'キャンセル', usernameSaved: 'ユーザー名を保存しました', usernameRequired: 'ユーザー名を入力してください', usernameTooLong: 'ユーザー名は24文字以内で入力してください', notSet: '未設定', teamMembers: 'チームメンバー情報', noTeamMembers: 'チームメンバーはいません', active: '有効', directMembers: '直属人数', joinedAt: '参加日時'
   },
   count: {
     myNodes: 'マイノード', myIncome: 'マイ収益', matrix: 'マトリックス', level: 'レベル', sharedNodes: '共有ノード',

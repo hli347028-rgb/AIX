@@ -182,7 +182,7 @@ export default {
     generation: 'Generation',
     reward: 'Reward',
     time: 'Time', directReferralReward: 'Direct Referral Reward', managementReward: 'Management Reward',
-    usdtAmount: 'USDT Amount', brc20Amount: 'BRC20 Amount', myTeam: 'My Team', refresh: 'Refresh', teamTotalMembers: 'Total Team Members', username: 'Username', usernameSetting: 'Name Setting', editUsername: 'Edit', saveUsername: 'Save', cancelUsername: 'Cancel', usernameSaved: 'Username saved', usernameRequired: 'Enter a username', usernameTooLong: 'Username must be 24 characters or fewer', notSet: 'Not set', teamMembers: 'Team Member Profiles', noTeamMembers: 'No team members', active: 'Active', directMembers: 'Direct Members', joinedAt: 'Joined'
+    usdtAmount: 'USDT Amount', subscribeAmount: 'Subscription Amount', subscribeType: 'Type', subscribeTypeRecharge: 'USDT Subscribe', subscribeTypeReward: 'Reinvest', subscribeTypeWin: 'WIN Pay', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 Amount', myTeam: 'My Team', refresh: 'Refresh', teamTotalMembers: 'Total Team Members', username: 'Username', usernameSetting: 'Name Setting', editUsername: 'Edit', saveUsername: 'Save', cancelUsername: 'Cancel', usernameSaved: 'Username saved', usernameRequired: 'Enter a username', usernameTooLong: 'Username must be 24 characters or fewer', notSet: 'Not set', teamMembers: 'Team Member Profiles', noTeamMembers: 'No team members', active: 'Active', directMembers: 'Direct Members', joinedAt: 'Joined'
   },
   count: {
     myNodes: 'My Nodes', myIncome: 'My Income', matrix: 'Matrix', level: 'Level', sharedNodes: 'Shared Nodes',

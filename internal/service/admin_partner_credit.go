@@ -76,14 +76,17 @@ func (s *AdminLegacyService) partnerCreditStats(ctx context.Context, q url.Value
 	}, nil
 }
 
-// sumPartnerCreditWin 统计所有合作方（交易所）划转进来的 WIN 总量。
-// 加款记录只增不删，因此该值单调递增。
-func (s *AdminLegacyService) sumPartnerCreditWin(ctx context.Context) (decimal.Decimal, error) {
-	var total decimal.Decimal
-	err := s.data.DB().WithContext(ctx).Table("recharges").
+// sumPartnerCreditWin 统计合作方（交易所）划转进来的 WIN。
+// 加款记录只增不删；since 非空时仅统计该时间之后的划转。
+func (s *AdminLegacyService) sumPartnerCreditWin(ctx context.Context, since *time.Time) (decimal.Decimal, error) {
+	db := s.data.DB().WithContext(ctx).Table("recharges").
 		Where("status = ?", biz.RechargeStatusConfirmed).
-		Where("tx_hash LIKE ?", "partner:%").
-		Select("COALESCE(SUM(amount),0)").Scan(&total).Error
+		Where("tx_hash LIKE ?", "partner:%")
+	if since != nil {
+		db = db.Where("created_time >= ?", *since)
+	}
+	var total decimal.Decimal
+	err := db.Select("COALESCE(SUM(amount),0)").Scan(&total).Error
 	if err != nil {
 		return decimal.Zero, err
 	}

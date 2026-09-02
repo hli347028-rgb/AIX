@@ -88,8 +88,8 @@ function collectRows(payload: unknown): unknown[] {
     ? row.data as Record<string, unknown>
     : null
   const candidates = [
-    row.candles, row.klines, row.list, row.rows, row.items, row.data,
-    nested && (nested.candles || nested.klines || nested.list || nested.rows),
+    row.candles, row.klines, row.list, row.rows, row.items, row.points,
+    nested && (nested.candles || nested.klines || nested.list || nested.rows || nested.points),
   ]
   for (let i = 0; i < candidates.length; i += 1) {
     if (Array.isArray(candidates[i])) return candidates[i] as unknown[]
@@ -157,13 +157,22 @@ const demoProvider: MarketDataProvider = {
   },
 }
 
+function sourceFromPayload(payload: unknown): MarketSource {
+  if (payload && typeof payload === 'object') {
+    const source = String((payload as Record<string, unknown>).source || '').trim().toLowerCase()
+    if (source === 'ave') return 'ave'
+  }
+  return sourceFromApi()
+}
+
 const remoteProvider: MarketDataProvider = {
   async getCandles(pair, interval) {
     const response = await fetch(resolveApiUrl(interval), { headers: { Accept: 'application/json' } })
     if (!response.ok) throw new Error(`kline ${response.status}`)
-    const candles = normalizeKlinePayload(await response.json())
+    const payload = await response.json()
+    const candles = normalizeKlinePayload(payload)
     if (!candles.length) throw new Error('empty kline')
-    return { pair, interval, candles, source: sourceFromApi() }
+    return { pair, interval, candles, source: sourceFromPayload(payload) }
   },
 }
 

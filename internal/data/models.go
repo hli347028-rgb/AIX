@@ -60,7 +60,7 @@ type OrderPO struct {
 	FromReward   decimal.Decimal `gorm:"column:from_reward;type:decimal(36,18);default:0;not null"`
 	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"`       // WIN 扣款数量（按认购时 win_price 折算）
 	FromWinA     decimal.Decimal `gorm:"column:from_win_a;type:decimal(36,18);default:0;not null"`     // WIN-A 扣款数量（按认购时 win_a_price 折算）
-	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得积分（= 认购金额）
+	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得 AIX-USDT（= 认购金额；复投为 0）
 	FundSource   string          `gorm:"column:fund_source;size:16;not null"`
 	Status       string          `gorm:"size:16;default:active;not null"`
 	ExitedTime   *time.Time      `gorm:"column:exited_time"`

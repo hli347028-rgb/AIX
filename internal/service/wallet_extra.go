@@ -36,6 +36,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.GET("/v1/wallet/management-rewards", wallet.HandleManagementRewards)
 	r.GET("/v1/wallet/aix-profile", wallet.HandleAixProfile)
 	r.GET("/v1/wallet/downline-usdt-recharges", wallet.HandleDownlineUSDTRecharges)
+	r.GET("/v1/wallet/downline-subscribe-orders", wallet.HandleDownlineSubscribeOrders)
 	r.GET("/v1/wallet/points-records", wallet.HandlePointsRecords)
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
 	r.POST("/v1/wallet/recharge-win/confirm", wallet.HandleConfirmWinRecharge)
@@ -135,7 +136,7 @@ func (s *WalletService) HandleSubscribeAIX(ctx khttp.Context) error {
 		"status":       order.Status,
 		"balance":      bal,
 		"total_amount": order.Principal,
-		"points":       order.Points, // 本单获得积分（= 认购金额）
+		"points":       order.Points, // 本单获得 AIX-USDT（复投为 0）
 	}
 	if user, _, _, _, _, _, _, _, _, uerr := s.uc.GetBalance(ctx, token); uerr == nil && user != nil {
 		resp["points_balance"] = user.Points
@@ -541,6 +542,51 @@ func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 	})
 }
 
+// HandleDownlineSubscribeOrders 当前用户所有下级的认购订单。
+func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	page, pageSize, err := transferRecordPagination(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
+	}
+	records, total, err := s.uc.ListDownlineSubscribeOrders(ctx, token, page, pageSize)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		if rec == nil || rec.Order == nil {
+			continue
+		}
+		o := rec.Order
+		amount := o.Principal
+		asset := "USDT"
+		if strings.EqualFold(o.FundSource, biz.PayFromWin) {
+			asset = biz.TokenWIN
+			if winAmt := strings.TrimSpace(o.FromWin); winAmt != "" && winAmt != "0" {
+				amount = winAmt
+			}
+		}
+		items = append(items, map[string]any{
+			"id":          o.ID,
+			"address":     rec.UserAddress,
+			"amount":      amount,
+			"asset":       asset,
+			"principal":   o.Principal,
+			"from_win":    o.FromWin,
+			"fund_source": o.FundSource,
+			"status":      o.Status,
+			"created_at":  o.CreatedTime.Unix(),
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"records":   items,
+		"count":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
 // HandlePointsRecords 用户端：积分获取记录（认购产生，时间=订单创建时间）
 func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
@@ -554,7 +600,7 @@ func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	}
 	items := make([]map[string]any, 0, len(orders))
 	for _, o := range orders {
-		if o.FundSource == biz.PayFromWinA {
+		if o.FundSource == biz.PayFromWinA || o.FundSource == biz.PayFromReward {
 			continue
 		}
 		pts := o.Points

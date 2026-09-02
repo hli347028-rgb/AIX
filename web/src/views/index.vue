@@ -70,7 +70,7 @@
           <h2>AIX / WIN</h2>
           <p>{{ $t('home.marketDescription') }}</p>
         </div>
-        <div class="embedded-panel"><AixWinMarket /></div>
+        <div class="embedded-panel"><AixWinMarket embedded /></div>
       </section>
 
       <section class="chapter chapter--ecosystem" :class="chapterClass(3)" :style="chapterStyle(3)">

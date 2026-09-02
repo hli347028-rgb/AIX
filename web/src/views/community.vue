@@ -159,20 +159,22 @@
       <div class="ledger">
         <div class="ledger-head">
           <span>{{ $t('community.walletAddress') }}</span>
-          <span class="num">{{ $t('community.usdtAmount') }}</span>
+          <span class="type">{{ $t('community.subscribeType') }}</span>
+          <span class="num">{{ $t('community.subscribeAmount') }}</span>
           <span class="time">{{ $t('community.time') }}</span>
         </div>
-        <template v-if="downlineRechargeList.length > 0">
-          <div class="ledger-row" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
+        <template v-if="downlineOrderList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineOrderList" :key="item.id || index">
             <span class="aix-mono">{{ formatAddr(item.address) }}</span>
-            <span class="num">{{ formatNum(item.amount) }}</span>
+            <span class="type">{{ formatSubscribeType(item.fundSource) }}</span>
+            <span class="num">{{ formatOrderAmount(item) }}</span>
             <span class="time">{{ item.createdAt }}</span>
           </div>
           <Pagination
             v-model="downlinePage"
             :page-count="downlinePageCount"
             mode="simple"
-            @change="getDownlineRecharges"
+            @change="getDownlineOrders"
           />
         </template>
         <p v-else class="empty-state">{{ $t('common.noData') }}</p>
@@ -311,7 +313,7 @@ const levelLabel = computed(() => {
   return `A${lv}`
 })
 
-let downlineRechargeList = $ref<any[]>([])
+let downlineOrderList = $ref<any[]>([])
 let downlinePage = $ref(1)
 let downlinePageCount = $ref(1)
 
@@ -327,6 +329,19 @@ const formatAddr = (value: string) => formatAddress(value) || '-'
 
 const formatNum = (value: any) => Number(value || 0).toFixed(2)
 const formatCount = (value: any) => Math.max(0, Number(value || 0)).toLocaleString()
+
+const formatOrderAmount = (item: any) => {
+  const amount = Number(item?.amount || 0)
+  return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
+}
+
+const formatSubscribeType = (fundSource: string) => {
+  const key = String(fundSource || '').toLowerCase()
+  if (key === 'reward') return $t('community.subscribeTypeReward')
+  if (key === 'win') return $t('community.subscribeTypeWin')
+  if (key === 'win_a') return $t('community.subscribeTypeWinA')
+  return $t('community.subscribeTypeRecharge')
+}
 
 const normalizeMember = (item: any) => {
   const directCount = firstValue(item.directCount, item.direct_count, item.recommendNum, item.recommend_num, item.countLow, 0)
@@ -354,11 +369,14 @@ const fetchDirectMembers = async (address: string) => {
 const loadChildren = async (node: any) => {
   if (!node.address || node.childrenLoaded) return
   try {
-    node.children = await fetchDirectMembers(node.address)
+    const children = await fetchDirectMembers(node.address)
+    node.children = children
   } catch {
     node.children = []
   } finally {
     node.childrenLoaded = true
+    // 触发树节点重渲染，避免深层对象属性变更未被追踪
+    teamMembers = teamMembers.slice()
   }
 }
 
@@ -383,12 +401,12 @@ const copyToClipboard = (text: string) => {
   showToast($t('common.copiedToClipboard'))
 }
 
-const getDownlineRecharges = async (pageNum: number = 1) => {
-  const res: any = await request.get('app_server/downline_recharges', {
+const getDownlineOrders = async (pageNum: number = 1) => {
+  const res: any = await request.get('app_server/downline_subscribe_orders', {
     params: { page: pageNum },
   })
   downlinePageCount = Math.ceil((res.count || 0) / 10) || 1
-  downlineRechargeList = res.list || []
+  downlineOrderList = res.list || []
 }
 
 const refreshTeamPage = async () => {
@@ -396,7 +414,7 @@ const refreshTeamPage = async () => {
   refreshLocked = true
   try {
     await Promise.allSettled([person.getUser?.(), person.refreshProfile?.()])
-    await Promise.allSettled([getDownlineRecharges(downlinePage), loadTeamMembers()])
+    await Promise.allSettled([getDownlineOrders(downlinePage), loadTeamMembers()])
   } finally {
     refreshCooldownTimer = setTimeout(() => {
       refreshLocked = false
@@ -625,8 +643,7 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 账目表。三列网格，表头与表体共用同一套列宽定义，
-   这样列标题永远对得上下面的值。 */
+/* 账目表。四列：地址 / 充值类型 / 金额 / 时间 */
 .ledger {
   margin-top: 2px;
 }
@@ -634,8 +651,8 @@ onBeforeUnmount(() => {
 .ledger-head,
 .ledger-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 0.95fr);
+  gap: 10px;
   align-items: baseline;
 }
 
@@ -690,11 +707,18 @@ onBeforeUnmount(() => {
     font-size: 11px;
     color: var(--text-3);
   }
+
+  .type {
+    font-size: 12px;
+    color: var(--text-2);
+  }
 }
 
 .ledger-head .num,
+.ledger-head .type,
 .ledger-head .time,
 .ledger-row .num,
+.ledger-row .type,
 .ledger-row .time {
   text-align: right;
 }

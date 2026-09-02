@@ -16,7 +16,7 @@ const (
 	RechargeStatusRejected  = "rejected"
 
 	PayFromRecharge = "recharge"
-	PayFromReward   = "reward" // 奖励钱包复投：上级只增业绩，不产生直推/管理奖
+	PayFromReward   = "reward" // 奖励钱包复投：上级只增业绩，不产生直推/管理奖/AIX-USDT
 	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
 	PayFromWinA     = "win_a" // 认购已关闭；保留供历史订单 fund_source 识别
 
@@ -416,6 +416,8 @@ type WalletRepo interface {
 	ListRechargesByUser(ctx context.Context, userID int64) ([]*Recharge, error)
 	ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*Recharge, error)
 	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
+	// ListOrdersByUserIDs 按用户 ID 集合分页认购订单（含地址），供下级认购列表。
+	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*AdminOrderDetail, int64, error)
 
 	// Subscribe 单源报单（recharge / reward / win）。
 	Subscribe(ctx context.Context, userID int64, in SubscribeInput) (*Order, string, error)

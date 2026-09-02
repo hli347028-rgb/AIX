@@ -104,9 +104,11 @@ func (s *AdminLegacyService) buildTeamSummary(ctx context.Context, q url.Values)
 }
 
 func (s *AdminLegacyService) sumChainRecharge(ctx context.Context, asset string, since *time.Time) (decimal.Decimal, error) {
+	// 仅统计用户真实链上充值：排除后台补录(admin-*)与交易所划转(partner:*)
 	db := s.data.DB().WithContext(ctx).Table("recharges r").
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
-		Where("r.tx_hash NOT LIKE ?", "admin-%")
+		Where("r.tx_hash NOT LIKE ?", "admin-%").
+		Where("r.tx_hash NOT LIKE ?", "partner:%")
 	switch strings.ToUpper(strings.TrimSpace(asset)) {
 	case biz.TokenWIN:
 		db = db.Where("UPPER(r.asset) = ?", biz.TokenWIN)
@@ -243,7 +245,9 @@ func (s *AdminLegacyService) rechargeListDB(ctx context.Context, q url.Values) *
 		Select(`r.id, COALESCE(NULLIF(r.from_address,''), u.address) as address,
 			r.asset, r.amount, r.tx_hash, COALESCE(r.message,'') as message, r.created_time`).
 		Joins("JOIN users u ON u.id = r.user_id").
-		Where("r.status = ?", biz.RechargeStatusConfirmed)
+		Where("r.status = ?", biz.RechargeStatusConfirmed).
+		// 交易所划转只出现在 partner_credit_list，不进充值列表
+		Where("r.tx_hash NOT LIKE ?", "partner:%")
 	teamIDs, teamMode, err := s.teamUserIDsForQuery(ctx, q)
 	if err == nil && teamMode {
 		db = db.Where("r.user_id IN ?", teamIDs)
@@ -282,9 +286,9 @@ func (s *AdminLegacyService) rechargeStats(ctx context.Context, q url.Values) (m
 	err := s.rechargeListDB(ctx, q).
 		Select(`COUNT(*) as total_count,
 			COALESCE(SUM(CASE WHEN r.tx_hash LIKE 'admin-%' THEN r.amount ELSE 0 END),0) as admin_total,
-			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' THEN r.amount ELSE 0 END),0) as win_total,
-			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' THEN r.amount ELSE 0 END),0) as win_a_total,
-			COALESCE(SUM(CASE WHEN (UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL) AND r.tx_hash NOT LIKE 'admin-%' THEN r.amount ELSE 0 END),0) as usdt_total`,
+			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as win_total,
+			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as win_a_total,
+			COALESCE(SUM(CASE WHEN (UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL) AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as usdt_total`,
 			biz.TokenWIN, biz.TokenWINA, biz.TokenUSDT).
 		Scan(&row).Error
 	if err != nil {

@@ -148,7 +148,7 @@ const local = {
     generation: 'รุ่น',
     reward: 'รางวัล',
     time: 'เวลา', directReferralReward: 'รางวัลแนะนำตรง', managementReward: 'รางวัลการจัดการ',
-    usdtAmount: 'จำนวน USDT', brc20Amount: 'จำนวน BRC20', myTeam: 'ทีมของฉัน', refresh: 'รีเฟรช', teamTotalMembers: 'สมาชิกทีมทั้งหมด', username: 'ชื่อผู้ใช้', usernameSetting: 'ตั้งชื่อ', editUsername: 'แก้ไข', saveUsername: 'บันทึก', cancelUsername: 'ยกเลิก', usernameSaved: 'บันทึกชื่อผู้ใช้แล้ว', usernameRequired: 'กรุณากรอกชื่อผู้ใช้', usernameTooLong: 'ชื่อผู้ใช้ต้องไม่เกิน 24 ตัวอักษร', notSet: 'ยังไม่ตั้งค่า', teamMembers: 'ข้อมูลสมาชิกทีม', noTeamMembers: 'ยังไม่มีสมาชิกทีม', active: 'ใช้งาน', directMembers: 'สมาชิกโดยตรง', joinedAt: 'วันที่เข้าร่วม'
+    usdtAmount: 'จำนวน USDT', subscribeAmount: 'ยอดสมัคร', subscribeType: 'ประเภท', subscribeTypeRecharge: 'สมัคร USDT', subscribeTypeReward: 'ลงทุนซ้ำ', subscribeTypeWin: 'จ่าย WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'จำนวน BRC20', myTeam: 'ทีมของฉัน', refresh: 'รีเฟรช', teamTotalMembers: 'สมาชิกทีมทั้งหมด', username: 'ชื่อผู้ใช้', usernameSetting: 'ตั้งชื่อ', editUsername: 'แก้ไข', saveUsername: 'บันทึก', cancelUsername: 'ยกเลิก', usernameSaved: 'บันทึกชื่อผู้ใช้แล้ว', usernameRequired: 'กรุณากรอกชื่อผู้ใช้', usernameTooLong: 'ชื่อผู้ใช้ต้องไม่เกิน 24 ตัวอักษร', notSet: 'ยังไม่ตั้งค่า', teamMembers: 'ข้อมูลสมาชิกทีม', noTeamMembers: 'ยังไม่มีสมาชิกทีม', active: 'ใช้งาน', directMembers: 'สมาชิกโดยตรง', joinedAt: 'วันที่เข้าร่วม'
   },
   count: {
     myNodes: 'โหนดของฉัน', myIncome: 'รายได้ของฉัน', matrix: 'เมทริกซ์', level: 'ระดับ', sharedNodes: 'โหนดที่แชร์',

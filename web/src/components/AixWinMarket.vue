@@ -30,7 +30,9 @@
           </div>
         </div>
 
-        <div v-if="embedSrc" class="chart-wrap">
+        <div v-if="loading" class="chart-state">{{ $t('market.loading') }}</div>
+        <div v-else-if="error" class="chart-state error">{{ error }}</div>
+        <div v-else-if="useEmbed" class="chart-wrap">
           <iframe
             class="kline-embed"
             data-kline-chart
@@ -40,8 +42,6 @@
             referrerpolicy="no-referrer"
           />
         </div>
-        <div v-else-if="loading" class="chart-state">{{ $t('market.loading') }}</div>
-        <div v-else-if="error" class="chart-state error">{{ error }}</div>
         <div v-else class="chart-wrap">
           <KlineChart
             class="chart"
@@ -58,11 +58,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import KlineChart from '@/components/KlineChart.vue'
 import {
   getAixWinCandles,
+  hasKlineApi,
   hasKlineEmbed,
   resolveKlineEmbedUrl,
   type Candle,
@@ -70,15 +71,26 @@ import {
   type MarketSource,
 } from '@/services/marketData'
 
+const props = withDefaults(defineProps<{
+  /** 首页嵌入：优先内置 K 线组件并同步加载行情统计 */
+  embedded?: boolean
+}>(), {
+  embedded: false,
+})
+
 const { t: $t, locale } = useI18n()
 const intervals: MarketInterval[] = ['15m', '1h', '4h', '1d']
 const interval = ref<MarketInterval>('1h')
 const candles = ref<Candle[]>([])
-const source = ref<MarketSource>(hasKlineEmbed ? 'embed' : 'demo')
-const loading = ref(!hasKlineEmbed)
+const source = ref<MarketSource>('demo')
+const loading = ref(true)
 const error = ref('')
 const hovered = ref<Candle | null>(null)
 let requestId = 0
+let refreshTimer = 0
+const refreshMs = 60_000
+
+const useEmbed = computed(() => !props.embedded && Boolean(embedSrc.value))
 
 const latest = computed(() => candles.value[candles.value.length - 1])
 const first = computed(() => candles.value[0])
@@ -102,27 +114,36 @@ const formatVolume = (value: number) => {
   return value >= 1e6 ? `${(value / 1e6).toFixed(2)}M` : `${(value / 1e3).toFixed(1)}K`
 }
 
-const load = async () => {
-  if (hasKlineEmbed) {
+const load = async (silent = false) => {
+  if (!props.embedded && hasKlineEmbed && !hasKlineApi) {
     source.value = 'embed'
     loading.value = false
     error.value = ''
     return
   }
   const currentRequest = ++requestId
-  loading.value = true
-  error.value = ''
-  hovered.value = null
+  if (!silent) {
+    loading.value = true
+    error.value = ''
+    hovered.value = null
+  }
   try {
     const result = await getAixWinCandles(interval.value)
     if (currentRequest !== requestId) return
     candles.value = result.candles
     source.value = result.source
+    error.value = ''
   } catch {
-    if (currentRequest === requestId) error.value = $t('market.unavailable')
+    if (currentRequest === requestId && !silent) error.value = $t('market.unavailable')
   } finally {
     if (currentRequest === requestId) loading.value = false
   }
+}
+
+const startRefresh = () => {
+  clearInterval(refreshTimer)
+  if (!hasKlineApi || useEmbed.value) return
+  refreshTimer = window.setInterval(() => { void load(true) }, refreshMs)
 }
 
 const changeInterval = (value: MarketInterval) => {
@@ -130,9 +151,17 @@ const changeInterval = (value: MarketInterval) => {
   interval.value = value
   hovered.value = null
   void load()
+  startRefresh()
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  startRefresh()
+})
+
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer)
+})
 </script>
 
 <style scoped>

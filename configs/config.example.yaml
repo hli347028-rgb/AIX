@@ -91,3 +91,8 @@ wallet:
   withdraw_private_key_file: "/opt/aix/secrets/withdraw.key"
   withdraw_payout_queries_per_cycle: 10
   withdraw_payout_query_interval_seconds: 5
+  # AVE Cloud Data API（首页 K 线 GET /v1/market/kline）
+  # 密钥优先读环境变量 AVE_API_KEY，其次 ave_api_key_file，勿提交到 git
+  # ave_api_key_file: "/opt/aix/secrets/ave_api.key"
+  ave_kline_base_url: "https://prod.ave-api.com"
+  ave_kline_token_id: "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
