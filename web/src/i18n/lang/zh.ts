@@ -103,7 +103,7 @@ export default {
     nftRights: 'NFT权益',
     partners: '生态与行业机构'
   },
-  market: { liveMarket: '实时市场', overview: '实时行情概览', stats24h: '24小时行情数据', high24h: '24H 最高', low24h: '24H 最低', volume24h: '24H 成交量', sourceLabel: '数据来源', dataSource: 'AVE 接口预留', intervals: 'K线周期', loading: '行情载入中', unavailable: '行情数据暂时不可用', chartTitle: 'AIX 对 WIN 的 {interval} K线图', chartDescription: '显示开盘价、最高价、最低价、收盘价与成交量。' },
+  market: { liveMarket: '实时市场', overview: '实时行情概览', stats24h: '24小时行情数据', high24h: '24H 最高', low24h: '24H 最低', volume24h: '24H 成交量', sourceLabel: '数据来源', dataSource: 'AVE 接口预留', dataSourceDemo: '演示数据', dataSourceLive: '实时接口', dataSourceEmbed: 'K线组件', intervals: 'K线周期', loading: '行情载入中', unavailable: '行情数据暂时不可用', chartTitle: 'AIX 对 WIN 的 {interval} K线图', chartDescription: '显示开盘价、最高价、最低价、收盘价与成交量。' },
   oracle: { title: '五级预言机网络', description: '从市场感知到全域决策，五个 AI 节点协同验证每一次预测信号。', levels: '预言机等级', expand: '展开', collapse: '收起', details: '详情', confidence: '信号置信度', items: [
     {name:'感知预言机',en:'MARKET SENSE',description:'持续捕捉价格、成交量与市场情绪，过滤噪声并生成第一层有效信号。',signals:['行情感知','情绪采样','异动识别']},
     {name:'洞察预言机',en:'MARKET VISION',description:'将多维市场数据转化为趋势洞察，识别尚未形成共识的潜在方向。',signals:['趋势建模','周期识别','因子融合']},

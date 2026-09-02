@@ -105,7 +105,7 @@ const local = {
     nftRights: 'NFT 권익',
     partners: '협력 기관'
   },
-  market: { liveMarket: '실시간 시장', overview: '실시간 시장 개요', stats24h: '24시간 시장 데이터', high24h: '24H 최고가', low24h: '24H 최저가', volume24h: '24H 거래량', sourceLabel: '데이터 출처', dataSource: 'AVE API 연동 예정', intervals: '캔들 주기', loading: '시장 데이터 로딩 중', unavailable: '시장 데이터를 일시적으로 사용할 수 없습니다', chartTitle: 'AIX/WIN {interval} 캔들 차트', chartDescription: '시가, 고가, 저가, 종가와 거래량을 표시합니다.' },
+  market: { liveMarket: '실시간 시장', overview: '실시간 시장 개요', stats24h: '24시간 시장 데이터', high24h: '24H 최고가', low24h: '24H 최저가', volume24h: '24H 거래량', sourceLabel: '데이터 출처', dataSource: 'AVE API 연동 예정', dataSourceDemo: '데모 데이터', dataSourceLive: '실시간 시세', dataSourceEmbed: 'K라인 위젯', intervals: '캔들 주기', loading: '시장 데이터 로딩 중', unavailable: '시장 데이터를 일시적으로 사용할 수 없습니다', chartTitle: 'AIX/WIN {interval} 캔들 차트', chartDescription: '시가, 고가, 저가, 종가와 거래량을 표시합니다.' },
   futurefi: { projectIntro: '프로젝트 소개', navigation: '기능 탐색' },
   community: {
     level: '등급:',

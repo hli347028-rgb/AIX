@@ -105,7 +105,7 @@ const local = {
     nftRights: 'Manfaat NFT',
     partners: 'Mitra'
   },
-  market: { liveMarket: 'PASAR LANGSUNG', overview: 'Ikhtisar Pasar Langsung', stats24h: 'Data pasar 24 jam', high24h: 'TERTINGGI 24H', low24h: 'TERENDAH 24H', volume24h: 'VOLUME 24H', sourceLabel: 'SUMBER DATA', dataSource: 'API AVE Disiapkan', intervals: 'Interval candlestick', loading: 'Memuat data pasar', unavailable: 'Data pasar sementara tidak tersedia', chartTitle: 'Grafik candlestick AIX/WIN {interval}', chartDescription: 'Menampilkan harga buka, tinggi, rendah, tutup, dan volume.' },
+  market: { liveMarket: 'PASAR LANGSUNG', overview: 'Ikhtisar Pasar Langsung', stats24h: 'Data pasar 24 jam', high24h: 'TERTINGGI 24H', low24h: 'TERENDAH 24H', volume24h: 'VOLUME 24H', sourceLabel: 'SUMBER DATA', dataSource: 'API AVE Disiapkan', dataSourceDemo: 'Data demo', dataSourceLive: 'Umpan langsung', dataSourceEmbed: 'Widget K-line', intervals: 'Interval candlestick', loading: 'Memuat data pasar', unavailable: 'Data pasar sementara tidak tersedia', chartTitle: 'Grafik candlestick AIX/WIN {interval}', chartDescription: 'Menampilkan harga buka, tinggi, rendah, tutup, dan volume.' },
   futurefi: { projectIntro: 'Pengenalan Proyek', navigation: 'Navigasi Fitur' },
   community: {
     level: 'Level:',

@@ -105,7 +105,7 @@ const local = {
     nftRights: 'NFT權益',
     partners: '生態與行業機構'
   },
-  market: { liveMarket: '即時市場', overview: '即時行情概覽', stats24h: '24 小時行情資料', high24h: '24H 最高', low24h: '24H 最低', volume24h: '24H 成交量', sourceLabel: '資料來源', dataSource: 'AVE 介面預留', intervals: 'K 線週期', loading: '行情載入中', unavailable: '行情資料暫時無法使用', chartTitle: 'AIX/WIN {interval} K 線圖', chartDescription: '顯示開盤、最高、最低、收盤價與成交量。' },
+  market: { liveMarket: '即時市場', overview: '即時行情概覽', stats24h: '24 小時行情資料', high24h: '24H 最高', low24h: '24H 最低', volume24h: '24H 成交量', sourceLabel: '資料來源', dataSource: 'AVE 介面預留', dataSourceDemo: '示範資料', dataSourceLive: '即時介面', dataSourceEmbed: 'K 線元件', intervals: 'K 線週期', loading: '行情載入中', unavailable: '行情資料暫時無法使用', chartTitle: 'AIX/WIN {interval} K 線圖', chartDescription: '顯示開盤、最高、最低、收盤價與成交量。' },
   futurefi: { projectIntro: '專案介紹', navigation: '功能導覽' },
   community: {
     level: '等級:',

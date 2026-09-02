@@ -105,7 +105,7 @@ const local = {
     nftRights: 'NFT権益',
     partners: '協力機構'
   },
-  market: { liveMarket: 'リアルタイム市場', overview: 'リアルタイム市場概要', stats24h: '24時間市場データ', high24h: '24H 高値', low24h: '24H 安値', volume24h: '24H 出来高', sourceLabel: 'データソース', dataSource: 'AVE API 予約済み', intervals: 'ローソク足期間', loading: '市場データを読み込み中', unavailable: '市場データは一時的に利用できません', chartTitle: 'AIX/WIN {interval} ローソク足チャート', chartDescription: '始値、高値、安値、終値、出来高を表示します。' },
+  market: { liveMarket: 'リアルタイム市場', overview: 'リアルタイム市場概要', stats24h: '24時間市場データ', high24h: '24H 高値', low24h: '24H 安値', volume24h: '24H 出来高', sourceLabel: 'データソース', dataSource: 'AVE API 予約済み', dataSourceDemo: 'デモデータ', dataSourceLive: 'リアルタイムAPI', dataSourceEmbed: 'K線ウィジェット', intervals: 'ローソク足期間', loading: '市場データを読み込み中', unavailable: '市場データは一時的に利用できません', chartTitle: 'AIX/WIN {interval} ローソク足チャート', chartDescription: '始値、高値、安値、終値、出来高を表示します。' },
   futurefi: { projectIntro: 'プロジェクト紹介', navigation: '機能ナビゲーション' },
   community: {
     level: 'レベル:',

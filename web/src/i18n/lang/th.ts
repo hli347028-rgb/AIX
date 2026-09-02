@@ -105,7 +105,7 @@ const local = {
     nftRights: 'สิทธิประโยชน์ NFT',
     partners: 'พันธมิตร'
   },
-  market: { liveMarket: 'ตลาดสด', overview: 'ภาพรวมตลาดสด', stats24h: 'ข้อมูลตลาด 24 ชั่วโมง', high24h: 'สูงสุด 24H', low24h: 'ต่ำสุด 24H', volume24h: 'ปริมาณ 24H', sourceLabel: 'แหล่งข้อมูล', dataSource: 'สำรอง API AVE', intervals: 'ช่วงแท่งเทียน', loading: 'กำลังโหลดข้อมูลตลาด', unavailable: 'ข้อมูลตลาดไม่พร้อมใช้งานชั่วคราว', chartTitle: 'กราฟแท่งเทียน AIX/WIN {interval}', chartDescription: 'แสดงราคาเปิด สูงสุด ต่ำสุด ปิด และปริมาณ' },
+  market: { liveMarket: 'ตลาดสด', overview: 'ภาพรวมตลาดสด', stats24h: 'ข้อมูลตลาด 24 ชั่วโมง', high24h: 'สูงสุด 24H', low24h: 'ต่ำสุด 24H', volume24h: 'ปริมาณ 24H', sourceLabel: 'แหล่งข้อมูล', dataSource: 'สำรอง API AVE', dataSourceDemo: 'ข้อมูลสาธิต', dataSourceLive: 'ฟีดสด', dataSourceEmbed: 'วิดเจ็ตกราฟแท่งเทียน', intervals: 'ช่วงแท่งเทียน', loading: 'กำลังโหลดข้อมูลตลาด', unavailable: 'ข้อมูลตลาดไม่พร้อมใช้งานชั่วคราว', chartTitle: 'กราฟแท่งเทียน AIX/WIN {interval}', chartDescription: 'แสดงราคาเปิด สูงสุด ต่ำสุด ปิด และปริมาณ' },
   futurefi: { projectIntro: 'แนะนำโครงการ', navigation: 'เมนูฟังก์ชัน' },
   community: {
     level: 'ระดับ:',

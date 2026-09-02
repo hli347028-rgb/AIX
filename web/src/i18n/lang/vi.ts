@@ -105,7 +105,7 @@ const local = {
     nftRights: 'Quyền lợi NFT',
     partners: 'Cơ quan hợp tác'
   },
-  market: { liveMarket: 'THỊ TRƯỜNG TRỰC TIẾP', overview: 'Tổng quan thị trường trực tiếp', stats24h: 'Dữ liệu thị trường 24 giờ', high24h: 'CAO NHẤT 24H', low24h: 'THẤP NHẤT 24H', volume24h: 'KHỐI LƯỢNG 24H', sourceLabel: 'NGUỒN DỮ LIỆU', dataSource: 'Dự phòng API AVE', intervals: 'Khung nến', loading: 'Đang tải dữ liệu thị trường', unavailable: 'Dữ liệu thị trường tạm thời không khả dụng', chartTitle: 'Biểu đồ nến AIX/WIN {interval}', chartDescription: 'Hiển thị giá mở, cao, thấp, đóng và khối lượng.' },
+  market: { liveMarket: 'THỊ TRƯỜNG TRỰC TIẾP', overview: 'Tổng quan thị trường trực tiếp', stats24h: 'Dữ liệu thị trường 24 giờ', high24h: 'CAO NHẤT 24H', low24h: 'THẤP NHẤT 24H', volume24h: 'KHỐI LƯỢNG 24H', sourceLabel: 'NGUỒN DỮ LIỆU', dataSource: 'Dự phòng API AVE', dataSourceDemo: 'Dữ liệu demo', dataSourceLive: 'Nguồn trực tiếp', dataSourceEmbed: 'Widget K-line', intervals: 'Khung nến', loading: 'Đang tải dữ liệu thị trường', unavailable: 'Dữ liệu thị trường tạm thời không khả dụng', chartTitle: 'Biểu đồ nến AIX/WIN {interval}', chartDescription: 'Hiển thị giá mở, cao, thấp, đóng và khối lượng.' },
   futurefi: { projectIntro: 'Giới thiệu dự án', navigation: 'Điều hướng tính năng' },
   community: {
     level: 'Cấp độ:',
