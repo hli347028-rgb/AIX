@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'Số dư AIX-USDT',
     usdtSubtitle: 'Rút USDT', usdtAvailableBalance: 'USDT có thể rút', usdtWithdrawHint: 'USDT có thể rút sẽ được gửi on-chain đến ví đã liên kết',
     sdtExchangeHint: 'AIX-USDT sẽ được chuyển tới ví liên kết dưới dạng token USDT on-chain',
+    sdtWithdrawDisabled: 'Rút AIX-USDT đã đóng',
     insufficientHint: 'Số dư có thể rút không đủ (số dư tài khoản không thể rút trực tiếp, cần có ghi có tĩnh/cổ tức)',
     aixExchangeHint: 'Không thể rút AIX trực tiếp. Vui lòng đổi sang WIN trước',
     toAddress: 'Địa chỉ rút',
@@ -404,6 +405,7 @@ const local = {
     feeDeducted: 'Phí {fee} USDT',
     positiveAmount: 'Số lượng phải lớn hơn 0', insufficientAix: 'Số dư AIX không đủ', netAmountTooSmall: 'Số lượng quá nhỏ, USDT sau phí bằng 0',
     processing: 'Đang đổi...', confirm: 'Xác nhận đổi',
+    disabled: 'Chức năng đổi đã bị tắt. Vui lòng liên hệ hỗ trợ',
     records: 'Lịch sử đổi', noRecords: 'Chưa có lịch sử đổi', priceShort: 'Giá', success: 'Đổi thành công, nhận {amount} USDT', failed: 'Đổi thất bại. Vui lòng thử lại'
   },
   payment: {

@@ -47,6 +47,7 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.POST(p+"/set_zero_account", legacy.HandleSetZeroAccount)
 	r.POST(p+"/set_community_subsidy", legacy.HandleSetCommunitySubsidy)
 	r.POST(p+"/set_frozen", legacy.HandleSetFrozen)
+	r.POST(p+"/set_exchange_enabled", legacy.HandleSetExchangeEnabled)
 	r.POST(p+"/set_inviter", legacy.HandleSetInviter)
 	r.POST(p+"/change_address", legacy.HandleChangeAddress)
 	r.POST(p+"/update_goods", legacy.HandleUpdateGoods)

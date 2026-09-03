@@ -305,6 +305,7 @@ export default {
     usdtAvailableBalance: 'Withdrawable USDT',
     usdtWithdrawHint: 'Withdrawable USDT will be sent to your linked wallet as USDT tokens on-chain',
     sdtExchangeHint: 'AIX-USDT will be sent to your linked wallet as USDT tokens on-chain',
+    sdtWithdrawDisabled: 'AIX-USDT withdrawal is closed',
     insufficientHint: 'Insufficient withdrawable balance (account balance cannot be withdrawn directly; static/dividend credits required)',
     aixExchangeHint: 'AIX cannot be withdrawn directly. Please exchange to WIN first.',
     toAddress: 'Withdraw Address',
@@ -445,6 +446,7 @@ export default {
     feeDeducted: 'Fee {fee} USDT',
     positiveAmount: 'Amount must be greater than 0', insufficientAix: 'Insufficient AIX balance', netAmountTooSmall: 'Amount too small; net USDT after fee would be zero',
     processing: 'Exchanging...', confirm: 'Confirm Exchange',
+    disabled: 'Exchange is disabled. Please contact support.',
     records: 'Exchange Records', noRecords: 'No exchange records', priceShort: 'Price', success: 'Exchange successful. Received {amount} USDT', failed: 'Exchange failed. Please try again'
   },
   payment: {

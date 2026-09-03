@@ -291,6 +291,7 @@ export default {
     usdtAvailableBalance: '可提 U 余额',
     usdtWithdrawHint: '可提 U 余额将提现至绑定钱包地址，链上到账为 USDT 代币',
     sdtExchangeHint: 'AIX-USDT 将提现至绑定钱包地址，链上到账为 USDT 代币',
+    sdtWithdrawDisabled: 'AIX-USDT 提现已关闭',
     insufficientHint: '可提余额不足（账户余额不可直接提现，须有静态/分红入账）',
     aixExchangeHint: 'AIX 不可直接提现，请先兑换为 WIN',
     toAddress: '提现地址',
@@ -431,6 +432,7 @@ export default {
     feeDeducted: '手续费 {fee} USDT',
     positiveAmount: '兑换数量必须大于 0', insufficientAix: 'AIX 余额不足', netAmountTooSmall: '兑换金额过小，扣除手续费后 USDT 净量为 0',
     processing: '兑换中...', confirm: '确认兑换',
+    disabled: '兑换功能已关闭，请联系客服',
     records: '兑换记录', noRecords: '暂无兑换记录', priceShort: '价格', success: '兑换成功，获得 {amount} USDT', failed: '兑换失败，请稍后重试'
   },
   payment: {

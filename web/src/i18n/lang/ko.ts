@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'AIX-USDT 잔액',
     usdtSubtitle: 'USDT 출금', usdtAvailableBalance: '출금 가능 USDT', usdtWithdrawHint: '출금 가능 USDT는 연결된 지갑으로 온체인 전송됩니다',
     sdtExchangeHint: 'AIX-USDT는 연결된 지갑으로 USDT 토큰으로 전송됩니다',
+    sdtWithdrawDisabled: 'AIX-USDT 출금이 종료되었습니다',
     insufficientHint: '출금 가능 잔액이 부족합니다(계정 잔액은 직접 출금 불가, 정적/배당 입금 필요)',
     aixExchangeHint: 'AIX는 직접 출금할 수 없습니다. 먼저 WIN으로 교환하세요',
     toAddress: '출금 주소',
@@ -404,6 +405,7 @@ const local = {
     feeDeducted: '수수료 {fee} USDT',
     positiveAmount: '수량은 0보다 커야 합니다', insufficientAix: 'AIX 잔액이 부족합니다', netAmountTooSmall: '교환 금액이 너무 작아 수수료 차감 후 USDT가 0이 됩니다',
     processing: '교환 중...', confirm: '교환 확인',
+    disabled: '교환 기능이 비활성화되었습니다. 고객센터에 문의하세요',
     records: '교환 내역', noRecords: '교환 내역이 없습니다', priceShort: '가격', success: '교환 완료: {amount} USDT 수령', failed: '교환에 실패했습니다. 다시 시도하세요'
   },
   payment: {

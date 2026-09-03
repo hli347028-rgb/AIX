@@ -209,6 +209,10 @@ export default {
                                                 设置社区补贴
                                             </a-menu-item>
 
+                                            <a-menu-item onClick={() => this.set_exchange_enabled(v.userId || v.id, v.exchange_enabled)}>
+                                                {v.exchange_enabled === false ? '开启兑换功能' : '关闭兑换功能'}
+                                            </a-menu-item>
+
                                             <a-menu-item onClick={() => this.set_inviter(v.userId || v.id, v.address, v.myRecommendAddress)}>
                                                 更改上级地址
                                             </a-menu-item>
@@ -357,6 +361,24 @@ export default {
                 onOk: () => {
                     return Gai.set_frozen({ user_id, enabled: willFreeze ? '1' : '0' }).then(() => {
                         this.$message.success(willFreeze ? '账户已冻结' : '账户已解冻')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_exchange_enabled(user_id, current) {
+            // 默认开启；仅当明确为 false 时视为已关闭
+            const currentlyEnabled = current !== false && current !== 0 && current !== '0'
+            const willEnable = !currentlyEnabled
+            this.$confirm({
+                title: willEnable ? '开启兑换功能' : '关闭兑换功能',
+                content: willEnable
+                    ? '开启后该用户可在「我的资产」中进行 AIX 兑换，确认开启？'
+                    : '关闭后该用户「确认兑换」按钮将不可点击，也无法提交兑换，确认关闭？',
+                centered: true,
+                onOk: () => {
+                    return Gai.set_exchange_enabled({ user_id, enabled: willEnable ? '1' : '0' }).then(() => {
+                        this.$message.success(willEnable ? '兑换功能已开启' : '兑换功能已关闭')
                         this.getList()
                     })
                 }

@@ -16,14 +16,14 @@ const (
 	RechargeStatusRejected  = "rejected"
 
 	PayFromRecharge = "recharge"
-	PayFromReward   = "reward" // 奖励钱包复投：默认不产生 AIX-USDT；上级划转额度内复投可产生
+	PayFromReward   = "reward" // 奖励钱包复投：默认不产生 AIX-USDT；邀请链上级划转额度内复投可产生
 	PayFromWin      = "win"    // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
 	PayFromWinA     = "win_a"  // 认购已关闭；保留供历史订单 fund_source 识别
 
 	// PointsSource AIX-USDT 产生来源（写入 orders.points_source）
 	PointsSourceRecharge         = "recharge"          // USDT 认购
 	PointsSourceWin              = "win"               // WIN 认购
-	PointsSourceTransferReinvest = "transfer_reinvest" // 上级划给下级后，下级复投产生
+	PointsSourceTransferReinvest = "transfer_reinvest" // 任意层级上级→下级划转后，下级复投产生（不限直推）
 
 	OrderStatusActive    = "active"
 	OrderStatusExited    = "exited"

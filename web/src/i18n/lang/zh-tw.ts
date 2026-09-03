@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'AIX-USDT 餘額',
     usdtSubtitle: 'USDT 提現', usdtAvailableBalance: '可提 USDT 餘額', usdtWithdrawHint: '可提 USDT 將透過鏈上發送至已綁定的錢包',
     sdtExchangeHint: 'AIX-USDT 將提現至綁定錢包地址，鏈上到賬為 USDT 代幣',
+    sdtWithdrawDisabled: 'AIX-USDT 提現已關閉',
     insufficientHint: '可提餘額不足（帳戶餘額不可直接提現，須有靜態/分紅入賬）',
     aixExchangeHint: 'AIX 不可直接提現，請先兌換為 WIN',
     toAddress: '提現地址',
@@ -406,6 +407,7 @@ const local = {
     feeDeducted: '手續費 {fee} USDT',
     positiveAmount: '兌換數量必須大於 0', insufficientAix: 'AIX 餘額不足', netAmountTooSmall: '兌換金額過小，扣除手續費後 USDT 淨量為 0',
     processing: '兌換中...', confirm: '確認兌換',
+    disabled: '兌換功能已關閉，請聯絡客服',
     records: '兌換記錄', noRecords: '暫無兌換記錄', priceShort: '價格', success: '兌換成功，獲得 {amount} USDT', failed: '兌換失敗，請稍後重試'
   },
   payment: {

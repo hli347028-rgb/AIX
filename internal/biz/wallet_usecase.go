@@ -382,6 +382,9 @@ func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixA
 	if err != nil {
 		return nil, "", "", err
 	}
+	if !user.ExchangeEnabled {
+		return nil, "", "", errors.BadRequest("EXCHANGE_DISABLED", "兑换功能已关闭，请联系客服")
+	}
 	amt, err := ParseAmount(aixAmount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
 		return nil, "", "", errors.BadRequest("INVALID_AMOUNT", "兑换金额必须大于0")
@@ -392,6 +395,9 @@ func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixA
 	}
 	rec, aixLeft, usdtWithdrawable, err := uc.walletRepo.ExchangeAixToWin(ctx, user.ID, amt.String(), needReview)
 	if err != nil {
+		if strings.Contains(err.Error(), "exchange disabled") {
+			return nil, "", "", errors.BadRequest("EXCHANGE_DISABLED", "兑换功能已关闭，请联系客服")
+		}
 		if strings.Contains(err.Error(), "insufficient") {
 			return nil, "", "", errors.BadRequest("INSUFFICIENT_AIX", "AIX 代币余额不足")
 		}
@@ -439,37 +445,9 @@ func (uc *WalletUsecase) CreateWinWithdraw(ctx context.Context, tokenString, amo
 	return nil, "", errors.BadRequest("WIN_WITHDRAW_DISABLED", "WIN 提现已关闭")
 }
 
-// CreateSdtWithdraw 提现 AIX-USDT（链上 ERC20）
+// CreateSdtWithdraw AIX-USDT 提现已关闭
 func (uc *WalletUsecase) CreateSdtWithdraw(ctx context.Context, tokenString, amount, toAddress string) (*Withdrawal, string, error) {
-	user, err := uc.resolveUser(ctx, tokenString)
-	if err != nil {
-		return nil, "", err
-	}
-	amt, err := ParseAmount(amount)
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额必须大于0")
-	}
-	minWithdraw, err := decimal.NewFromString(uc.walletCfg.GetMinWithdraw())
-	if err == nil && minWithdraw.GreaterThan(decimal.Zero) && amt.LessThan(minWithdraw) {
-		return nil, "", errors.BadRequest("INVALID_AMOUNT", "提现金额低于最低限额")
-	}
-	toNorm := strings.TrimSpace(toAddress)
-	if toNorm == "" {
-		toNorm = user.Address
-	} else {
-		toNorm, err = eth.NormalizeAddress(toNorm)
-		if err != nil {
-			return nil, "", errors.BadRequest("INVALID_ADDRESS", "提现地址无效")
-		}
-	}
-	w, left, err := uc.walletRepo.CreateSdtWithdrawal(ctx, user.ID, amt.String(), toNorm, initialWithdrawStatus(TokenSDT, amt))
-	if err != nil {
-		if strings.Contains(err.Error(), "insufficient") {
-			return nil, "", errors.BadRequest("INSUFFICIENT_SDT", "AIX-USDT 余额不足")
-		}
-		return nil, "", err
-	}
-	return w, left, nil
+	return nil, "", errors.BadRequest("SDT_WITHDRAW_DISABLED", "AIX-USDT 提现已关闭")
 }
 
 // CreateUsdtWithdraw 提现可提 U 余额（链上 USDT ERC20）

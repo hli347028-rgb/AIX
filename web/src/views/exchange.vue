@@ -65,7 +65,7 @@
         <button
           type="button"
           class="exchange-submit"
-          :disabled="!canSubmit || submitting"
+          :disabled="!canSubmit || submitting || !exchangeEnabled"
           @click="submitExchange"
         >
           {{ submitting ? $t('exchange.processing') : $t('exchange.confirm') }}
@@ -133,6 +133,11 @@ const aixBalance = computed(() => String(person.profile?.aix_balance || person.u
 const usdtWithdrawable = computed(() => String(person.profile?.usdt_withdrawable || '0'))
 const aixPrice = computed(() => String(person.profile?.aix_price || '0'))
 const exchangeFeeRate = computed(() => Number(person.profile?.exchange_fee_rate ?? 0.05))
+const exchangeEnabled = computed(() => {
+  const p = person.profile || {}
+  if (p.exchange_enabled === false || p.exchangeEnabled === false) return false
+  return true
+})
 const feeRateText = computed(() => formatFeeRate(exchangeFeeRate.value))
 const hasRate = computed(() => isPositiveDecimal(aixPrice.value))
 const unitRate = computed(() => (
@@ -149,7 +154,7 @@ const amountError = computed(() => {
   if (preview.value && !isPositiveDecimal(preview.value.usdtNet)) return $t('exchange.netAmountTooSmall')
   return ''
 })
-const canSubmit = computed(() => Boolean(amount.value) && !amountError.value && hasRate.value)
+const canSubmit = computed(() => Boolean(amount.value) && !amountError.value && hasRate.value && exchangeEnabled.value)
 
 function normalizeAmount(event: Event) {
   const input = event.target as HTMLInputElement
@@ -209,6 +214,10 @@ async function loadRecords() {
 }
 
 async function submitExchange() {
+  if (!exchangeEnabled.value) {
+    showFailToast($t('exchange.disabled'))
+    return
+  }
   if (!canSubmit.value || submitting.value) return
   submitting.value = true
   try {
@@ -230,6 +239,7 @@ async function submitExchange() {
       USDT_NET_AMOUNT_TOO_SMALL: 'exchange.netAmountTooSmall',
       WIN_PRICE_NOT_CONFIGURED: 'exchange.priceUnavailable',
       WIN_NET_AMOUNT_TOO_SMALL: 'exchange.netAmountTooSmall',
+      EXCHANGE_DISABLED: 'exchange.disabled',
     }
     showFailToast(messageKey[code] ? $t(messageKey[code]) : (error?.response?.data?.message || $t('exchange.failed')))
   } finally {

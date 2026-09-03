@@ -374,6 +374,7 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"historyRecommend":    strconv.Itoa(inviteeCount),
 			"is_frozen":           u.IsFrozen,
 			"frozen_at":           formatLegacyTimePtr(u.FrozenAt),
+			"exchange_enabled":    u.ExchangeEnabled,
 			"is_zero_account":     u.IsZeroAccount,
 			"is_community_subsidy": u.IsCommunitySubsidy,
 			"community_subsidy_rate": u.CommunitySubsidyRate,
@@ -1114,6 +1115,33 @@ func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error 
 	}
 	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
 		UserID: userID, SetCommunitySubsidyRate: true, CommunitySubsidyRate: int32(rate),
+	}); err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandleSetExchangeEnabled(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	raw := strings.TrimSpace(firstNonEmpty(
+		ctx.Request().Form.Get("enabled"),
+		ctx.Request().Form.Get("exchange_enabled"),
+	))
+	enabled := raw == "1" || strings.EqualFold(raw, "true")
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	if _, err := s.admin.UpdateUser(ctx, s.token(ctx), &biz.AdminUserUpdate{
+		UserID: userID, SetExchangeEnabled: true, ExchangeEnabled: enabled,
 	}); err != nil {
 		return err
 	}
@@ -2004,7 +2032,7 @@ func pointsSourceLabel(src string) string {
 	case biz.PointsSourceWin:
 		return "WIN认购"
 	case biz.PointsSourceTransferReinvest:
-		return "复投（上级划转）"
+		return "复投（上级划转，含隔代）"
 	default:
 		if src == "" {
 			return "-"

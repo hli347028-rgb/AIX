@@ -335,6 +335,13 @@ export default {
             data: parameter
         })
     },
+    set_exchange_enabled: (parameter) => {
+        return axios({
+            url: `${api8006}/set_exchange_enabled`,
+            method: 'post',
+            data: parameter
+        })
+    },
     set_inviter: (parameter) => {
         return axios({
             url: `${api8006}/set_inviter`,

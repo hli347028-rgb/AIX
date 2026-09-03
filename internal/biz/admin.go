@@ -148,6 +148,8 @@ type AdminUserUpdate struct {
 	CommunitySubsidyRate     int32
 	SetIsFrozen              bool
 	IsFrozen                 bool
+	SetExchangeEnabled       bool
+	ExchangeEnabled          bool
 	Address                  string // 非空时更新钱包地址（及 invite_code）
 }
 

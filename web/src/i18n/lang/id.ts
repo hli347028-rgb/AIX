@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'Saldo AIX-USDT',
     usdtSubtitle: 'Penarikan USDT', usdtAvailableBalance: 'USDT yang dapat ditarik', usdtWithdrawHint: 'USDT yang dapat ditarik akan dikirim on-chain ke dompet tertaut',
     sdtExchangeHint: 'AIX-USDT akan dikirim ke dompet terhubung Anda sebagai token USDT on-chain',
+    sdtWithdrawDisabled: 'Penarikan AIX-USDT telah ditutup',
     insufficientHint: 'Saldo yang dapat ditarik tidak cukup (saldo akun tidak dapat ditarik langsung; diperlukan kredit statis/dividen)',
     aixExchangeHint: 'AIX tidak dapat ditarik langsung. Silakan tukar ke WIN terlebih dahulu.',
     toAddress: 'Alamat Penarikan',
@@ -407,6 +408,7 @@ const local = {
     feeDeducted: 'Biaya {fee} USDT',
     positiveAmount: 'Jumlah harus lebih dari 0', insufficientAix: 'Saldo AIX tidak cukup', netAmountTooSmall: 'Jumlah terlalu kecil; USDT bersih setelah biaya akan nol',
     processing: 'Menukar...', confirm: 'Konfirmasi Tukar',
+    disabled: 'Fitur tukar dinonaktifkan. Silakan hubungi dukungan',
     records: 'Catatan Tukar', noRecords: 'Tidak ada catatan tukar', priceShort: 'Harga', success: 'Tukar berhasil. Menerima {amount} USDT', failed: 'Tukar gagal. Silakan coba lagi'
   },
   payment: {

@@ -50,9 +50,9 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	if err := migratePointsSource(db); err != nil {
 		return nil, nil, err
 	}
-	if err := migrateRepairUserPointsBalance(db); err != nil {
-		return nil, nil, err
-	}
+	// 禁止在启动时改写 users.points（可花余额）。
+	// 历史回灌修复 migrateRepairUserPointsBalance 已完成使命，不再挂到 NewData，
+	// 避免每次部署/重启按公式重写余额（含误伤手工扣减）。
 	if err := migrateWinRechargeBalance(db); err != nil {
 		return nil, nil, err
 	}
@@ -199,10 +199,9 @@ func migratePointsSource(db *gorm.DB) error {
 	`).Error
 }
 
-// migrateRepairUserPointsBalance 扣除回灌的 AIX-USDT 可用余额：
-// points_all = 订单积分合计（累计获得）；
-// points = max(0, points_all - 已扣款 SDT 提现)。
-// 提现创建时已扣 points；仅 rejected 会退回，故统计时排除 rejected。
+// migrateRepairUserPointsBalance 曾用于扣除回灌的 AIX-USDT 可用余额：
+// points = max(0, SUM(orders.points) - 非 rejected SDT 提现)。
+// 已从 NewData 启动路径移除；仅保留供紧急手工调用，切勿再挂回启动流程。
 func migrateRepairUserPointsBalance(db *gorm.DB) error {
 	type row struct {
 		UserID     int64           `gorm:"column:user_id"`
@@ -338,6 +337,10 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 		{
 			name: "frozen_at",
 			ddl:  "ALTER TABLE users ADD COLUMN frozen_at datetime(3) DEFAULT NULL",
+		},
+		{
+			name: "exchange_enabled",
+			ddl:  "ALTER TABLE users ADD COLUMN exchange_enabled tinyint(1) NOT NULL DEFAULT 1",
 		},
 	}
 	for _, col := range columns {

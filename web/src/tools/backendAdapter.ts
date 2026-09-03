@@ -371,6 +371,8 @@ async function fetchUserInfo() {
         aixProfile.communitySubsidyTotal,
         '0',
       ),
+      exchange_enabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
+      exchangeEnabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
       points: String(aixProfile.points || pickField(aixProfile, 'points') || '0'),
       points_all: String(aixProfile.points_all || pickField(aixProfile, 'points_all', 'pointsAll') || '0'),
       // 代数奖励合计（1代+≥2代，累计）

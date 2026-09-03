@@ -471,6 +471,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 			orderPoints = principal
 			pointsSource = biz.PointsSourceWin
 		case biz.PayFromReward:
+			// 仅消耗「邀请链上级划入」额度；额度来自任意层级上级→下级划转，不限直推。
 			orderPoints = decimal.Min(principal, user.TransferReinvestCredit)
 			if orderPoints.IsPositive() {
 				user.TransferReinvestCredit = user.TransferReinvestCredit.Sub(orderPoints)
@@ -1144,10 +1145,12 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 			"usdt_reward": to.UsdtReward,
 			"aix_balance": to.AixBalance,
 		}
+		// 额度按邀请链祖先关系处理：任意层级上级均可，不要求直推。
 		if uplineToDownline, err := isAncestorInTx(tx, t.FromUserID, t.ToUserID); err != nil {
 			return err
 		} else if uplineToDownline {
-			// 上级→下级：无存量额度时全额记给接收方（如 A→B）；有存量额度时只传递额度并扣减发送方（如 B→C），避免重复产生 AIX-USDT。
+			// 任意上级→下级：无存量额度时全额记给接收方（如 A→B / A→隔代C）；
+			// 有存量额度时只传递额度并扣减发送方（如 B→C），避免同一笔资金重复产生 AIX-USDT。
 			var creditAdd decimal.Decimal
 			if from.TransferReinvestCredit.IsPositive() {
 				creditAdd = decimal.Min(amount, from.TransferReinvestCredit)
@@ -1184,7 +1187,7 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 	return created, err
 }
 
-// isAncestorInTx reports whether ancestorID is on the invitation chain above nodeID.
+// isAncestorInTx 判断 ancestorID 是否在 nodeID 的邀请链上方（任意层级，含直推与隔代）。
 func isAncestorInTx(tx *gorm.DB, ancestorID, nodeID int64) (bool, error) {
 	if ancestorID <= 0 || nodeID <= 0 || ancestorID == nodeID {
 		return false, nil
@@ -1268,6 +1271,9 @@ func (r *walletRepo) ExchangeAixToWin(ctx context.Context, userID int64, aixAmou
 		var u UserPO
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
 			return err
+		}
+		if !u.ExchangeEnabled {
+			return fmt.Errorf("exchange disabled")
 		}
 		if u.AixBalance.LessThan(amt) {
 			return fmt.Errorf("insufficient aix_balance")

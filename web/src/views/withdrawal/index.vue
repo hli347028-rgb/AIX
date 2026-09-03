@@ -13,7 +13,8 @@
         <button
           type="button"
           class="asset-tab"
-          :class="{ active: assetType === 'SDT' }"
+          :class="{ active: assetType === 'SDT', disabled: sdtWithdrawDisabled }"
+          :disabled="sdtWithdrawDisabled"
           @click="switchAsset('SDT')"
         >
           AIX-USDT
@@ -36,13 +37,14 @@
           {{ displayAmount(currentBalance) }}<span class="page-balance-unit">{{ assetLabel }}</span>
         </p>
         <p v-if="assetType === 'USDT'" class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
+        <p v-else-if="sdtWithdrawDisabled" class="page-hint">{{ $t('withdraw.sdtWithdrawDisabled') }}</p>
         <p v-else class="page-hint">{{ $t('withdraw.sdtExchangeHint') }}</p>
       </div>
 
       <div class="withdraw-form">
         <div class="form-hint-row">
           <p class="form-hint">{{ $t('withdraw.amount') }}</p>
-          <button type="button" class="all-btn" @click="handleAllAmount">
+          <button type="button" class="all-btn" :disabled="sdtWithdrawDisabled && assetType === 'SDT'" @click="handleAllAmount">
             {{ $t('withdraw.all') }}
           </button>
         </div>
@@ -53,6 +55,7 @@
             @input="checkAmount"
             type="text"
             inputmode="decimal"
+            :disabled="sdtWithdrawDisabled && assetType === 'SDT'"
             :placeholder="$t('withdraw.enterAmount')"
           />
           <span class="asset-tag">{{ assetLabel }}</span>
@@ -61,7 +64,7 @@
 
         <button
           class="subscribe-btn custom-btn"
-          :disabled="!canSubmit || loading"
+          :disabled="!canSubmit || loading || (sdtWithdrawDisabled && assetType === 'SDT')"
           @click="handleWithdrawal"
         >
           {{ loading ? $t('withdraw.processing') : $t('withdraw.confirm') }}
@@ -127,16 +130,19 @@ import { useI18n } from 'vue-i18n'
 
 type AssetType = 'SDT' | 'USDT'
 
+const SDT_WITHDRAW_DISABLED = true
+
 const { t: $t } = useI18n()
 const router = useRouter()
 const person = userPerson()
 
-const assetType = ref<AssetType>('SDT')
+const assetType = ref<AssetType>('USDT')
 const amountInput = ref('')
 const loading = ref(false)
 const recordLoading = ref(false)
 const amountList = ref<WinWithdrawRecord[]>([])
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const sdtWithdrawDisabled = computed(() => SDT_WITHDRAW_DISABLED)
 
 const assetLabel = computed(() => {
   if (assetType.value === 'USDT') return 'USDT'
@@ -210,6 +216,10 @@ const formatTime = (value: number) => {
 }
 
 const switchAsset = (next: AssetType) => {
+  if (next === 'SDT' && SDT_WITHDRAW_DISABLED) {
+    showToast({ message: $t('withdraw.sdtWithdrawDisabled'), position: 'middle' })
+    return
+  }
   if (assetType.value === next) return
   assetType.value = next
   amountInput.value = ''
@@ -283,6 +293,10 @@ const checkAmount = (e: Event) => {
 
 const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
+  if (assetType.value === 'SDT' && SDT_WITHDRAW_DISABLED) {
+    showToast({ message: $t('withdraw.sdtWithdrawDisabled'), position: 'middle' })
+    return
+  }
   loading.value = true
   try {
     let result: Awaited<ReturnType<typeof withdrawSdt>>
@@ -315,6 +329,7 @@ const handleWithdrawal = async () => {
       INVALID_ADDRESS: 'withdraw.invalidAddress',
       AIX_WITHDRAW_FORBIDDEN: 'withdraw.aixExchangeHint',
       WIN_WITHDRAW_DISABLED: 'withdraw.winWithdrawDisabled',
+      SDT_WITHDRAW_DISABLED: 'withdraw.sdtWithdrawDisabled',
     }
     showToast({
       message: messageKey[code]
@@ -381,6 +396,12 @@ onUnmounted(() => {
   transition:
     color .18s var(--ease),
     background-color .18s var(--ease);
+
+  &.disabled,
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 
   &.active {
     background: #0052ff;

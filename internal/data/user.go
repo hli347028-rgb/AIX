@@ -577,6 +577,9 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 			updates["frozen_at"] = nil
 		}
 	}
+	if update.SetExchangeEnabled {
+		updates["exchange_enabled"] = update.ExchangeEnabled
+	}
 	if addr := strings.TrimSpace(update.Address); addr != "" {
 		updates["address"] = addr
 		updates["invite_code"] = addr // 注册时 invite_code=address，一并替换
@@ -761,6 +764,7 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		Status:               po.Status,
 		IsFrozen:             po.IsFrozen,
 		FrozenAt:             po.FrozenAt,
+		ExchangeEnabled:      po.ExchangeEnabled,
 		InviterID:            po.InviterID,
 		Role:                 po.Role,
 		CreatedTime:          po.CreatedTime,

@@ -48,6 +48,7 @@ type User struct {
 	Status          int32
 	IsFrozen        bool
 	FrozenAt        *time.Time
+	ExchangeEnabled bool // 默认 true；后台关闭后禁止 AIX 兑换
 	InviterID       *int64
 	InviterAddress  string
 	Role            string

@@ -91,7 +91,7 @@ const fundSourceText = {
 const pointsSourceText = {
     recharge: 'USDT认购',
     win: 'WIN认购',
-    transfer_reinvest: '复投（上级划转）',
+    transfer_reinvest: '复投（上级划转，含隔代）',
 }
 
 const fundSourceOptions = Object.keys(fundSourceText).map((value) => ({

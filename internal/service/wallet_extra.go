@@ -451,6 +451,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"win_price":            winPrice,
 		"aix_to_win_rate":      aixToWinRate,
 		"exchange_fee_rate":    biz.GetExchangeFeeRate(),
+		"exchange_enabled":     user == nil || user.ExchangeEnabled,
 		"aix_contract":         "", // TODO
 		"win_contract":           s.uc.WinContract(),
 		"win_a_recharge_enabled": false,

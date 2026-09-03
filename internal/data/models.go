@@ -26,7 +26,7 @@ type UserPO struct {
 	OverflowDirect    decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`     // 直推奖溢出
 	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                         // 当前 AIX-USDT
 	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                     // 累计 AIX-USDT
-	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 上级划入、可用于复投产生 AIX-USDT 的额度
+	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 邀请链任意上级划入额度；下级复投可产生 AIX-USDT（不限直推）
 	StaticUsdtTotal   decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`   // 静态总收益（USDT 金本位累计）
 	MgmtLevel         int32           `gorm:"column:mgmt_level;default:0;not null"`
 	MgmtLevelLocked   bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
@@ -43,6 +43,7 @@ type UserPO struct {
 	Status            int32           `gorm:"default:1;not null"`
 	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结后禁止登录/充值/报单/提现
 	FrozenAt          *time.Time      `gorm:"column:frozen_at"`
+	ExchangeEnabled   bool            `gorm:"column:exchange_enabled;default:true;not null"` // 关闭后禁止 AIX→可提 U 兑换
 	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
 	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime       time.Time       `gorm:"column:updated_time;autoUpdateTime"`

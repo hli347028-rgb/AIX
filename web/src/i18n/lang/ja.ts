@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'AIX-USDT残高',
     usdtSubtitle: 'USDT出金', usdtAvailableBalance: '出金可能USDT', usdtWithdrawHint: '出金可能USDTは連携ウォレットへオンチェーン送金されます',
     sdtExchangeHint: 'AIX-USDTは連携ウォレットへUSDTトークンとして送金されます',
+    sdtWithdrawDisabled: 'AIX-USDT出金は停止中です',
     insufficientHint: '出金可能残高が不足しています（口座残高は直接出金不可。静的/配当入金が必要）',
     aixExchangeHint: 'AIXは直接出金できません。先にWINへ交換してください',
     toAddress: '出金先アドレス',
@@ -404,6 +405,7 @@ const local = {
     feeDeducted: '手数料 {fee} USDT',
     positiveAmount: '数量は0より大きい必要があります', insufficientAix: 'AIX残高が不足しています', netAmountTooSmall: '交換数量が小さすぎます。手数料控除後のUSDTが0になります',
     processing: '交換中...', confirm: '交換を確認',
+    disabled: '交換機能は無効です。サポートへご連絡ください',
     records: '交換履歴', noRecords: '交換履歴はありません', priceShort: '価格', success: '交換成功：{amount} USDTを受け取りました', failed: '交換に失敗しました。再試行してください'
   },
   payment: {

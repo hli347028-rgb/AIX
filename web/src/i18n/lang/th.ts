@@ -268,6 +268,7 @@ const local = {
     sdtAvailableBalance: 'ยอด AIX-USDT',
     usdtSubtitle: 'ถอน USDT', usdtAvailableBalance: 'USDT ที่ถอนได้', usdtWithdrawHint: 'USDT ที่ถอนได้จะถูกส่งออนเชนไปยังกระเป๋าที่เชื่อมโยง',
     sdtExchangeHint: 'AIX-USDT จะถูกส่งไปยังกระเป๋าที่เชื่อมต่อเป็นโทเคน USDT บนเชน',
+    sdtWithdrawDisabled: 'ปิดการถอน AIX-USDT แล้ว',
     insufficientHint: 'ยอดที่ถอนได้ไม่เพียงพอ (ยอดบัญชีถอนโดยตรงไม่ได้ ต้องมีเครดิตคงที่/เงินปันผล)',
     aixExchangeHint: 'ถอน AIX โดยตรงไม่ได้ กรุณาแลกเป็น WIN ก่อน',
     toAddress: 'ที่อยู่ถอน',
@@ -407,6 +408,7 @@ const local = {
     feeDeducted: 'ค่าธรรมเนียม {fee} USDT',
     positiveAmount: 'จำนวนต้องมากกว่า 0', insufficientAix: 'ยอด AIX ไม่เพียงพอ', netAmountTooSmall: 'จำนวนน้อยเกินไป USDT สุทธิหลังหักค่าธรรมเนียมจะเป็นศูนย์',
     processing: 'กำลังแลก...', confirm: 'ยืนยันการแลก',
+    disabled: 'ปิดการแลกแล้ว กรุณาติดต่อฝ่ายสนับสนุน',
     records: 'บันทึกการแลก', noRecords: 'ไม่มีบันทึกการแลก', priceShort: 'ราคา', success: 'แลกสำเร็จ ได้รับ {amount} USDT', failed: 'แลกไม่สำเร็จ กรุณาลองอีกครั้ง'
   },
   payment: {
