@@ -42,7 +42,7 @@ export default {
     futureTitle: 'AI 云预测金融', futureEmphasis: '新赛道', futureLead: '从区块链基础设施，到 AI 预测金融；从 WIN 生态，到 WIN/AIX 首个核心交易对。下一阶段的 Web3，不只是交易已经发生的资产，更要探索如何交易对未来的判断。',
     futureStory1: '当区块链进入应用时代、人工智能进入智能决策时代，WIN Chain 云链生态正式布局 FutureFi，并推出首个核心云预测项目。', futureStory2: 'AIX 不只是新的生态资产，更承担着 WIN Chain 迈向 AI + Prediction + DeFi 的战略入口。',
     protocolAria: 'FutureFi 协议组成', predictionTrading: '智能预测交易', futureProtocol: '未来金融协议', chainInfrastructure: '链上基础设施', flow: '真实事件输入 → AI 与群体智慧定价 → 预言机验证 → 链上结算', viewNarrative: '查看叙事',
-    marketDescription: '实时价格、24H 行情、成交量及多周期蜡烛图。停驻本幕即可切换周期并查看 OHLC。', ecosystemTitle: '可信生态，', ecosystemEmphasis: '共同验证未来', ecosystemDescription: '交易基础设施、预言机网络、公链与钱包共同组成价值流转网络。',
+    marketDescription: '实时价格、24H 行情、成交量及多周期蜡烛图。停驻本幕即可切换周期并查看 OHLC。', marketPlain: 'AIX / WIN 交易对实时行情。完整 K 线在支持场景渲染的环境中查看。', staticAria: 'AIX 首页', ecosystemTitle: '可信生态，', ecosystemEmphasis: '共同验证未来', ecosystemDescription: '交易基础设施、预言机网络、公链与钱包共同组成价值流转网络。',
     networkStatus: '网络状态', ecosystemPartners: '生态机构', settlementNetwork: '结算网络', heroTitle: '未来，', heroEmphasis: '可以被交易', heroDescription: '数字文明的价值溯源网络', startNow: '立即开始', oracle: '预言机', tradingPair: '交易对',
     quickLinksAria: '首页快捷入口', assetRecharge: '资产充值', predictFuture: '此刻，预测未来', getWinWallet: '获取 WIN 钱包', currentChapter: '当前章节', controlHint: '滚轮 / 拖拽 / 触摸推进'
   },

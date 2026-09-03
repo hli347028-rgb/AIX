@@ -10,7 +10,13 @@ export default defineConfig(({ mode }) => {
     return {
     plugins: [vue({
         reactivityTransform: true,
-    }),],
+    }), {
+        name: 'aix-build-id',
+        transformIndexHtml(html) {
+            const id = process.env.AIX_BUILD_ID || new Date().toISOString()
+            return html.replace('</head>', `    <meta name="aix-build" content="${id}">\n  </head>`)
+        },
+    }],
     resolve: {
         alias: {
             '@': join(__dirname, "src"),

@@ -45,7 +45,7 @@ const local = {
     futureTitle: 'AI 雲端預測金融', futureEmphasis: '新賽道', futureLead: '從區塊鏈基礎設施，到 AI 預測金融；從 WIN 生態，到 WIN/AIX 首個核心交易對。下一階段的 Web3，不只交易已發生的資產，更要探索如何交易對未來的判斷。',
     futureStory1: '當區塊鏈進入應用時代、人工智慧進入智能決策時代，WIN Chain 雲鏈生態正式布局 FutureFi，並推出首個核心雲端預測專案。', futureStory2: 'AIX 不只是新的生態資產，更承擔 WIN Chain 邁向 AI + Prediction + DeFi 的戰略入口。',
     protocolAria: 'FutureFi 協議組成', predictionTrading: '智能預測交易', futureProtocol: '未來金融協議', chainInfrastructure: '鏈上基礎設施', flow: '真實事件輸入 → AI 與群體智慧定價 → 預言機驗證 → 鏈上結算', viewNarrative: '查看敘事',
-    marketDescription: '即時價格、24H 行情、成交量及多週期 K 線圖。停駐本幕即可切換週期並查看 OHLC。', ecosystemTitle: '可信生態，', ecosystemEmphasis: '共同驗證未來', ecosystemDescription: '交易基礎設施、預言機網路、公鏈與錢包共同組成價值流轉網路。',
+    marketDescription: '即時價格、24H 行情、成交量及多週期 K 線圖。停駐本幕即可切換週期並查看 OHLC。', marketPlain: 'AIX / WIN 交易對即時行情。完整 K 線在支援場景渲染的環境中查看。', staticAria: 'AIX 首頁', ecosystemTitle: '可信生態，', ecosystemEmphasis: '共同驗證未來', ecosystemDescription: '交易基礎設施、預言機網路、公鏈與錢包共同組成價值流轉網路。',
     networkStatus: '網路狀態', ecosystemPartners: '生態機構', settlementNetwork: '結算網路', heroTitle: '未來，', heroEmphasis: '可以被交易', heroDescription: '數字文明的價值溯源網路', startNow: '立即開始', oracle: '預言機', tradingPair: '交易對',
     quickLinksAria: '首頁快速入口', assetRecharge: '資產充值', predictFuture: '此刻，預測未來', getWinWallet: '取得 WIN 錢包', currentChapter: '目前章節', controlHint: '滾輪 / 拖曳 / 觸控推進'
   },
