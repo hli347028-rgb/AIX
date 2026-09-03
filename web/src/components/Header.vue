@@ -1,7 +1,14 @@
 <template>
   <header class="app-header">
     <div class="header-container">
-      <button class="brand" type="button" :aria-label="$t('common.openNavigation')" @pointerdown.stop @click.stop="handleSidebarClick">
+      <button
+        class="brand"
+        type="button"
+        :aria-label="$t('common.openNavigation')"
+        :aria-expanded="showSidebar"
+        @click.stop.prevent="openSidebar"
+        @touchend.stop.prevent="openSidebar"
+      >
         <img src="/assets/aix-orbit-logo.jpeg" alt="AIX" />
         <span class="brand-menu" aria-hidden="true">
           <svg viewBox="0 0 18 18" fill="none">
@@ -20,6 +27,7 @@
           :class="`announcement-trigger--${noticePriority}`"
           :aria-label="noticeAriaLabel"
           @click="openAnnouncement"
+          @touchend.stop.prevent="openAnnouncement"
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 10.5v3l2.2.8L9 19h2l-1.3-4H13l5 3V6l-5 3H7.2L5 10.5Z"/><path d="M20 9v6"/></svg>
           <span v-if="noticePriority === 'important'" class="announcement-alert">!!!</span>
@@ -32,10 +40,11 @@
           :aria-label="$t('common.switchWallet')"
           :title="$t('common.switchWallet')"
           @click="handleWalletClick"
+          @touchend.stop.prevent="handleWalletClick"
         >
           {{ address ? formatAddress(address) : $t('common.connectWallet') }}
         </button>
-        <button class="language" :aria-label="$t('common.selectLanguage')" @click="handleLanguageClick">
+        <button class="language" :aria-label="$t('common.selectLanguage')" @click="handleLanguageClick" @touchend.stop.prevent="handleLanguageClick">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.2 2.4 3.4 5.3 3.4 8.5S14.2 18.1 12 20.5C9.8 18.1 8.6 15.2 8.6 12S9.8 5.9 12 3.5Z"/></svg>
         </button>
       </div>
@@ -117,7 +126,7 @@ const normalizeAnnouncements = (items: AnnouncementItem[] = []) =>
       priority: (item.priority || (index === 0 ? 'new' : 'normal')) as AnnouncementPriority,
       status: item.status || 'published',
     }))
-const handleSidebarClick = () => { showSidebar.value = true }
+const openSidebar = () => { showSidebar.value = true }
 const handleLanguageClick = () => { showLangDrawer.value = true }
 const selectLanguage = (code: string) => { locale.value = code; localStorage.setItem('lan', code); document.documentElement.lang = code; showLangDrawer.value = false }
 const handleWalletClick = async () => {
@@ -192,11 +201,12 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-.app-header{position:fixed;z-index:2147483000;top:0;left:50%;width:100%;max-width:414px;pointer-events:auto;transform:translateX(-50%);background:rgba(255,255,255,.96);border-bottom:1px solid rgba(0,82,255,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.app-header{position:fixed;z-index:11000;top:0;left:50%;width:100%;max-width:414px;pointer-events:auto;transform:translateX(-50%);background:rgba(255,255,255,.96);border-bottom:1px solid rgba(0,82,255,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 .header-container{display:flex;align-items:center;justify-content:space-between;min-height:60px;padding:0 20px}.brand,.header-actions{display:flex;align-items:center}.announcement-trigger{position:relative;display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid rgba(0,82,255,.2);border-radius:50%;background:#f2f5ff;color:#0052ff;cursor:pointer;transition:transform .2s ease,background-color .2s ease,color .2s ease}.announcement-trigger svg{width:18px;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.announcement-trigger:hover,.announcement-trigger:focus-visible{outline:none;transform:translateY(-1px);background:#0052ff;color:#fff}.announcement-dot,.announcement-alert{position:absolute;top:-8px;right:-9px;display:grid;place-items:center;min-width:25px;height:16px;padding:0 4px;border:2px solid #fff;border-radius:9px;background:#0052ff;color:#fff;font-size:8px;font-weight:850;line-height:1;letter-spacing:-.02em;box-shadow:0 3px 10px rgba(0,82,255,.3)}.announcement-alert{min-width:27px;background:#df1f32;font-size:11px;letter-spacing:-.08em;box-shadow:0 3px 12px rgba(223,31,50,.42);animation:announcement-urgent 1.2s ease-in-out infinite}.announcement-trigger--important{border-color:rgba(223,31,50,.32);background:#fff4f5;color:#df1f32}@keyframes announcement-urgent{50%{transform:scale(1.12);box-shadow:0 3px 18px rgba(223,31,50,.68)}}.brand{gap:7px;padding:0;border:0;background:transparent;color:#0052ff;cursor:pointer}.brand img{width:29px;height:29px;object-fit:cover;border-radius:50%;opacity:1;mix-blend-mode:multiply;filter:saturate(1.1) brightness(1.12);transition:opacity .25s ease,transform .35s cubic-bezier(.2,.8,.2,1)}.brand-menu{position:relative;display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(0,82,255,.28);border-radius:8px;background:#f2f5ff;color:#0052ff;transition:color .25s ease,border-color .25s ease,background .25s ease,transform .35s cubic-bezier(.2,.8,.2,1)}.brand-menu svg{width:17px;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}.brand-menu svg rect{fill:currentColor;stroke:none}.brand-menu i{position:absolute;top:-3px;right:-3px;width:7px;height:7px;border:2px solid #070c16;border-radius:50%;background:#72a9df;box-shadow:0 0 8px rgba(114,169,223,.65)}.brand:hover img,.brand:focus-visible img{opacity:1;transform:rotate(-8deg) scale(1.06)}.brand:hover .brand-menu,.brand:focus-visible .brand-menu{color:#fff;border-color:rgba(180,213,246,.82);background:rgba(98,151,207,.28);transform:translateX(3px)}.brand:focus-visible{outline:1px solid rgba(221,234,249,.5);outline-offset:5px;border-radius:16px}.header-actions{gap:13px}.wallet{padding:7px 12px;border:1px solid rgba(0,82,255,.24);border-radius:18px;background:#f2f5ff;color:#0052ff;font-size:11px;font-weight:600;cursor:pointer;transition:border-color .25s ease,color .25s ease,background .25s ease}.wallet:hover:not(:disabled),.wallet:focus-visible:not(:disabled){outline:none;border-color:#0052ff;background:#0052ff;color:#fff}.wallet:disabled{cursor:default}.wallet[aria-busy="true"]{cursor:wait;opacity:.65}.language{display:grid;place-items:center;padding:0;border:0;background:transparent;color:#0052ff;cursor:pointer;transition:color .25s ease,transform .25s ease}.language:hover,.language:focus-visible{outline:none;color:#003ec4;transform:translateY(-1px)}.language svg{width:18px;stroke:currentColor;stroke-width:1.25}
-.lang-overlay{position:fixed;z-index:1000;inset:0;background:rgba(11,18,32,.22);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}.lang-drawer{position:absolute;top:0;right:0;width:min(76%,290px);height:100%;padding:32px 24px;background:#fbfaf7;border-left:1px solid rgba(12,23,48,.12);box-shadow:-18px 0 48px rgba(12,23,48,.1)}.lang-drawer::before{content:"";position:absolute;top:0;left:0;width:72px;height:4px;background:#0052ff}.lang-drawer p{margin:0 0 24px;font:650 10px/1 var(--aix-font-display);letter-spacing:.14em;color:#0052ff}.lang-drawer button{position:relative;display:block;width:100%;padding:17px 12px;border:0;border-bottom:1px solid rgba(12,23,48,.11);background:transparent;color:#263247;font-size:15px;font-weight:520;text-align:left;cursor:pointer;transition:color .2s ease,background .2s ease,padding-left .2s ease}.lang-drawer button:hover,.lang-drawer button:focus-visible{outline:none;background:#f1f5ff;color:#0052ff;padding-left:16px}.lang-drawer button.active{background:#0052ff;color:#fff;font-weight:680;padding-left:16px}.lang-drawer button.active::after{content:"✓";position:absolute;right:12px;color:#fff;font-size:12px}
+.lang-overlay{position:fixed;z-index:14000;inset:0;background:rgba(11,18,32,.22);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}.lang-drawer{position:absolute;top:0;right:0;width:min(76%,290px);height:100%;padding:32px 24px;background:#fbfaf7;border-left:1px solid rgba(12,23,48,.12);box-shadow:-18px 0 48px rgba(12,23,48,.1)}.lang-drawer::before{content:"";position:absolute;top:0;left:0;width:72px;height:4px;background:#0052ff}.lang-drawer p{margin:0 0 24px;font:650 10px/1 var(--aix-font-display);letter-spacing:.14em;color:#0052ff}.lang-drawer button{position:relative;display:block;width:100%;padding:17px 12px;border:0;border-bottom:1px solid rgba(12,23,48,.11);background:transparent;color:#263247;font-size:15px;font-weight:520;text-align:left;cursor:pointer;transition:color .2s ease,background .2s ease,padding-left .2s ease}.lang-drawer button:hover,.lang-drawer button:focus-visible{outline:none;background:#f1f5ff;color:#0052ff;padding-left:16px}.lang-drawer button.active{background:#0052ff;color:#fff;font-weight:680;padding-left:16px}.lang-drawer button.active::after{content:"✓";position:absolute;right:12px;color:#fff;font-size:12px}
 @media(max-width:420px){.header-container{padding:0 14px}.brand{gap:5px}.brand img{width:25px;height:25px}.header-actions{gap:9px}.announcement-trigger{width:31px;height:31px}.wallet{max-width:128px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-.brand{position:relative;z-index:2;min-width:64px;min-height:44px;touch-action:manipulation}
+.brand{position:relative;z-index:2;min-width:72px;min-height:48px;padding:8px 10px 8px 0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.brand img,.brand-menu,.brand-menu *{pointer-events:none}
 @media(max-width:540px){.app-header{backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){.announcement-alert{animation:none}}
 </style>

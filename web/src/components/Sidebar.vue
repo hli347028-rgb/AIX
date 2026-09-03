@@ -157,7 +157,7 @@ const handleNav = (item, event) => {
 .sidebar-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: 14000;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
