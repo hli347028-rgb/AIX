@@ -16,6 +16,38 @@ type ChainConfig = {
   blockExplorerUrls?: string[]
 }
 
+const WALLET_TIMEOUT = 'WALLET_TIMEOUT'
+const QUICK_WALLET_MS = 8000
+const INTERACTIVE_WALLET_MS = 40000
+
+function withWalletTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      const error: any = new Error(WALLET_TIMEOUT)
+      error.code = WALLET_TIMEOUT
+      reject(error)
+    }, ms)
+    promise.then((value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(value)
+    }, (error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      reject(error)
+    })
+  })
+}
+
+function requestWallet(ethereum: any, payload: { method: string; params?: unknown[] }, ms: number) {
+  return withWalletTimeout(Promise.resolve(ethereum.request(payload)), ms)
+}
+
 const EOEO_CHAIN_ID = Number(import.meta.env.VITE_CHAINID || 86233268)
 const BSC_CHAIN_ID = Number(import.meta.env.VITE_BSC_CHAINID || 56)
 
@@ -61,7 +93,7 @@ export class ETH {
   }
   // 链接钱包返回钱包地址；USDT / WIN 充值均在 EOEO
   public static async getAccount(chain: ChainKey = 'eoeo'): Promise<string> {
-    const ethereum: any = await detectEthereumProvider()
+    const ethereum: any = await detectEthereumProvider({ timeout: 8000 })
     if (!ethereum) {
       showFailToast(lang('请安装钱包'))
       throw lang('请安装钱包')
@@ -72,21 +104,27 @@ export class ETH {
 
     // 先授权账号，再按需切链。已在目标链时不要再发 switch，
     // 部分手机钱包（TokenPocket / imToken）对已在当前链的 switch 会一直不返回。
-    let accounts = await ethereum.request({ method: 'eth_accounts' })
-    if (!accounts?.length) {
-      accounts = await ethereum.request({ method: 'eth_requestAccounts' })
+    let accounts: any = []
+    try {
+      accounts = await requestWallet(ethereum, { method: 'eth_accounts' }, QUICK_WALLET_MS)
+    } catch (error: any) {
+      if (error?.code !== WALLET_TIMEOUT && error?.message !== WALLET_TIMEOUT) throw error
     }
-    const currentChainId = Number(await ethereum.request({ method: 'eth_chainId' }))
+    if (!accounts?.length) {
+      accounts = await requestWallet(ethereum, { method: 'eth_requestAccounts' }, INTERACTIVE_WALLET_MS)
+    }
+    const currentChainId = Number(await requestWallet(ethereum, { method: 'eth_chainId' }, QUICK_WALLET_MS))
     if (currentChainId !== target.chainId) {
       try {
-        await ethereum.request({
+        await requestWallet(ethereum, {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: target.chainIdHex }]
-        })
+        }, INTERACTIVE_WALLET_MS)
       } catch (error: any) {
+        if (error?.code === WALLET_TIMEOUT || error?.message === WALLET_TIMEOUT) throw error
         const errorCode = error?.code ?? error?.data?.originalError?.code
         if (errorCode === 4902) {
-          await ethereum.request({
+          await requestWallet(ethereum, {
             method: 'wallet_addEthereumChain',
             params: [
               {
@@ -97,7 +135,7 @@ export class ETH {
                 ...(target.blockExplorerUrls ? { blockExplorerUrls: target.blockExplorerUrls } : {})
               }
             ]
-          })
+          }, INTERACTIVE_WALLET_MS)
         } else {
           throw error
         }
@@ -105,7 +143,7 @@ export class ETH {
     }
 
     ETH.provider = new ethers.providers.Web3Provider(ethereum)
-    const chainId = Number(await ethereum.request({ method: 'eth_chainId' }))
+    const chainId = Number(await requestWallet(ethereum, { method: 'eth_chainId' }, QUICK_WALLET_MS))
     console.log('chainId', chainId)
     if (chainId !== target.chainId) {
       const message = `请切换至 ${target.chainName} 网络（Chain ID: ${target.chainId}）`
@@ -179,7 +217,10 @@ export class ETH {
   }
   // 签名
   public static async signMessage(message?: string): Promise<string> {
-    return await ETH.signer.signMessage(message || ETH.account.toLowerCase())
+    return await withWalletTimeout(
+      ETH.signer.signMessage(message || ETH.account.toLowerCase()),
+      INTERACTIVE_WALLET_MS,
+    )
   }
   static parseUnits(n: any, dec: number): BigNumber {
     return ethers.utils.parseUnits(`${n}`, dec)

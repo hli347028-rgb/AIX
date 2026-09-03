@@ -7,20 +7,38 @@
                 <div v-else-if="person.authStage === 'connecting'">{{lang('common.walletConnecting')}}</div>
                 <div v-else-if="person.authStage === 'authenticating'">{{lang('common.authorizing')}}</div>
                 <div v-else>{{lang('common.contractVerifying')}}</div>
+                <p v-if="!person.authError && showRetry" class="loading-hint">{{ lang('common.walletWaitingHint') }}</p>
             </div>
-            <button v-if="person.authError" class="retry-button" type="button" @click="retry">
+            <button v-if="person.authError || showRetry" class="retry-button" type="button" @click="retry">
                 {{ lang('common.retry') }}
             </button>
         </div>
     </div>
 </template>
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
 import userPerson from "@/pinia/person";
 import lang from '@/i18n/index'
 const person = userPerson();
+const showRetry = ref(false)
+let retryTimer = 0
+
+const armRetry = () => {
+  showRetry.value = Boolean(person.authError)
+  clearTimeout(retryTimer)
+  if (person.authError || person.isLogin) return
+  retryTimer = window.setTimeout(() => {
+    showRetry.value = true
+  }, 8000)
+}
+
 const retry = () => {
+    showRetry.value = false
     void person.retryAuth().catch(() => undefined)
 }
+
+watch(() => [person.authStage, person.authError, person.isLogin], armRetry, { immediate: true })
+onBeforeUnmount(() => clearTimeout(retryTimer))
 </script>
 <style scoped lang="less">
 .login-view {
@@ -61,6 +79,14 @@ const retry = () => {
 
 .error-text {
     max-width: 300px;
+    line-height: 1.6;
+}
+
+.loading-hint {
+    max-width: 280px;
+    margin: 10px 0 0;
+    color: var(--text-2);
+    font-size: 12px;
     line-height: 1.6;
 }
 

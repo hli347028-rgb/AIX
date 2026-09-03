@@ -25,6 +25,8 @@ const local = {
     error: 'ข้อผิดพลาด',
     contractVerifying: 'กำลังตรวจสอบ',
     walletConnecting: 'กำลังเชื่อมต่อ',
+    walletTimeout: 'กระเป๋าไม่ตอบสนอง โปรดยืนยันในกระเป๋าแล้วลองใหม่',
+    walletWaitingHint: 'หากมีหน้าต่างอนุมัติ ให้ยืนยันในกระเป๋า หากไม่มี ให้กดลองใหม่',
     insufficientBalance: 'ยอดเงินไม่เพียงพอ',
     quantity: 'จำนวน',
     copiedToClipboard: 'คัดลอกไปยังคลิปบอร์ดแล้ว',

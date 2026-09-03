@@ -25,6 +25,8 @@ const local = {
     error: 'エラー',
     contractVerifying: '検証中',
     walletConnecting: '接続中',
+    walletTimeout: 'ウォレットから応答がありません。ウォレットで承認してから再試行してください。',
+    walletWaitingHint: '承認画面が出ている場合はウォレットで確認してください。出ていない場合は再試行できます。',
     insufficientBalance: '残高不足',
     quantity: '数量',
     copiedToClipboard: '内容がクリップボードにコピーされました',

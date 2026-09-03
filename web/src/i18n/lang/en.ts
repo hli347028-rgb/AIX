@@ -22,6 +22,8 @@ export default {
     error: 'Error',
     contractVerifying: 'Verifying',
     walletConnecting: 'Connecting',
+    walletTimeout: 'Wallet did not respond. Confirm the request in your wallet, then retry.',
+    walletWaitingHint: 'If a wallet prompt is open, confirm it there. If not, tap Retry.',
     insufficientBalance: 'Insufficient Balance',
     quantity: 'Quantity',
     copiedToClipboard: 'Content copied to clipboard',

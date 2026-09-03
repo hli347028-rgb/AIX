@@ -25,6 +25,8 @@ const local = {
     error: 'Kesalahan',
     contractVerifying: 'Memverifikasi',
     walletConnecting: 'Menghubungkan',
+    walletTimeout: 'Dompet tidak merespons. Konfirmasikan di dompet, lalu coba lagi.',
+    walletWaitingHint: 'Jika permintaan muncul, konfirmasikan di dompet. Jika tidak, ketuk Coba lagi.',
     insufficientBalance: 'Saldo Tidak Cukup',
     quantity: 'Jumlah',
     copiedToClipboard: 'Konten disalin ke clipboard',

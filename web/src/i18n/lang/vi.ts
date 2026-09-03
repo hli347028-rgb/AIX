@@ -25,6 +25,8 @@ const local = {
     error: 'Lỗi',
     contractVerifying: 'Đang xác minh',
     walletConnecting: 'Đang kết nối',
+    walletTimeout: 'Ví không phản hồi. Hãy xác nhận trong ví rồi thử lại.',
+    walletWaitingHint: 'Nếu ví đã hiện yêu cầu, hãy xác nhận trong ví. Nếu chưa, hãy thử lại.',
     insufficientBalance: 'Số dư không đủ',
     quantity: 'Số lượng',
     copiedToClipboard: 'Nội dung đã được sao chép vào bộ nhớ tạm',

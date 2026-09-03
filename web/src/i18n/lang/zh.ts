@@ -22,6 +22,8 @@ export default {
     error: '错误',
     contractVerifying: '合约验证中',
     walletConnecting: '钱包连接中',
+    walletTimeout: '钱包长时间无响应，请在钱包内确认授权后重试',
+    walletWaitingHint: '若钱包已弹出授权，请在钱包内确认；未弹出可点击重试',
     insufficientBalance: '余额不足',
     quantity: '数量',
     copiedToClipboard: '内容已复制到剪贴板',

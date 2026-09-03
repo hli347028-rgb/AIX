@@ -25,6 +25,8 @@ const local = {
     error: '錯誤',
     contractVerifying: '合約驗證中',
     walletConnecting: '錢包連接中',
+    walletTimeout: '錢包長時間無回應，請在錢包內確認授權後重試',
+    walletWaitingHint: '若錢包已彈出授權，請在錢包內確認；未彈出可點擊重試',
     insufficientBalance: '餘額不足',
     quantity: '數量',
     copiedToClipboard: '內容已複製到剪貼板',

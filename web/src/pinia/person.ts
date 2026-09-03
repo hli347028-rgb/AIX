@@ -313,6 +313,9 @@ export default defineStore('person', {
     mapAuthError(message?: string, error?: any) {
       if (message === INVITE_CANCELLED) return lang('common.inviteCancelled')
       if (message === WALLET_DISCONNECTED) return lang('common.walletDisconnected')
+      if (error?.code === 'WALLET_TIMEOUT' || /WALLET_TIMEOUT/i.test(String(message || ''))) {
+        return lang('common.walletTimeout')
+      }
       if (error?.code === 4001 || /user rejected|用户拒绝|拒绝签名/i.test(String(message || ''))) {
         return lang('common.authRejected')
       }

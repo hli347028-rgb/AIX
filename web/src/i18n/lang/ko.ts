@@ -25,6 +25,8 @@ const local = {
     error: '오류',
     contractVerifying: '검증 중',
     walletConnecting: '연결 중',
+    walletTimeout: '지갑이 응답하지 않습니다. 지갑에서 승인한 뒤 다시 시도하세요.',
+    walletWaitingHint: '승인 창이 보이면 지갑에서 확인하세요. 보이지 않으면 다시 시도하세요.',
     insufficientBalance: '잔액 부족',
     quantity: '수량',
     copiedToClipboard: '내용이 클립보드에 복사되었습니다',
