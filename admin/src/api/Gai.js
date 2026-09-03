@@ -363,13 +363,6 @@ export default {
             data: parameter
         })
     },
-    recharge_to_reward: (parameter) => {
-        return axios({
-            url: `${api8005}/recharge_to_reward`,
-            method: 'post',
-            data: parameter
-        })
-    },
     principal_update: (parameter) => {
         return axios({
             url: `${api8005}/add_money_two`,

@@ -67,7 +67,6 @@ import { useI18n } from 'vue-i18n'
 import KlineChart from '@/components/KlineChart.vue'
 import {
   getAixWinCandles,
-  hasKlineApi,
   hasKlineEmbed,
   resolveKlineEmbedUrl,
   type Candle,
@@ -90,7 +89,7 @@ const error = ref('')
 const hovered = ref<Candle | null>(null)
 let requestId = 0
 let refreshTimer = 0
-const refreshMs = 60_000
+const refreshMs = 30_000
 
 const useEmbed = computed(() => !props.embedded && Boolean(embedSrc.value))
 
@@ -106,7 +105,7 @@ const formatPrice = (value: number) => {
   return value >= 1 ? value.toFixed(4) : value.toFixed(6)
 }
 const load = async (silent = false) => {
-  if (!props.embedded && hasKlineEmbed && !hasKlineApi) {
+  if (useEmbed.value) {
     loading.value = false
     error.value = ''
     return
@@ -131,7 +130,7 @@ const load = async (silent = false) => {
 
 const startRefresh = () => {
   clearInterval(refreshTimer)
-  if (!hasKlineApi || useEmbed.value) return
+  if (useEmbed.value) return
   refreshTimer = window.setInterval(() => { void load(true) }, refreshMs)
 }
 

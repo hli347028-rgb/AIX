@@ -22,8 +22,6 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/subscribe-aix", wallet.HandleSubscribeAIX)
 	r.GET("/v1/wallet/subscribe-orders", wallet.HandleSubscribeOrders)
 	r.POST("/v1/wallet/transfer", wallet.HandleTransfer)
-	r.POST("/v1/wallet/recharge-to-reward", wallet.HandleRechargeToReward)
-	r.GET("/v1/wallet/transfer-records/self", wallet.HandleSelfTransferRecords)
 	r.GET("/v1/wallet/transfer-records/lineal", wallet.HandleLinealTransferRecords)
 	r.POST("/v1/wallet/withdraw-aix", wallet.HandleWithdrawAIX)
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
@@ -221,50 +219,6 @@ func (s *WalletService) HandleTransfer(ctx khttp.Context) error {
 		"id": t.ID, "from_user_id": t.FromUserID, "to_user_id": t.ToUserID,
 		"asset": t.Asset, "amount": t.Amount, "pay_from": t.PayFrom,
 		"to_credit_reward": t.ToCreditReward, "to_credit_aix": t.ToCreditAix,
-	})
-}
-
-func (s *WalletService) HandleRechargeToReward(ctx khttp.Context) error {
-	var req struct {
-		Token  string `json:"token"`
-		Amount string `json:"amount"`
-	}
-	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
-		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
-	}
-	token := tokenFromRequest(ctx, req.Token)
-	rechargeBal, rewardBal, err := s.uc.MoveRechargeToReward(ctx, token, req.Amount)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(http.StatusOK, map[string]any{
-		"usdt_recharge": rechargeBal,
-		"usdt_reward":   rewardBal,
-	})
-}
-
-func (s *WalletService) HandleSelfTransferRecords(ctx khttp.Context) error {
-	page, pageSize, err := transferRecordPagination(ctx)
-	if err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]any{
-			"code": 400, "reason": "INVALID_PAGE", "message": err.Error(),
-		})
-	}
-	records, err := s.uc.ListSelfTransferRecords(ctx, tokenFromRequest(ctx, ""))
-	if err != nil {
-		return err
-	}
-	start, end := pageBounds(len(records), page, pageSize)
-	list := make([]map[string]any, 0, end-start)
-	for _, record := range records[start:end] {
-		list = append(list, map[string]any{
-			"id": record.ID, "asset": record.Asset, "amount": record.Amount,
-			"from_wallet": record.FromWallet, "to_wallet": record.ToWallet,
-			"created_at": record.CreatedTime.Unix(),
-		})
-	}
-	return ctx.JSON(http.StatusOK, map[string]any{
-		"page": page, "page_size": pageSize, "total": len(records), "list": list,
 	})
 }
 
@@ -600,26 +554,50 @@ func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	}
 	items := make([]map[string]any, 0, len(orders))
 	for _, o := range orders {
-		if o.FundSource == biz.PayFromWinA || o.FundSource == biz.PayFromReward {
+		fund := strings.ToLower(strings.TrimSpace(o.FundSource))
+		pts := strings.TrimSpace(o.Points)
+		ptsSource := strings.TrimSpace(o.PointsSource)
+		ptsDec, ptsErr := decimal.NewFromString(pts)
+		hasPoints := ptsErr == nil && ptsDec.IsPositive()
+
+		switch {
+		case fund == biz.PayFromWinA:
+			// WIN-A 历史认购不计入 AIX-USDT
+			continue
+		case hasPoints:
+			// 含划转复投产生的积分
+		case fund == biz.PayFromRecharge || fund == biz.PayFromWin:
+			// 历史 USDT/WIN 认购：积分字段为空时按本金 1:1 展示
+			pts = strings.TrimSpace(o.Principal)
+			ptsDec, ptsErr = decimal.NewFromString(pts)
+			if ptsErr != nil || !ptsDec.IsPositive() {
+				continue
+			}
+			if ptsSource == "" {
+				if fund == biz.PayFromWin {
+					ptsSource = biz.PointsSourceWin
+				} else {
+					ptsSource = biz.PointsSourceRecharge
+				}
+			}
+		default:
+			// 奖励复投且无划转额度：不产生 AIX-USDT
 			continue
 		}
-		pts := o.Points
-		if pts == "" || pts == "0" {
-			pts = o.Principal
-		}
 		items = append(items, map[string]any{
-			"id":           o.ID,
-			"order_id":     o.ID,
-			"points":       pts,
-			"principal":    o.Principal,
-			"total_amount": o.Principal,
-			"amount":       o.Principal,
-			"from_win":     o.FromWin,
-			"from_win_a":   o.FromWinA,
-			"fund_source":  o.FundSource,
-			"status":       o.Status,
-			"created_at":   o.CreatedTime.Unix(),
-			"created_time": o.CreatedTime.Unix(),
+			"id":            o.ID,
+			"order_id":      o.ID,
+			"points":        pts,
+			"points_source": ptsSource,
+			"principal":     o.Principal,
+			"total_amount":  o.Principal,
+			"amount":        o.Principal,
+			"from_win":      o.FromWin,
+			"from_win_a":    o.FromWinA,
+			"fund_source":   o.FundSource,
+			"status":        o.Status,
+			"created_at":    o.CreatedTime.Unix(),
+			"created_time":  o.CreatedTime.Unix(),
 		})
 	}
 	points := "0"

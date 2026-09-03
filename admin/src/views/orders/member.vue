@@ -201,10 +201,6 @@ export default {
                                                 添加充值余额
                                             </a-menu-item>
 
-                                            <a-menu-item onClick={() => this.recharge_to_reward(v.userId || v.id, v.address)}>
-                                                充值钱包转入奖励钱包
-                                            </a-menu-item>
-
                                             <a-menu-item onClick={() => this.vip_update(v.userId || v.id, v.vip || v.mgmt_level)}>
                                                 设置级别(A0~A10)
                                             </a-menu-item>
@@ -319,33 +315,6 @@ export default {
                     }
                     return Gai.admin_recharge({ address, amount }).then(() => {
                         this.$message.success('已添加到充值余额')
-                        this.getList()
-                    })
-                }
-            })
-        },
-        recharge_to_reward(user_id, address) {
-            let amount = ""
-            this.$confirm({
-                title: `充值钱包转入奖励钱包`,
-                content: (
-                    <div>
-                        <div style="margin-bottom:8px;color:#888;font-size:12px;">地址：{address}</div>
-                        <div style="margin-bottom:8px;color:#888;font-size:12px;">仅划转 USDT，不产生直推奖；出局目标仍按 USDT 结算</div>
-                        <a-input style="margin-top:8px;" placeholder="请输入划转金额(USDT)" onInput={(val) => {
-                            amount = val.target.value
-                        }} />
-                    </div>
-                ),
-                centered: true,
-                onOk: () => {
-                    const n = parseFloat(amount)
-                    if (!amount || isNaN(n) || n <= 0) {
-                        this.$message.warning('请填写大于 0 的金额')
-                        return Promise.reject()
-                    }
-                    return Gai.recharge_to_reward({ user_id, amount }).then(() => {
-                        this.$message.success('已转入奖励钱包')
                         this.getList()
                     })
                 }

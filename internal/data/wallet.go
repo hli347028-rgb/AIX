@@ -461,9 +461,22 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 		updates := map[string]interface{}{}
 		fundSource := payFrom
 		skipMgmt := payFrom == biz.PayFromReward
-		orderPoints := principal
-		if payFrom == biz.PayFromReward {
-			orderPoints = decimal.Zero
+		orderPoints := decimal.Zero
+		pointsSource := ""
+		switch payFrom {
+		case biz.PayFromRecharge:
+			orderPoints = principal
+			pointsSource = biz.PointsSourceRecharge
+		case biz.PayFromWin:
+			orderPoints = principal
+			pointsSource = biz.PointsSourceWin
+		case biz.PayFromReward:
+			orderPoints = decimal.Min(principal, user.TransferReinvestCredit)
+			if orderPoints.IsPositive() {
+				user.TransferReinvestCredit = user.TransferReinvestCredit.Sub(orderPoints)
+				updates["transfer_reinvest_credit"] = user.TransferReinvestCredit
+				pointsSource = biz.PointsSourceTransferReinvest
+			}
 		}
 
 		if payFrom != biz.PayFromRecharge && payFrom != biz.PayFromReward && payFrom != biz.PayFromWin {
@@ -522,6 +535,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 			FromWin:      fromWin,
 			FromWinA:     fromWinA,
 			Points:       orderPoints,
+			PointsSource: pointsSource,
 			FundSource:   fundSource,
 			Status:       biz.OrderStatusActive,
 		}
@@ -1121,17 +1135,44 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 		default:
 			return fmt.Errorf("invalid asset")
 		}
-		if err := tx.Model(&from).Updates(map[string]interface{}{
+		fromUpdates := map[string]interface{}{
 			"usdt_recharge": from.UsdtRecharge,
 			"usdt_reward":   from.UsdtReward,
 			"aix_balance":   from.AixBalance,
-		}).Error; err != nil {
-			return err
 		}
-		if err := tx.Model(&to).Updates(map[string]interface{}{
+		toUpdates := map[string]interface{}{
 			"usdt_reward": to.UsdtReward,
 			"aix_balance": to.AixBalance,
-		}).Error; err != nil {
+		}
+		if uplineToDownline, err := isAncestorInTx(tx, t.FromUserID, t.ToUserID); err != nil {
+			return err
+		} else if uplineToDownline {
+			// 上级→下级：无存量额度时全额记给接收方（如 A→B）；有存量额度时只传递额度并扣减发送方（如 B→C），避免重复产生 AIX-USDT。
+			var creditAdd decimal.Decimal
+			if from.TransferReinvestCredit.IsPositive() {
+				creditAdd = decimal.Min(amount, from.TransferReinvestCredit)
+				from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(creditAdd)
+				fromUpdates["transfer_reinvest_credit"] = from.TransferReinvestCredit
+			} else {
+				creditAdd = amount
+			}
+			if creditAdd.IsPositive() {
+				to.TransferReinvestCredit = to.TransferReinvestCredit.Add(creditAdd)
+				toUpdates["transfer_reinvest_credit"] = to.TransferReinvestCredit
+			}
+		} else if downlineToUpline, err := isAncestorInTx(tx, t.ToUserID, t.FromUserID); err != nil {
+			return err
+		} else if downlineToUpline {
+			deduct := decimal.Min(amount, from.TransferReinvestCredit)
+			if deduct.IsPositive() {
+				from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(deduct)
+				fromUpdates["transfer_reinvest_credit"] = from.TransferReinvestCredit
+			}
+		}
+		if err := tx.Model(&from).Updates(fromUpdates).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&to).Updates(toUpdates).Error; err != nil {
 			return err
 		}
 		if err := tx.Create(po).Error; err != nil {
@@ -1141,6 +1182,37 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 		return nil
 	})
 	return created, err
+}
+
+// isAncestorInTx reports whether ancestorID is on the invitation chain above nodeID.
+func isAncestorInTx(tx *gorm.DB, ancestorID, nodeID int64) (bool, error) {
+	if ancestorID <= 0 || nodeID <= 0 || ancestorID == nodeID {
+		return false, nil
+	}
+	seen := map[int64]bool{nodeID: true}
+	current := nodeID
+	for current > 0 {
+		var u UserPO
+		if err := tx.Select("id", "inviter_id").First(&u, current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+		if u.InviterID == nil {
+			return false, nil
+		}
+		parent := *u.InviterID
+		if seen[parent] {
+			return false, nil
+		}
+		if parent == ancestorID {
+			return true, nil
+		}
+		seen[parent] = true
+		current = parent
+	}
+	return false, nil
 }
 
 func (r *walletRepo) ListTransfersByUser(ctx context.Context, userID int64) ([]*biz.Transfer, error) {
@@ -1155,48 +1227,6 @@ func (r *walletRepo) ListTransfersByUser(ctx context.Context, userID int64) ([]*
 		out = append(out, r.transferToBiz(&list[i]))
 	}
 	return out, nil
-}
-
-func (r *walletRepo) MoveRechargeToReward(ctx context.Context, userID int64, amount string) (string, string, error) {
-	amt, err := decimal.NewFromString(amount)
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return "", "", fmt.Errorf("invalid amount")
-	}
-	var rechargeBal, rewardBal string
-	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var u UserPO
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
-			return err
-		}
-		if u.UsdtRecharge.LessThan(amt) {
-			return fmt.Errorf("insufficient usdt_recharge")
-		}
-		u.UsdtRecharge = u.UsdtRecharge.Sub(amt)
-		u.UsdtReward = u.UsdtReward.Add(amt)
-		if err := tx.Model(&u).Updates(map[string]interface{}{
-			"usdt_recharge": u.UsdtRecharge,
-			"usdt_reward":   u.UsdtReward,
-		}).Error; err != nil {
-			return err
-		}
-		po := &TransferPO{
-			FromUserID:        userID,
-			ToUserID:          userID,
-			Asset:             biz.TokenUSDT,
-			Amount:            amt,
-			PayFrom:           biz.PayFromRecharge,
-			FromRechargeDebit: amt,
-			ToCreditReward:    amt,
-			Remark:            "recharge_to_reward",
-		}
-		if err := tx.Create(po).Error; err != nil {
-			return err
-		}
-		rechargeBal = u.UsdtRecharge.String()
-		rewardBal = u.UsdtReward.String()
-		return nil
-	})
-	return rechargeBal, rewardBal, err
 }
 
 func (r *walletRepo) CreateAixWithdrawal(ctx context.Context, userID int64, amount, toAddress string) (*biz.Withdrawal, string, error) {
@@ -1747,6 +1777,7 @@ func (r *walletRepo) orderToBiz(po *OrderPO) *biz.Order {
 		FromWin:      po.FromWin.String(),
 		FromWinA:     po.FromWinA.String(),
 		Points:       po.Points.String(),
+		PointsSource: po.PointsSource,
 		FundSource:   po.FundSource,
 		Status:       po.Status,
 		ExitedTime:   po.ExitedTime,

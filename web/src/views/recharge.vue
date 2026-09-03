@@ -116,7 +116,7 @@ const rechargeBalance = $computed(() => String(profile.usdt_recharge || userinfo
 const winBalance = $computed(() => String(profile.win_recharge_balance || '0'))
 /* winPrice 已移除：它唯一的引用是模板里一行被注释掉的价格展示，
    等于一个永远不会显示的计算属性。 */
-const displayAmount = (value) => displayDecimal(value)
+const displayAmount = (value) => displayDecimal(value, 4)
 const rechargeDialogRef = ref(null)
 const recordTab = ref('usdt')
 

@@ -528,26 +528,6 @@ func (uc *WalletUsecase) ListWithdrawals(ctx context.Context, tokenString string
 	return uc.walletRepo.ListWithdrawalsByUser(ctx, user.ID)
 }
 
-// MoveRechargeToReward 充值钱包 USDT → 奖励钱包（同账户，不产生直推）
-func (uc *WalletUsecase) MoveRechargeToReward(ctx context.Context, tokenString, amount string) (string, string, error) {
-	user, err := uc.resolveUser(ctx, tokenString)
-	if err != nil {
-		return "", "", err
-	}
-	amt, err := ParseAmount(amount)
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return "", "", errors.BadRequest("INVALID_AMOUNT", "划转金额必须大于0")
-	}
-	rechargeBal, rewardBal, err := uc.walletRepo.MoveRechargeToReward(ctx, user.ID, amt.String())
-	if err != nil {
-		if strings.Contains(err.Error(), "insufficient") {
-			return "", "", errors.BadRequest("INSUFFICIENT_BALANCE", "充值钱包余额不足")
-		}
-		return "", "", err
-	}
-	return rechargeBal, rewardBal, nil
-}
-
 func (uc *WalletUsecase) DepositAddress() string {
 	return uc.walletCfg.GetDepositAddress()
 }
@@ -883,33 +863,6 @@ func (uc *WalletUsecase) Transfer(ctx context.Context, tokenString, toAddress, a
 		return nil, err
 	}
 	return created, nil
-}
-
-func (uc *WalletUsecase) ListSelfTransferRecords(ctx context.Context, tokenString string) ([]*SelfTransferRecord, error) {
-	user, err := uc.resolveUser(ctx, tokenString)
-	if err != nil {
-		return nil, err
-	}
-	transfers, err := uc.walletRepo.ListTransfersByUser(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]*SelfTransferRecord, 0)
-	for _, transfer := range transfers {
-		if transfer.FromUserID != user.ID || transfer.ToUserID != user.ID ||
-			transfer.PayFrom != PayFromRecharge || transfer.Remark != "recharge_to_reward" {
-			continue
-		}
-		result = append(result, &SelfTransferRecord{
-			ID:          transfer.ID,
-			Asset:       transfer.Asset,
-			Amount:      transfer.Amount,
-			FromWallet:  PayFromRecharge,
-			ToWallet:    PayFromReward,
-			CreatedTime: transfer.CreatedTime,
-		})
-	}
-	return result, nil
 }
 
 func (uc *WalletUsecase) ListLinealTransferRecords(ctx context.Context, tokenString, direction string) ([]*LinealTransferRecord, error) {

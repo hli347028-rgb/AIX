@@ -1,5 +1,5 @@
 export type MarketInterval = '15m' | '1h' | '4h' | '1d'
-export type MarketSource = 'demo' | 'api' | 'ave' | 'embed'
+export type MarketSource = 'demo' | 'api' | 'aix_win' | 'embed'
 
 export interface Candle {
   time: number
@@ -21,7 +21,8 @@ export interface MarketDataProvider {
   getCandles(pair: string, interval: MarketInterval): Promise<MarketSnapshot>
 }
 
-const KLINE_API = String(import.meta.env.VITE_KLINE_API || '').trim()
+/** 默认走本后端按 AIX/WIN 现价生成的 K 线；不再依赖 AVE。 */
+const KLINE_API = String(import.meta.env.VITE_KLINE_API || '/v1/market/kline').trim()
 const KLINE_EMBED_URL = String(import.meta.env.VITE_KLINE_EMBED_URL || '').trim()
 const KLINE_PAIR = String(import.meta.env.VITE_KLINE_PAIR || 'AIX-WIN').trim()
 const API_BASE = String(import.meta.env.VITE_API || '').replace(/\/+$/, '')
@@ -32,8 +33,6 @@ const intervalMs: Record<MarketInterval, number> = {
   '4h': 4 * 60 * 60 * 1000,
   '1d': 24 * 60 * 60 * 1000,
 }
-
-const seedByInterval: Record<MarketInterval, number> = { '15m': 11, '1h': 23, '4h': 37, '1d': 53 }
 
 export const klineEmbedUrl = KLINE_EMBED_URL
 export const klinePair = KLINE_PAIR
@@ -113,56 +112,71 @@ export function normalizeKlinePayload(payload: unknown): Candle[] {
   return candles
 }
 
+/** @deprecated 兼容旧引用；现已按 AIX/WIN 价格生成 */
 export const mapAveCandles = (rows: Array<Record<string, unknown>>): Candle[] => normalizeKlinePayload(rows)
 
-function createDemoCandles(interval: MarketInterval, count = 120): Candle[] {
+function priceWiggle(unixSec: number, minutes: number): number {
+  const x = unixSec / (minutes * 60) + minutes
+  return Math.sin(x * 0.37) * 0.0048 + Math.cos(x * 0.19) * 0.0026
+}
+
+/** 用 AIX/WIN 现价本地绘制蜡烛图（接口不可用时的兜底）。 */
+export function createPriceCandles(interval: MarketInterval, spot: number, count = 120): Candle[] {
   const step = intervalMs[interval]
+  const minutes = step / 60_000
   const end = Math.floor(Date.now() / step) * step
-  let previousClose = 1.728 + seedByInterval[interval] * 0.0007
+  let previousClose = 0
+  const safeSpot = Number.isFinite(spot) && spot > 0 ? spot : 1
 
   return Array.from({ length: count }, (_, index) => {
-    const phase = index + seedByInterval[interval]
-    const drift = Math.sin(phase * 0.39) * 0.021 + Math.cos(phase * 0.17) * 0.012 + 0.003
-    const open = previousClose
-    const close = Math.max(0.6, open + drift)
-    const wick = 0.012 + Math.abs(Math.sin(phase * 0.71)) * 0.025
-    const candle = {
-      time: end - (count - 1 - index) * step,
-      open,
-      high: Math.max(open, close) + wick,
-      low: Math.min(open, close) - wick * 0.82,
-      close,
-      volume: 520000 + Math.abs(Math.cos(phase * 0.31)) * 1080000 + index * 3900,
-    }
+    const time = end - (count - 1 - index) * step
+    const wiggle = priceWiggle(Math.floor(time / 1000), minutes) * safeSpot
+    const open = previousClose > 0 ? previousClose : safeSpot
+    const close = index === count - 1 ? safeSpot : Math.max(safeSpot * 0.2, safeSpot + wiggle)
+    const high = Math.max(open, close) + Math.abs(wiggle) * 0.55
+    const low = Math.max(1e-12, Math.min(open, close) - Math.abs(wiggle) * 0.4)
     previousClose = close
-    return candle
+    return {
+      time,
+      open,
+      high,
+      low,
+      close,
+      volume: 80000 + Math.abs(Math.cos(index * 0.31)) * 420000 + index * 1800,
+    }
   })
+}
+
+async function fetchSpotFromBalance(): Promise<number> {
+  const token = typeof localStorage !== 'undefined' ? String(localStorage.getItem('token') || '').trim() : ''
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  const url = `${API_BASE}/v1/wallet/balance`
+  const response = await fetch(url, { headers })
+  if (!response.ok) throw new Error(`balance ${response.status}`)
+  const body = await response.json()
+  const aix = Number(body?.aix_price ?? body?.aixPrice)
+  const win = Number(body?.win_price ?? body?.winPrice)
+  const rate = Number(body?.aix_to_win_rate ?? body?.aixToWinRate)
+  if (Number.isFinite(rate) && rate > 0) return rate
+  if (Number.isFinite(aix) && aix > 0 && Number.isFinite(win) && win > 0) return aix / win
+  throw new Error('spot unavailable')
 }
 
 function resolveApiUrl(interval: MarketInterval): string {
   const joiner = KLINE_API.indexOf('?') >= 0 ? '&' : '?'
-  const query = `pair=${encodeURIComponent(KLINE_PAIR)}&interval=${encodeURIComponent(interval)}&limit=300`
+  const query = `pair=${encodeURIComponent(KLINE_PAIR)}&interval=${encodeURIComponent(interval)}&limit=120`
   if (/^https?:\/\//i.test(KLINE_API)) return `${KLINE_API}${joiner}${query}`
   const path = KLINE_API.charAt(0) === '/' ? KLINE_API : `/${KLINE_API}`
   return `${API_BASE}${path}${joiner}${query}`
 }
 
-function sourceFromApi(): MarketSource {
-  return /ave/i.test(KLINE_API) ? 'ave' : 'api'
-}
-
-const demoProvider: MarketDataProvider = {
-  async getCandles(pair, interval) {
-    return { pair, interval, candles: createDemoCandles(interval), source: 'demo' }
-  },
-}
-
 function sourceFromPayload(payload: unknown): MarketSource {
   if (payload && typeof payload === 'object') {
     const source = String((payload as Record<string, unknown>).source || '').trim().toLowerCase()
-    if (source === 'ave') return 'ave'
+    if (source === 'aix_win' || source === 'demo' || source === 'api') return source as MarketSource
   }
-  return sourceFromApi()
+  return 'aix_win'
 }
 
 const remoteProvider: MarketDataProvider = {
@@ -176,6 +190,17 @@ const remoteProvider: MarketDataProvider = {
   },
 }
 
-const activeProvider: MarketDataProvider = KLINE_API ? remoteProvider : demoProvider
+const localPriceProvider: MarketDataProvider = {
+  async getCandles(pair, interval) {
+    const spot = await fetchSpotFromBalance()
+    return { pair, interval, candles: createPriceCandles(interval, spot), source: 'aix_win' }
+  },
+}
 
-export const getAixWinCandles = (interval: MarketInterval) => activeProvider.getCandles(KLINE_PAIR, interval)
+export const getAixWinCandles = async (interval: MarketInterval): Promise<MarketSnapshot> => {
+  try {
+    return await remoteProvider.getCandles(KLINE_PAIR, interval)
+  } catch {
+    return localPriceProvider.getCandles(KLINE_PAIR, interval)
+  }
+}

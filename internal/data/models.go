@@ -24,8 +24,9 @@ type UserPO struct {
 	PendingMgmtReward decimal.Decimal `gorm:"column:pending_mgmt_reward;type:decimal(36,18);default:0;not null"` // 兼容旧列；= OverflowReward
 	OverflowReward    decimal.Decimal `gorm:"column:overflow_reward;type:decimal(36,18);default:0;not null"`     // 管理奖溢出
 	OverflowDirect    decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`     // 直推奖溢出
-	Points            decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`               // 当前积分
-	PointsAll         decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`           // 累计总积分（认购金额累计）
+	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                         // 当前 AIX-USDT
+	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                     // 累计 AIX-USDT
+	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 上级划入、可用于复投产生 AIX-USDT 的额度
 	StaticUsdtTotal   decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`   // 静态总收益（USDT 金本位累计）
 	MgmtLevel         int32           `gorm:"column:mgmt_level;default:0;not null"`
 	MgmtLevelLocked   bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
@@ -60,7 +61,8 @@ type OrderPO struct {
 	FromReward   decimal.Decimal `gorm:"column:from_reward;type:decimal(36,18);default:0;not null"`
 	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"`       // WIN 扣款数量（按认购时 win_price 折算）
 	FromWinA     decimal.Decimal `gorm:"column:from_win_a;type:decimal(36,18);default:0;not null"`     // WIN-A 扣款数量（按认购时 win_a_price 折算）
-	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得 AIX-USDT（= 认购金额；复投为 0）
+	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得 AIX-USDT
+	PointsSource string          `gorm:"column:points_source;size:32;default:'';not null"`             // recharge | win | transfer_reinvest
 	FundSource   string          `gorm:"column:fund_source;size:16;not null"`
 	Status       string          `gorm:"size:16;default:active;not null"`
 	ExitedTime   *time.Time      `gorm:"column:exited_time"`

@@ -93,7 +93,7 @@
           </div>
         </div>
         <p v-if="activeMode === 'win' && winPrice > 0" class="mode-tip win-cost-tip">
-          {{ $t('node.winPayHint', { price: winPrice, cost: minAmountText }) }}
+          {{ $t('node.winPayHint', { price: displayAmount(winPrice), cost: minAmountText }) }}
         </p>
         <p class="mode-tip">{{ modeTip }}</p>
       </div>
@@ -132,7 +132,7 @@
           <div class="order-list" v-for="(item, index) in orderList" :key="item.id || index">
             <div class="table-row">
               <span>
-                {{ item.total_amount ?? item.amount }} USDT
+                {{ displayAmount(item.total_amount ?? item.amount) }} USDT
                 <small v-if="item.from_win" class="win-deduct">-{{ displayAmount(item.from_win) }} WIN</small>
               </span>
               <span>{{ orderStatusText(item.status) }}</span>
@@ -200,7 +200,7 @@ function calcWinCost(usdtAmount: number | string) {
 }
 
 function displayAmount(value: unknown) {
-  return displayDecimal(value)
+  return displayDecimal(value, 4)
 }
 
 function calcNeedWin(usdtAmount: string) {

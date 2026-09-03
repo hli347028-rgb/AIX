@@ -41,7 +41,6 @@ var adminActionLabels = map[string]string{
 	"/api/admin_dhb/record_list_export":    "导出流水记录",
 	"/api/admin_dhb/admin_recharge":        "后台USDT充值",
 	"/api/admin_dhb/admin_recharge_win":    "后台WIN充值",
-	"/api/admin_dhb/recharge_to_reward":    "充值转奖励钱包",
 	"/api/admin_dhb/settlement_list":       "查看结算列表",
 	"/api/admin_dhb/settlement_trigger":    "触发结算",
 	"/api/admin_dhb/vip_update":            "更新管理等级",

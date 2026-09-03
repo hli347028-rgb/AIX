@@ -151,12 +151,29 @@
         />
       </ul>
 
-      <div class="section-title-wrap">
+      <div class="section-title-wrap direct-ledger-section">
         <div class="title-bar"></div>
-        <h3 class="section-title">{{ $t('community.directInviteData') }}</h3>
+        <div class="direct-ledger-tabs" role="tablist" :aria-label="$t('community.directLedgerTabs')">
+          <button
+            type="button"
+            role="tab"
+            class="direct-ledger-tab"
+            :class="{ active: directLedgerTab === 'subscribe' }"
+            :aria-selected="directLedgerTab === 'subscribe'"
+            @click="switchDirectLedgerTab('subscribe')"
+          >{{ $t('community.downlineSubscribeAmount') }}</button>
+          <button
+            type="button"
+            role="tab"
+            class="direct-ledger-tab"
+            :class="{ active: directLedgerTab === 'recharge' }"
+            :aria-selected="directLedgerTab === 'recharge'"
+            @click="switchDirectLedgerTab('recharge')"
+          >{{ $t('community.downlineRechargeUsdt') }}</button>
+        </div>
       </div>
 
-      <div class="ledger">
+      <div v-show="directLedgerTab === 'subscribe'" class="ledger" role="tabpanel">
         <div class="ledger-head">
           <span>{{ $t('community.walletAddress') }}</span>
           <span class="type">{{ $t('community.subscribeType') }}</span>
@@ -175,6 +192,28 @@
             :page-count="downlinePageCount"
             mode="simple"
             @change="getDownlineOrders"
+          />
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
+      </div>
+
+      <div v-show="directLedgerTab === 'recharge'" class="ledger is-three-col" role="tabpanel">
+        <div class="ledger-head">
+          <span>{{ $t('community.walletAddress') }}</span>
+          <span class="num">{{ $t('community.usdtAmount') }}</span>
+          <span class="time">{{ $t('community.time') }}</span>
+        </div>
+        <template v-if="downlineRechargeList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineRechargeList" :key="item.id || index">
+            <span class="aix-mono">{{ formatAddr(item.address) }}</span>
+            <span class="num">{{ formatRechargeAmount(item.amount) }}</span>
+            <span class="time">{{ item.createdAt }}</span>
+          </div>
+          <Pagination
+            v-model="downlineRechargePage"
+            :page-count="downlineRechargePageCount"
+            mode="simple"
+            @change="getDownlineRecharges"
           />
         </template>
         <p v-else class="empty-state">{{ $t('common.noData') }}</p>
@@ -316,6 +355,10 @@ const levelLabel = computed(() => {
 let downlineOrderList = $ref<any[]>([])
 let downlinePage = $ref(1)
 let downlinePageCount = $ref(1)
+let downlineRechargeList = $ref<any[]>([])
+let downlineRechargePage = $ref(1)
+let downlineRechargePageCount = $ref(1)
+let directLedgerTab = $ref<'subscribe' | 'recharge'>('subscribe')
 
 const formatAddress = (value: string) => {
   if (!value) return ''
@@ -333,6 +376,11 @@ const formatCount = (value: any) => Math.max(0, Number(value || 0)).toLocaleStri
 const formatOrderAmount = (item: any) => {
   const amount = Number(item?.amount || 0)
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
+}
+
+const formatRechargeAmount = (value: any) => {
+  const amount = Number(value || 0)
+  return Number.isFinite(amount) ? amount.toFixed(4) : '0.0000'
 }
 
 const formatSubscribeType = (fundSource: string) => {
@@ -409,12 +457,32 @@ const getDownlineOrders = async (pageNum: number = 1) => {
   downlineOrderList = res.list || []
 }
 
+const getDownlineRecharges = async (pageNum: number = 1) => {
+  const res: any = await request.get('app_server/downline_recharges', {
+    params: { page: pageNum },
+  })
+  downlineRechargePageCount = Math.ceil((res.count || 0) / 10) || 1
+  downlineRechargeList = res.list || []
+}
+
+const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge') => {
+  if (directLedgerTab === tab) return
+  directLedgerTab = tab
+  if (tab === 'recharge' && downlineRechargeList.length === 0) {
+    void getDownlineRecharges(downlineRechargePage)
+  }
+}
+
 const refreshTeamPage = async () => {
   if (refreshLocked) return
   refreshLocked = true
   try {
     await Promise.allSettled([person.getUser?.(), person.refreshProfile?.()])
-    await Promise.allSettled([getDownlineOrders(downlinePage), loadTeamMembers()])
+    await Promise.allSettled([
+      getDownlineOrders(downlinePage),
+      getDownlineRecharges(downlineRechargePage),
+      loadTeamMembers(),
+    ])
   } finally {
     refreshCooldownTimer = setTimeout(() => {
       refreshLocked = false
@@ -643,9 +711,44 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 账目表。四列：地址 / 充值类型 / 金额 / 时间 */
+/* 账目表。四列：地址 / 充值类型 / 金额 / 时间；三列：地址 / 金额 / 时间 */
 .ledger {
   margin-top: 2px;
+}
+
+.direct-ledger-section {
+  align-items: stretch;
+}
+
+.direct-ledger-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.direct-ledger-tab {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.direct-ledger-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+.direct-ledger-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .ledger-head,
@@ -654,6 +757,11 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 0.95fr);
   gap: 10px;
   align-items: baseline;
+}
+
+.ledger.is-three-col .ledger-head,
+.ledger.is-three-col .ledger-row {
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.95fr) minmax(0, 1fr);
 }
 
 .ledger-head {

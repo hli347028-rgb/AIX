@@ -909,27 +909,6 @@ func (s *AdminLegacyService) HandleAdminRechargeWin(ctx khttp.Context) error {
 	})
 }
 
-func (s *AdminLegacyService) HandleRechargeToReward(ctx khttp.Context) error {
-	if err := s.requireAdmin(ctx); err != nil {
-		return err
-	}
-	if err := ctx.Request().ParseForm(); err != nil {
-		return errors.BadRequest("INVALID_FORM", "请求格式错误")
-	}
-	userID, _ := strconv.ParseInt(ctx.Request().Form.Get("user_id"), 10, 64)
-	amount := strings.TrimSpace(ctx.Request().Form.Get("amount"))
-	rechargeBal, rewardBal, err := s.admin.AdminMoveRechargeToReward(ctx, s.token(ctx), userID, amount)
-	if err != nil {
-		return err
-	}
-	return ctx.Result(200, map[string]interface{}{
-		"status":        "ok",
-		"usdt_recharge": rechargeBal,
-		"usdt_reward":   rewardBal,
-		"message":       "已转入奖励钱包",
-	})
-}
-
 func (s *AdminLegacyService) HandleGoodList(ctx khttp.Context) error {
 	if err := s.requireAdmin(ctx); err != nil {
 		return err
@@ -1998,21 +1977,39 @@ func mapLegacyBuyOrder(o *biz.AdminOrderDetail) map[string]interface{} {
 		status = biz.OrderStatusExited
 	}
 	return map[string]interface{}{
-		"id":          o.Order.ID,
-		"address":     o.UserAddress,
-		"amount":      principal.String(),
-		"exitAmount":  exitMul.String(),
-		"money":       exitCap.String(),
-		"amountGet":   earned.String(),
-		"amountLast":  remain.String(),
-		"points":      o.Order.Points,
+		"id":            o.Order.ID,
+		"address":       o.UserAddress,
+		"amount":        principal.String(),
+		"exitAmount":    exitMul.String(),
+		"money":         exitCap.String(),
+		"amountGet":     earned.String(),
+		"amountLast":    remain.String(),
+		"points":        o.Order.Points,
+		"points_source": o.Order.PointsSource,
+		"points_source_label": pointsSourceLabel(o.Order.PointsSource),
 		"fund_source":   o.Order.FundSource,
 		"from_recharge": o.Order.FromRecharge,
 		"from_win":      o.Order.FromWin,
 		"from_win_a":    o.Order.FromWinA,
 		"status":        status,
-		"createdAt":   formatLegacyTime(o.Order.CreatedAt),
-		"one":         o.Order.FundSource,
+		"createdAt":     formatLegacyTime(o.Order.CreatedAt),
+		"one":           o.Order.FundSource,
+	}
+}
+
+func pointsSourceLabel(src string) string {
+	switch strings.TrimSpace(src) {
+	case biz.PointsSourceRecharge:
+		return "USDT认购"
+	case biz.PointsSourceWin:
+		return "WIN认购"
+	case biz.PointsSourceTransferReinvest:
+		return "复投（上级划转）"
+	default:
+		if src == "" {
+			return "-"
+		}
+		return src
 	}
 }
 

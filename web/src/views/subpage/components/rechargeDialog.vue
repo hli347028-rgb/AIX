@@ -68,10 +68,12 @@ import { useI18n } from 'vue-i18n'
 import { errMsg } from '@/api/aix'
 import { compareDecimals, displayDecimal } from '@/tools/decimal'
 import { mapWinRechargeError, pollWinBalance } from '@/tools/winRecharge'
+import { sendBuyTransaction, sendErc20Approve } from '@/tools/walletTx'
 
-const BUY_USDT = new Contract(import.meta.env.VITE_BUY_USDT || import.meta.env.VITE_BUY, 'BUY')
-const BUY_WIN = new Contract(import.meta.env.VITE_BUY, 'BUY')
-const USDT = import.meta.env.VITE_USDT ? new Contract(import.meta.env.VITE_USDT, 'ERC20') : null
+const BUY_USDT_ADDR = import.meta.env.VITE_BUY_USDT || import.meta.env.VITE_BUY
+const BUY_WIN_ADDR = import.meta.env.VITE_BUY
+const USDT_ADDR = import.meta.env.VITE_USDT || ''
+const USDT = USDT_ADDR ? new Contract(USDT_ADDR, 'ERC20') : null
 
 const person = userPerson()
 const { t: $t } = useI18n()
@@ -181,7 +183,9 @@ const isWalletCancelled = (error) => {
   return code === 4001 || /user rejected|denied|cancel/i.test(text)
 }
 
-const sendUsdtBuy = (count, extra = {}) => BUY_USDT.send('buy', [count], {
+const sendUsdtBuy = (count, extra = {}) => sendBuyTransaction({
+  buyContract: BUY_USDT_ADDR,
+  num: count,
   gasLimit: 350000,
   onTxHash: () => startRechargeLoading($t('recharge.processing')),
   ...extra,
@@ -208,18 +212,18 @@ const explainUsdtFailure = async () => {
   const [usdtBal, winBal, allowance] = await Promise.all([
     ETH.getUSDTBalance(),
     ETH.getNativeBalance(),
-    USDT.call('allowance', [ETH.account, BUY_USDT.address]),
+    USDT.call('allowance', [ETH.account, BUY_USDT_ADDR]),
   ])
   nativeWinBalance.value = winBal
   return { usdtBal, winBal, allowance }
 }
 
 const submitUsdtRecharge = async () => {
-  if (!USDT) {
+  if (!USDT || !USDT_ADDR) {
     showRechargeToast($t('recharge.usdtNotConfigured'))
     return
   }
-  if (!import.meta.env.VITE_BUY_USDT && !import.meta.env.VITE_BUY) {
+  if (!BUY_USDT_ADDR) {
     showRechargeToast($t('recharge.usdtNotConfigured'))
     return
   }
@@ -238,8 +242,12 @@ const submitUsdtRecharge = async () => {
     stopRechargeLoading()
     const { usdtBal, winBal, allowance } = await explainUsdtFailure()
     if (!(Number(allowance) > 0)) {
-      await USDT.send('approve', [BUY_USDT.address, MAX_USDT_ALLOWANCE], {
+      await sendErc20Approve({
+        tokenContract: USDT_ADDR,
+        spender: BUY_USDT_ADDR,
+        amount: MAX_USDT_ALLOWANCE,
         gasLimit: 120000,
+        logDecimals: true,
         onTxHash: () => startRechargeLoading($t('recharge.processing')),
       })
       stopRechargeLoading()
@@ -273,7 +281,14 @@ const submitWinRecharge = async () => {
   const beforeBalance = String(person.profile?.win_recharge_balance || '0')
   let hash = ''
   try {
-    const result = await BUY_WIN.send('buy', [num], { value, gasLimit: 350000, silent: true })
+    // 仍走充值合约 buy + 原生 WIN value，不用 ERC20 transfer（否则无法入账）
+    const result = await sendBuyTransaction({
+      buyContract: BUY_WIN_ADDR,
+      num,
+      value,
+      gasLimit: 350000,
+      silent: true,
+    })
     hash = result.hash
   } catch (error) {
     if (isWalletCancelled(error)) throw error

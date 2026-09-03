@@ -189,7 +189,6 @@ const routes: Record<string, Handler> = {
   '/v1/wallet/recharges': () => ({ recharges: [{ id: 1, amount: '1000.0000', asset: 'USDT', status: 'completed', tx_hash: '0xdevusdt', created_at: nowSec() - 26 * DAY }], count: 1 }),
   '/v1/wallet/recharges-win': () => ({ recharges: [{ id: 2, amount: '300.0000', asset: 'WIN', status: 'completed', tx_hash: '0xdevwin', created_at: nowSec() - 14 * DAY }], count: 1 }),
   '/v1/wallet/downline-usdt-recharges': () => ({ recharges: INVITEES.map((v, i) => ({ id: 10 + i, address: v.address, amount: v.team_stake, status: 'completed', created_at: v.created_at })), count: INVITEES.length }),
-  '/v1/wallet/transfer-records/self': () => ({ records: [], count: 0 }),
   '/v1/wallet/transfer-records/lineal': () => ({ records: [], count: 0 }),
 
   '/v1/announcements': () => ({ list: ANNOUNCEMENTS, count: ANNOUNCEMENTS.length, page: 1 }),
@@ -213,7 +212,6 @@ const writeOk: Record<string, Handler> = {
   '/v1/wallet/recharge/confirm': () => ({ status: 'ok' }),
   '/v1/wallet/recharge-win': () => ({ status: 'ok', order_id: 9007 }),
   '/v1/wallet/recharge-win/confirm': () => ({ status: 'ok' }),
-  '/v1/wallet/recharge-to-reward': () => ({ status: 'ok' }),
   '/v1/wallet/transfer': () => ({ status: 'ok' }),
 }
 

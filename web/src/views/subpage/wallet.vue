@@ -25,7 +25,7 @@
           <span class="aix-signal-dot" aria-hidden="true"></span>
           <span class="balance-label">{{ $t('wallet.aixBalance') }}</span>
         </div>
-        <p class="balance-figure">{{ aixBalance }}</p>
+        <p class="balance-figure">{{ formatFour(aixBalance) }}</p>
       </div>
 
       <hr class="aix-trace balance-trace" />
@@ -33,19 +33,19 @@
       <div class="price-list">
         <div class="price-item">
           <p>{{ $t('wallet.rechargeBalance') }}</p>
-          <p>{{ rechargeBalance }}</p>
+          <p>{{ formatFour(rechargeBalance) }}</p>
         </div>
         <div class="price-item">
           <p>{{ $t('wallet.rewardBalance') }}</p>
-          <p>{{ rewardBalance }}</p>
+          <p>{{ formatFour(rewardBalance) }}</p>
         </div>
         <div class="price-item">
           <p>{{ $t('wallet.winBalance') }}</p>
-          <p>{{ winRechargeBalance }}</p>
+          <p>{{ formatFour(winRechargeBalance) }}</p>
         </div>
         <div class="price-item">
           <p>{{ $t('wallet.usdtWithdrawable') }}</p>
-          <p>{{ usdtWithdrawable }}</p>
+          <p>{{ formatFour(usdtWithdrawable) }}</p>
         </div>
       </div>
     </div>
@@ -71,7 +71,7 @@
         <div class="pledge-info">
           <div class="pledge-item">
             <p>{{ $t('wallet.exitRemaining') }}</p>
-            <p>{{ userinfo.unexitedAmount || 0 }}</p>
+            <p>{{ formatFour(userinfo.unexitedAmount || 0) }}</p>
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.earnedIncome') }}</p>
@@ -83,7 +83,7 @@
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.aixUsdt') }}</p>
-            <p>{{ profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0 }}</p>
+            <p>{{ formatFour(profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0) }}</p>
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@
               <span v-if="active === '1'" class="col-status" :class="item.exited ? 'is-exited' : 'is-active'">
                 <span class="status-text">{{ item.exited ? $t('node.statusExited') : $t('node.statusActive') }}</span>
                 <template v-if="item.progressAcc != null && item.progressTarget">
-                  <span class="progress-text">{{ item.progressAcc }} / {{ item.progressTarget }}</span>
+                  <span class="progress-text">{{ formatFour(item.progressAcc) }} / {{ formatFour(item.progressTarget) }}</span>
                   <span class="progress-bar">
                     <i :style="{ width: `${progressPercent(item)}%` }" />
                   </span>
@@ -161,11 +161,11 @@
                 <p class="income-list-item-name">{{ item.name || $t('wallet.income') }}</p>
                 <p class="income-list-item-time">
                   <span>{{ item.createdAt }}</span>
-                  <span class="income-list-item-money">{{ item.reward }}</span>
+                  <span class="income-list-item-money">{{ formatFour(item.reward) }}</span>
                 </p>
                 <p v-if="item.address" class="income-list-item-note">{{ formatShortAddr(item.address) }}</p>
                 <p v-if="active === '5'" class="income-list-item-note">
-                  {{ $t('wallet.releasedManagementReward') }}: {{ item.released || 0 }} / {{ $t('wallet.pendingManagementReward') }}: {{ item.pending || 0 }}
+                  {{ $t('wallet.releasedManagementReward') }}: {{ formatFour(item.released || 0) }} / {{ $t('wallet.pendingManagementReward') }}: {{ formatFour(item.pending || 0) }}
                 </p>
               </div>
             </div>

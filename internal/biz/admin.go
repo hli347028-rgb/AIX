@@ -571,28 +571,6 @@ func (uc *AdminUsecase) AdminCreditWinBalance(ctx context.Context, tokenString, 
 	return balance, amountDec.String(), nil
 }
 
-// AdminMoveRechargeToReward 管理端：用户充值钱包 → 奖励钱包
-func (uc *AdminUsecase) AdminMoveRechargeToReward(ctx context.Context, tokenString string, userID int64, amount string) (string, string, error) {
-	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
-		return "", "", err
-	}
-	if userID <= 0 {
-		return "", "", errors.BadRequest("INVALID_USER", "用户无效")
-	}
-	amt, err := ParseAmount(strings.TrimSpace(amount))
-	if err != nil || !amt.GreaterThan(decimal.Zero) {
-		return "", "", errors.BadRequest("INVALID_AMOUNT", "划转金额必须大于0")
-	}
-	rechargeBal, rewardBal, err := uc.walletRepo.MoveRechargeToReward(ctx, userID, amt.String())
-	if err != nil {
-		if strings.Contains(err.Error(), "insufficient") {
-			return "", "", errors.BadRequest("INSUFFICIENT_BALANCE", "充值钱包余额不足")
-		}
-		return "", "", err
-	}
-	return rechargeBal, rewardBal, nil
-}
-
 type AdminSettlementBatch struct {
 	*SettlementBatch
 	ReleaseTotal string

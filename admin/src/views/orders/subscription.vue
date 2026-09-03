@@ -88,6 +88,12 @@ const fundSourceText = {
     'win_a+win': 'WIN-A+WIN',
 }
 
+const pointsSourceText = {
+    recharge: 'USDT认购',
+    win: 'WIN认购',
+    transfer_reinvest: '复投（上级划转）',
+}
+
 const fundSourceOptions = Object.keys(fundSourceText).map((value) => ({
     value,
     label: fundSourceText[value],
@@ -130,6 +136,14 @@ export default {
                     title: '积分',
                     dataIndex: 'points',
                     customRender: (v) => v || '0',
+                },
+                {
+                    title: 'AIX-USDT来源',
+                    dataIndex: 'points_source',
+                    customRender: (v, row) => {
+                        if (row && row.points_source_label) return row.points_source_label
+                        return pointsSourceText[v] || (v ? v : '-')
+                    },
                 },
                 {
                     title: '资金来源',

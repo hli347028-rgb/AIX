@@ -47,6 +47,12 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	if err := migrateSubscribePoints(db); err != nil {
 		return nil, nil, err
 	}
+	if err := migratePointsSource(db); err != nil {
+		return nil, nil, err
+	}
+	if err := migrateRepairUserPointsBalance(db); err != nil {
+		return nil, nil, err
+	}
 	if err := migrateWinRechargeBalance(db); err != nil {
 		return nil, nil, err
 	}
@@ -127,26 +133,125 @@ func migrateOverflowReward(db *gorm.DB) error {
 	`).Error
 }
 
-// migrateSubscribePoints 回填历史订单积分与用户累计积分（仅补零值，不覆盖已有）。
+// migrateSubscribePoints 回填历史 USDT/WIN 认购积分（仅补零值；奖励复投不回填）。
+// 注意：users.points 是可花余额，不能用订单合计直接覆盖（提现会扣减）。
 func migrateSubscribePoints(db *gorm.DB) error {
 	if err := db.Exec(`
 		UPDATE orders
-		SET points = principal
+		SET points = principal,
+			points_source = CASE
+				WHEN fund_source = 'win' THEN 'win'
+				ELSE 'recharge'
+			END
 		WHERE points = 0 AND principal > 0
+			AND fund_source IN ('recharge', 'win')
 	`).Error; err != nil {
 		return err
 	}
 	return db.Exec(`
 		UPDATE users u
-		SET
-			points_all = COALESCE((
-				SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id
-			), 0),
-			points = COALESCE((
-				SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id
-			), 0)
+		SET points_all = COALESCE((
+			SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id
+		), 0)
 		WHERE u.points_all = 0
 	`).Error
+}
+
+// migratePointsSource 回填 AIX-USDT 来源；清理历史误记的奖励复投积分（保留划转复投）。
+// 只校正 points_all（累计获得），不改写 points 可用余额。
+func migratePointsSource(db *gorm.DB) error {
+	if err := db.Exec(`
+		UPDATE orders SET points = 0, points_source = ''
+		WHERE fund_source = 'reward' AND points > 0
+			AND (points_source IS NULL OR points_source = '' OR points_source <> 'transfer_reinvest')
+	`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`
+		UPDATE orders
+		SET points = principal, points_source = 'recharge'
+		WHERE fund_source = 'recharge' AND principal > 0 AND points = 0
+	`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`
+		UPDATE orders
+		SET points = principal, points_source = 'win'
+		WHERE fund_source = 'win' AND principal > 0 AND points = 0
+	`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`
+		UPDATE orders SET points_source = 'recharge'
+		WHERE points > 0 AND fund_source = 'recharge' AND (points_source IS NULL OR points_source = '')
+	`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`
+		UPDATE orders SET points_source = 'win'
+		WHERE points > 0 AND fund_source = 'win' AND (points_source IS NULL OR points_source = '')
+	`).Error; err != nil {
+		return err
+	}
+	return db.Exec(`
+		UPDATE users u
+		SET points_all = COALESCE((SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id), 0)
+	`).Error
+}
+
+// migrateRepairUserPointsBalance 扣除回灌的 AIX-USDT 可用余额：
+// points_all = 订单积分合计（累计获得）；
+// points = max(0, points_all - 已扣款 SDT 提现)。
+// 提现创建时已扣 points；仅 rejected 会退回，故统计时排除 rejected。
+func migrateRepairUserPointsBalance(db *gorm.DB) error {
+	type row struct {
+		UserID     int64           `gorm:"column:user_id"`
+		Earned     decimal.Decimal `gorm:"column:earned"`
+		Withdrawn  decimal.Decimal `gorm:"column:withdrawn"`
+		CurPoints  decimal.Decimal `gorm:"column:cur_points"`
+		CurAll     decimal.Decimal `gorm:"column:cur_all"`
+	}
+	var rows []row
+	if err := db.Raw(`
+		SELECT
+			u.id AS user_id,
+			u.points AS cur_points,
+			u.points_all AS cur_all,
+			COALESCE((SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id), 0) AS earned,
+			COALESCE((
+				SELECT SUM(w.amount) FROM withdrawals w
+				WHERE w.user_id = u.id
+					AND UPPER(TRIM(w.asset)) IN ('SDT', 'AIX-USDT')
+					AND LOWER(TRIM(IFNULL(w.status, ''))) <> 'rejected'
+			), 0) AS withdrawn
+		FROM users u
+	`).Scan(&rows).Error; err != nil {
+		return err
+	}
+	for _, r := range rows {
+		earned := r.Earned
+		if earned.IsNegative() {
+			earned = decimal.Zero
+		}
+		withdrawn := r.Withdrawn
+		if withdrawn.IsNegative() {
+			withdrawn = decimal.Zero
+		}
+		correct := earned.Sub(withdrawn)
+		if correct.IsNegative() {
+			correct = decimal.Zero
+		}
+		if r.CurPoints.Equal(correct) && r.CurAll.Equal(earned) {
+			continue
+		}
+		if err := db.Model(&UserPO{}).Where("id = ?", r.UserID).Updates(map[string]interface{}{
+			"points":     correct,
+			"points_all": earned,
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // migrateWinRechargeBalance 首次启动时将历史 WIN 充值从 win_balance 拆入 win_recharge_balance。

@@ -16,9 +16,14 @@ const (
 	RechargeStatusRejected  = "rejected"
 
 	PayFromRecharge = "recharge"
-	PayFromReward   = "reward" // 奖励钱包复投：上级只增业绩，不产生直推/管理奖/AIX-USDT
-	PayFromWin      = "win"   // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
-	PayFromWinA     = "win_a" // 认购已关闭；保留供历史订单 fund_source 识别
+	PayFromReward   = "reward" // 奖励钱包复投：默认不产生 AIX-USDT；上级划转额度内复投可产生
+	PayFromWin      = "win"    // 用 WIN 充值钱包按 win_price 折算认购（产生直推/管理奖）
+	PayFromWinA     = "win_a"  // 认购已关闭；保留供历史订单 fund_source 识别
+
+	// PointsSource AIX-USDT 产生来源（写入 orders.points_source）
+	PointsSourceRecharge         = "recharge"          // USDT 认购
+	PointsSourceWin              = "win"               // WIN 认购
+	PointsSourceTransferReinvest = "transfer_reinvest" // 上级划给下级后，下级复投产生
 
 	OrderStatusActive    = "active"
 	OrderStatusExited    = "exited"
@@ -222,15 +227,6 @@ type Transfer struct {
 	CreatedTime       time.Time
 }
 
-type SelfTransferRecord struct {
-	ID          int64
-	Asset       string
-	Amount      string
-	FromWallet  string
-	ToWallet    string
-	CreatedTime time.Time
-}
-
 type LinealTransferRecord struct {
 	ID                  int64
 	Direction           string
@@ -358,7 +354,8 @@ type Order struct {
 	FromReward   string
 	FromWin      string
 	FromWinA     string
-	Points       string // 本单获得积分（= 认购金额）
+	Points       string // 本单获得 AIX-USDT
+	PointsSource string // AIX-USDT 产生来源：recharge | win | transfer_reinvest
 	WinPrice     string // 认购时 WIN 价格快照（仅 pay_from=win）
 	WinAPrice    string // 认购时 WIN-A 价格快照（仅 pay_from=win_a）
 	FundSource   string
@@ -430,8 +427,6 @@ type WalletRepo interface {
 
 	CreateTransfer(ctx context.Context, t *Transfer) (*Transfer, error)
 	ListTransfersByUser(ctx context.Context, userID int64) ([]*Transfer, error)
-	// MoveRechargeToReward 同用户：充值钱包 USDT → 奖励钱包（不触发直推）
-	MoveRechargeToReward(ctx context.Context, userID int64, amount string) (rechargeBal, rewardBal string, err error)
 
 	CreateRewardLog(ctx context.Context, log *RewardLog) error
 	ListRewardLogsByUser(ctx context.Context, userID int64) ([]*RewardLog, error)
