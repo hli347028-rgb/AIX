@@ -14,11 +14,11 @@
     <main class="space-stage" :aria-label="$t('home.experienceAria')">
       <div class="space-camera" aria-hidden="true">
         <div
-          v-for="(scene, index) in scenes"
+          v-for="scene in visibleScenes"
           :key="scene.id"
           class="scene-image"
-          :class="`scene-image--${index}`"
-          :style="sceneStyle(index, scene.image)"
+          :class="`scene-image--${scene.index}`"
+          :style="sceneStyle(scene.index, scene.image)"
         />
         <div class="speed-lines" />
         <div class="vignette" />
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Header from '@/components/Header.vue'
@@ -130,6 +130,7 @@ let startX = 0
 let startY = 0
 let startValue = 0
 let raf = 0
+let animating = false
 let snapTimer = 0
 type TouchAxis = 'pending' | 'horizontal' | 'vertical'
 let touchAxis: TouchAxis = 'pending'
@@ -176,6 +177,10 @@ const sceneStyle = (index: number, image: string) => {
     transform: rotate ? `scale(${scale}) rotate(${rotate}deg)` : `scale(${scale})`,
   }
 }
+// 钱包 WebView 的显存通常比系统浏览器小，只创建当前和相邻场景图层。
+const visibleScenes = computed(() => scenes
+  .map((scene, index) => ({ ...scene, index }))
+  .filter((scene) => Math.abs(scene.index - activeNode.value) <= 1))
 const chapterClass = (index: number) => ({ active: Math.abs(current.value - index) < 0.98, interactive: Math.abs(current.value - index) < 0.08 })
 const chapterStyle = (index: number) => {
   const distance = current.value - index
@@ -194,8 +199,19 @@ const animate = () => {
   const difference = target.value - current.value
   const easing = isPhone() ? Math.min(0.16, 0.105 + Math.abs(difference) * 0.035) : 0.09
   current.value += difference * easing
-  if (Math.abs(difference) < 0.0006) current.value = target.value
+  if (Math.abs(difference) < 0.0006) {
+    current.value = target.value
+    activeNode.value = Math.round(current.value)
+    animating = false
+    raf = 0
+    return
+  }
   activeNode.value = Math.round(current.value)
+  raf = requestAnimationFrame(animate)
+}
+const startAnimation = () => {
+  if (animating || document.hidden) return
+  animating = true
   raf = requestAnimationFrame(animate)
 }
 const snap = () => {
@@ -326,12 +342,22 @@ const onKey = (event: KeyboardEvent) => {
   if (['Enter', 'ArrowRight', 'ArrowDown', 'PageDown'].includes(event.key)) target.value = clamp(Math.round(target.value) + 1)
   if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) target.value = clamp(Math.round(target.value) - 1)
 }
+const onVisibilityChange = () => {
+  if (document.hidden) {
+    cancelAnimationFrame(raf)
+    raf = 0
+    animating = false
+    return
+  }
+  if (Math.abs(target.value - current.value) >= 0.0006) startAnimation()
+}
 const openPrediction = () => window.open('https://prediction-exchange-lovat.vercel.app', '_blank', 'noopener,noreferrer')
 const openWallet = () => window.open('https://testnet.wallet.eoeo.info/06bx', '_blank', 'noopener,noreferrer')
 
 onMounted(() => {
-  raf = requestAnimationFrame(animate)
+  startAnimation()
   addEventListener('keydown', onKey)
+  document.addEventListener('visibilitychange', onVisibilityChange)
   stageRef.value?.addEventListener('touchstart', onTouchStart, { passive: true })
   stageRef.value?.addEventListener('touchmove', onTouchMove, { passive: false })
   stageRef.value?.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -339,18 +365,21 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
+  animating = false
   clearTimeout(snapTimer)
   removeEventListener('keydown', onKey)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   stageRef.value?.removeEventListener('touchstart', onTouchStart)
   stageRef.value?.removeEventListener('touchmove', onTouchMove)
   stageRef.value?.removeEventListener('touchend', onTouchEnd)
   stageRef.value?.removeEventListener('touchcancel', onTouchCancel)
 })
+watch(target, startAnimation)
 </script>
 
 <style scoped>
 .timeline{--t:0;position:fixed;top:0;right:0;bottom:0;left:0;inset:0;width:100%;height:100%;height:100vh;min-height:100%;overflow:hidden;background:#020817;color:#f5f9ff;font-family:var(--aix-font);touch-action:none;user-select:none}.timeline :deep(.app-header){z-index:12000}.space-stage{position:absolute;top:0;right:0;bottom:0;left:0;inset:0;overflow:hidden;perspective:1200px}.space-camera{pointer-events:none}.space-camera{position:absolute;top:-10%;right:-10%;bottom:-10%;left:-10%;transform:perspective(900px) translateZ(var(--cam-z,0px)) rotate(var(--cam-rotate,0deg)) scale(var(--cam-scale,1.06));will-change:transform}.scene-image{position:absolute;top:0;right:0;bottom:0;left:0;inset:0;background-position:center;background-size:cover}.speed-lines{position:absolute;top:-20%;right:-20%;bottom:-20%;left:-20%;opacity:var(--speed-opacity,0);background:repeating-conic-gradient(from 0deg at 50% 50%,transparent 0 3deg,rgba(69,170,255,.13) 3.2deg 3.4deg);transform:scale(1.4)}.vignette{position:absolute;top:0;right:0;bottom:0;left:0;inset:0;background:radial-gradient(circle,transparent 30%,rgba(0,4,16,.78))}
-.opening{position:fixed;z-index:10000;top:0;right:0;bottom:0;left:0;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#020817;pointer-events:none;transition:opacity .85s ease,visibility .85s}.opening-space,.opening-tunnel,.opening-energy,.opening-vignette{position:absolute;top:0;right:0;bottom:0;left:0;inset:0}.opening-space{overflow:hidden;animation:opening-flight 2.65s cubic-bezier(.18,.7,.22,1) both}.opening-tunnel{inset:-8%;background:url('/assets/timeline-00-time-tunnel.png') center/cover no-repeat;filter:saturate(1.12) contrast(1.08);animation:tunnel-roll 2.65s cubic-bezier(.18,.7,.22,1) both;will-change:transform,filter}.opening-energy{inset:-25%;background:repeating-conic-gradient(from 12deg at 50% 50%,transparent 0 5.5deg,rgba(61,174,255,.13) 5.7deg 5.95deg,transparent 6.1deg 12deg);mix-blend-mode:screen;animation:energy-spin 2.65s cubic-bezier(.18,.7,.22,1) both}.opening-vignette{background:radial-gradient(circle at center,transparent 12%,rgba(1,7,20,.12) 39%,rgba(1,7,20,.84) 100%),linear-gradient(180deg,rgba(1,7,20,.36),transparent 34%,rgba(1,7,20,.5))}.opening-copy{position:relative;z-index:2;display:flex;align-items:center;flex-direction:column;gap:18px;padding:28px;text-align:center;animation:opening-copy 2.3s ease both}.timeline:not(.intro-complete) :deep(.app-header){opacity:0;visibility:hidden}.timeline :deep(.app-header){transition:opacity .45s ease,visibility .45s}.opening p,.opening h1{margin:0;color:#f7fbff;font-weight:700;letter-spacing:.1em;text-shadow:0 4px 18px #020817,0 12px 42px #000}.opening p{font-size:clamp(18px,2vw,28px)}.opening h1{font-size:clamp(48px,8vw,112px);letter-spacing:.04em}.opening-copy span{width:clamp(70px,9vw,140px);height:2px;background:#168bff;box-shadow:0 0 24px #168bff;animation:scan 1.25s .18s ease-in-out both}.intro-complete .opening{opacity:0;visibility:hidden;pointer-events:none}.intro-complete .opening-tunnel{transform:scale(1.68)}
+.opening{position:fixed;z-index:10000;top:0;right:0;bottom:0;left:0;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#020817;pointer-events:none;transition:opacity .85s ease,visibility .85s}.opening-space,.opening-tunnel,.opening-energy,.opening-vignette{position:absolute;top:0;right:0;bottom:0;left:0;inset:0}.opening-space{overflow:hidden;animation:opening-flight 2.65s cubic-bezier(.18,.7,.22,1) both}.opening-tunnel{inset:-8%;background:url('/assets/timeline-00-time-tunnel.png') center/cover no-repeat;filter:saturate(1.12) contrast(1.08);animation:tunnel-roll 2.65s cubic-bezier(.18,.7,.22,1) both;will-change:transform,filter}.opening-energy{inset:-25%;background:repeating-conic-gradient(from 12deg at 50% 50%,transparent 0 5.5deg,rgba(61,174,255,.13) 5.7deg 5.95deg,transparent 6.1deg 12deg);mix-blend-mode:screen;animation:energy-spin 2.65s cubic-bezier(.18,.7,.22,1) both}.opening-vignette{background:radial-gradient(circle at center,transparent 12%,rgba(1,7,20,.12) 39%,rgba(1,7,20,.84) 100%),linear-gradient(180deg,rgba(1,7,20,.36),transparent 34%,rgba(1,7,20,.5))}.opening-copy{position:relative;z-index:2;display:flex;align-items:center;flex-direction:column;gap:18px;padding:28px;text-align:center;animation:opening-copy 2.3s ease both}.timeline :deep(.app-header){transition:opacity .45s ease,visibility .45s}.opening p,.opening h1{margin:0;color:#f7fbff;font-weight:700;letter-spacing:.1em;text-shadow:0 4px 18px #020817,0 12px 42px #000}.opening p{font-size:clamp(18px,2vw,28px)}.opening h1{font-size:clamp(48px,8vw,112px);letter-spacing:.04em}.opening-copy span{width:clamp(70px,9vw,140px);height:2px;background:#168bff;box-shadow:0 0 24px #168bff;animation:scan 1.25s .18s ease-in-out both}.intro-complete .opening{opacity:0;visibility:hidden;pointer-events:none}.intro-complete .opening-tunnel{transform:scale(1.68)}
 @keyframes scan{from{transform:scaleX(0);opacity:.2}to{transform:scaleX(1);opacity:1}}
 @keyframes opening-flight{0%{filter:brightness(.55)}42%{filter:brightness(.92)}100%{filter:brightness(1.08)}}
 @keyframes tunnel-roll{0%{transform:scale(1.02) rotate(-5deg)}55%{transform:scale(1.18) rotate(2deg)}100%{transform:scale(1.48) rotate(8deg);filter:saturate(1.25) contrast(1.12) blur(1px)}}
@@ -462,4 +491,12 @@ onBeforeUnmount(() => {
 }
 .embedded-panel :deep(.market-stats>.stat span){font-size:10px;letter-spacing:.14em}
 .embedded-panel :deep(.market-stats>.stat strong){font-size:18px}
+/* 手机钱包内置 WebView：减少昂贵的合成图层，避免 GPU 进程被回收后白屏。 */
+@media(max-width:540px){
+  .space-camera{will-change:auto}
+  .speed-lines,.opening-energy{display:none}
+  .content-surface,.embedded-panel,.partners-panel,.hero-actions button{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+  .opening-tunnel{filter:none;will-change:auto}
+  .partners-panel :deep(.wall-track){animation:none!important}
+}
 </style>

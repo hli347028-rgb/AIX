@@ -64,6 +64,12 @@ body {
     }
 }
 
+/* JS 尚未挂载或钱包 WebView 正在恢复页面时，根节点也保持深色，避免白闪/白屏。 */
+#app:empty {
+    min-height: 100vh;
+    background: #020817;
+}
+
 .icon-isps {
     background: url('../assets/images/biw-logo.jpg') no-repeat;
     background-size: 100% 100%;
