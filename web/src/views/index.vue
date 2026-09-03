@@ -2,7 +2,7 @@
   <div
     ref="stageRef"
     class="timeline"
-    :class="{ 'intro-complete': activeNode > 0 }"
+    :class="{ 'intro-complete': activeNode > 0, 'resource-lite': resourceLite }"
     :style="timelineStyle"
     @wheel.prevent="onWheel"
     @pointerdown="onPointerDown"
@@ -24,7 +24,7 @@
         <div class="vignette" />
       </div>
 
-      <div class="opening" aria-live="polite">
+      <div v-if="!resourceLite && activeNode === 0" class="opening" aria-live="polite">
         <div class="opening-space" aria-hidden="true">
           <div class="opening-tunnel" />
           <div class="opening-energy" />
@@ -33,6 +33,9 @@
         <div class="opening-copy">
           <p>{{ $t('home.openingKicker') }}</p>
           <h1><span>{{ $t('home.openingPrefix') }}</span>{{ $t('home.openingTitle') }}</h1>
+          <button class="opening-enter" type="button" @click="enterFuture">
+            <span>{{ $t('home.openingTitle') }}</span><b>→</b>
+          </button>
           <small>{{ $t('home.openingHint') }}</small>
         </div>
       </div>
@@ -70,7 +73,7 @@
           <h2>AIX / WIN</h2>
           <p>{{ $t('home.marketDescription') }}</p>
         </div>
-        <div class="embedded-panel"><AixWinMarket embedded /></div>
+        <div class="embedded-panel"><AixWinMarket v-if="activeNode === 2" embedded /></div>
       </section>
 
       <section class="chapter chapter--ecosystem" :class="chapterClass(3)" :style="chapterStyle(3)">
@@ -80,7 +83,7 @@
           <p>{{ $t('home.ecosystemDescription') }}</p>
           <dl><div><dt>{{ $t('home.networkStatus') }}</dt><dd>ONLINE</dd></div><div><dt>{{ $t('home.ecosystemPartners') }}</dt><dd>06</dd></div><div><dt>{{ $t('home.settlementNetwork') }}</dt><dd>MULTI-CHAIN</dd></div></dl>
         </article>
-        <div class="partners-panel"><PartnersWall /></div>
+        <div class="partners-panel"><PartnersWall v-if="activeNode === 3" /></div>
       </section>
 
       <section class="chapter chapter--hero" :class="chapterClass(4)" :style="chapterStyle(4)">
@@ -115,6 +118,11 @@ import PartnersWall from '@/components/PartnersWall.vue'
 const router = useRouter()
 const { t: $t } = useI18n()
 const stageRef = ref<HTMLElement | null>(null)
+// Android 钱包 WebView 的 GPU/图片解码能力差异很大。手机端直接进入首个
+// 内容章节，避免开场遮罩或大图解码失败时把可用页面永久盖成黑屏。
+const resourceLite = /Android/i.test(navigator.userAgent) || window.innerWidth <= 540
+const initialNode = resourceLite ? 1 : 0
+const minimumNode = initialNode
 const scenes = [
   { id: 'opening', image: '/assets/timeline-00-time-tunnel-v2.png' },
   { id: 'future', image: '/assets/timeline-04-consensus.png' },
@@ -122,9 +130,9 @@ const scenes = [
   { id: 'ecosystem', image: '/assets/timeline-05-ecosystem.png' },
   { id: 'hero', image: '/assets/timeline-06-destination.png' },
 ]
-const target = ref(0)
-const current = ref(0)
-const activeNode = ref(0)
+const target = ref(initialNode)
+const current = ref(initialNode)
+const activeNode = ref(initialNode)
 const dragging = ref(false)
 let startX = 0
 let startY = 0
@@ -180,7 +188,9 @@ const sceneStyle = (index: number, image: string) => {
 // 钱包 WebView 的显存通常比系统浏览器小，只创建当前和相邻场景图层。
 const visibleScenes = computed(() => scenes
   .map((scene, index) => ({ ...scene, index }))
-  .filter((scene) => Math.abs(scene.index - activeNode.value) <= 1))
+  .filter((scene) => resourceLite
+    ? scene.index === activeNode.value
+    : Math.abs(scene.index - activeNode.value) <= 1))
 const chapterClass = (index: number) => ({ active: Math.abs(current.value - index) < 0.98, interactive: Math.abs(current.value - index) < 0.08 })
 const chapterStyle = (index: number) => {
   const distance = current.value - index
@@ -193,7 +203,7 @@ const chapterStyle = (index: number) => {
     '--chapter-y': `${easedDistance * -3}vh`,
   }
 }
-const clamp = (value: number) => Math.max(0, Math.min(4, value))
+const clamp = (value: number) => Math.max(minimumNode, Math.min(4, value))
 const enterFuture = () => { target.value = 1 }
 const animate = () => {
   const difference = target.value - current.value
@@ -306,7 +316,11 @@ const onTouchMove = (event: TouchEvent) => {
   const travelBase = touchAxis === 'horizontal' ? Math.max(260, innerWidth * 0.82) : Math.max(300, innerHeight * 0.58)
   const travel = -primaryDelta / travelBase
   const rawProgress = touchStartNode + travel
-  const resistedProgress = rawProgress < 0 ? rawProgress * 0.18 : rawProgress > 4 ? 4 + (rawProgress - 4) * 0.18 : rawProgress
+  const resistedProgress = rawProgress < minimumNode
+    ? minimumNode + (rawProgress - minimumNode) * 0.18
+    : rawProgress > 4
+      ? 4 + (rawProgress - 4) * 0.18
+      : rawProgress
   current.value = resistedProgress
   target.value = resistedProgress
   activeNode.value = Math.round(clamp(resistedProgress))
@@ -499,4 +513,8 @@ watch(target, startAnimation)
   .opening-tunnel{filter:none;will-change:auto}
   .partners-panel :deep(.wall-track){animation:none!important}
 }
+
+/* 桌面开场保留可点击入口；较旧 WebView 不再依赖滑动才能离开遮罩。 */
+.opening { pointer-events: auto; }
+.opening-space { pointer-events: none; }
 </style>
