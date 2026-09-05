@@ -42,6 +42,7 @@ const MODULE_OPTIONS = [
     { label: '兑换记录', value: '/exchangeList' },
     { label: '划转记录', value: '/transferList' },
     { label: '交易所划转', value: '/exchangeTransfer' },
+    { label: '向交易所划转', value: '/toExchangeTransfer' },
     { label: '每日结算', value: '/settlement' },
     { label: '公告列表', value: '/news' },
 ]

@@ -87,8 +87,13 @@ export default {
                 },
                 {
                     title: 'AIX-USDT',
+                    dataIndex: 'points',
+                    customRender: (v) => (v === null || v === undefined || v === '') ? '0' : String(v)
+                },
+                {
+                    title: '累计AIX-USDT',
                     dataIndex: 'points_all',
-                    customRender: (v, row) => v || (row && row.points) || '0'
+                    customRender: (v) => (v === null || v === undefined || v === '') ? '0' : String(v)
                 },
                 {
                     title: '静态总收益',

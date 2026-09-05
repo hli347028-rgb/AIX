@@ -124,6 +124,7 @@ const local = {
     directInviteData: 'Jumlah Langganan Bawahan',
     downlineSubscribeAmount: 'Jumlah Langganan Bawahan',
     downlineRechargeUsdt: 'Jumlah Isi Ulang USDT Bawahan',
+    downlineRechargeWin: 'Jumlah Isi Ulang WIN Bawahan',
     directLedgerTabs: 'Catatan bawahan',
     teamIdoTotal: 'Total IDO Tim',
     personalRedeemed: 'Ditebus Pribadi',
@@ -153,7 +154,7 @@ const local = {
     generation: 'Generasi',
     reward: 'Hadiah',
     time: 'Waktu', directReferralReward: 'Hadiah Rujukan Langsung', managementReward: 'Hadiah Manajemen',
-    usdtAmount: 'Jumlah USDT', subscribeAmount: 'Jumlah Langganan', subscribeType: 'Jenis', subscribeTypeRecharge: 'Langganan USDT', subscribeTypeReward: 'Investasi Ulang', subscribeTypeWin: 'Bayar WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Jumlah BRC20', myTeam: 'Tim Saya', refresh: 'Segarkan', teamTotalMembers: 'Total Anggota Tim', username: 'Nama Pengguna', usernameSetting: 'Pengaturan Nama', editUsername: 'Edit', saveUsername: 'Simpan', cancelUsername: 'Batal', usernameSaved: 'Nama pengguna disimpan', usernameRequired: 'Masukkan nama pengguna', usernameTooLong: 'Nama pengguna maksimal 24 karakter', notSet: 'Belum diatur', teamMembers: 'Profil Anggota Tim', noTeamMembers: 'Belum ada anggota tim', active: 'Aktif', directMembers: 'Anggota Langsung', joinedAt: 'Tanggal Bergabung'
+    usdtAmount: 'Jumlah USDT', winAmount: 'Jumlah WIN', rechargeSource: 'Sumber isi ulang', rechargeSourceChain: 'On-chain', rechargeSourceExchange: 'Transfer bursa', subscribeAmount: 'Jumlah Langganan', subscribeType: 'Jenis', subscribeTypeRecharge: 'Langganan USDT', subscribeTypeReward: 'Investasi Ulang', subscribeTypeWin: 'Bayar WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Jumlah BRC20', myTeam: 'Tim Saya', refresh: 'Segarkan', teamTotalMembers: 'Total Anggota Tim', username: 'Nama Pengguna', usernameSetting: 'Pengaturan Nama', editUsername: 'Edit', saveUsername: 'Simpan', cancelUsername: 'Batal', usernameSaved: 'Nama pengguna disimpan', usernameRequired: 'Masukkan nama pengguna', usernameTooLong: 'Nama pengguna maksimal 24 karakter', notSet: 'Belum diatur', teamMembers: 'Profil Anggota Tim', noTeamMembers: 'Belum ada anggota tim', active: 'Aktif', directMembers: 'Anggota Langsung', joinedAt: 'Tanggal Bergabung'
   },
   count: {
     myNodes: 'Node Saya', myIncome: 'Pendapatan Saya', matrix: 'Matriks', level: 'Level', sharedNodes: 'Node Bersama',
@@ -425,7 +426,7 @@ const local = {
     recordsUnavailable: 'Catatan transfer belum tersedia', noRecords: 'Tidak ada catatan transfer',
     rechargeWallet: 'Dompet Isi Ulang', rewardWallet: 'Dompet Hadiah', myRewardWallet: 'Dompet Hadiah Saya',
     userRewardWallet: 'Dompet Hadiah Pengguna', selfHint: 'Pindahkan saldo isi ulang ke dompet hadiah tanpa hadiah rujukan.',
-    userHint: 'Hanya pengguna upline dan downline. Dana masuk ke dompet hadiah penerima.', upline: 'Upline', downline: 'Downline',
+    userHint: 'Hanya upline yang dapat transfer ke downline di rantai undangan. Dana masuk ke dompet hadiah penerima.', upline: 'Upline', downline: 'Downline',
     fetchRecordsFailed: 'Gagal mengambil catatan transfer', insufficientBalance: 'Saldo di {wallet} tidak cukup',
     amountMustBePositive: 'Jumlah transfer harus lebih dari 0', invalidRecipient: 'Alamat penerima tidak valid',
     cannotTransferToSelf: 'Anda tidak dapat mentransfer ke diri sendiri', success: 'Transfer berhasil', failed: 'Transfer gagal'

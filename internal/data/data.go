@@ -32,6 +32,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
 		&ExchangeRecordPO{}, &AnnouncementPO{}, &FeedbackPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
+		&ExchangeTransferPO{},
 	); err != nil {
 		return nil, nil, err
 	}
@@ -157,13 +158,14 @@ func migrateSubscribePoints(db *gorm.DB) error {
 	`).Error
 }
 
-// migratePointsSource 回填 AIX-USDT 来源；清理历史误记的奖励复投积分（保留划转复投）。
+// migratePointsSource 回填 AIX-USDT 来源；清理未标记来源的奖励复投积分。
+// 保留划转复投，以及 2026-09-02 前回补的 reward_legacy。
 // 只校正 points_all（累计获得），不改写 points 可用余额。
 func migratePointsSource(db *gorm.DB) error {
 	if err := db.Exec(`
 		UPDATE orders SET points = 0, points_source = ''
 		WHERE fund_source = 'reward' AND points > 0
-			AND (points_source IS NULL OR points_source = '' OR points_source <> 'transfer_reinvest')
+			AND points_source NOT IN ('transfer_reinvest', 'reward_legacy')
 	`).Error; err != nil {
 		return err
 	}
@@ -341,6 +343,10 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 		{
 			name: "exchange_enabled",
 			ddl:  "ALTER TABLE users ADD COLUMN exchange_enabled tinyint(1) NOT NULL DEFAULT 1",
+		},
+		{
+			name: "transfer_reinvest_blocked",
+			ddl:  "ALTER TABLE users ADD COLUMN transfer_reinvest_blocked decimal(36,18) NOT NULL DEFAULT 0",
 		},
 	}
 	for _, col := range columns {

@@ -45,6 +45,9 @@ type SystemConfigSnapshot struct {
 	// AIX 兑换审核：全网当日已兑换 AIX 超过「今日AIX数量 × 阈值%」后，后续兑换进待审核
 	ExchangeReviewThresholdPercent string `json:"exchange_review_threshold_percent"`
 
+	// 用户端「向交易所划转」AIX-USDT 单笔最低额（管理端可配）
+	ExchangeTransferMinAmount string `json:"exchange_transfer_min_amount"`
+
 	MgmtCountsTowardExit  bool      `json:"mgmt_counts_toward_exit"` // 管理奖是否计入出局
 	MgmtCountsTowardExitP *bool     `json:"-"`                       // 内部：区分 JSON 缺省与 false
 
@@ -84,6 +87,9 @@ const (
 
 	// 兑换审核阈值（%）：当日已兑换 AIX 超过「今日AIX × 该百分比」后，后续兑换需审核。默认 100=不提前触发。
 	DefaultExchangeReviewThresholdPercent = "100"
+
+	// 向交易所划转 AIX-USDT 单笔最低额
+	DefaultExchangeTransferMinAmount = "500"
 )
 
 // DefaultMgmtThresholds W1→W10 小区业绩门槛（USDT）
@@ -134,6 +140,7 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	s.PartnerMaxAmount = normalizePositiveAmount(s.PartnerMaxAmount, DefaultPartnerMaxAmount)
 	s.PartnerDailyLimit = normalizePositiveAmount(s.PartnerDailyLimit, DefaultPartnerDailyLimit)
 	s.ExchangeReviewThresholdPercent = normalizePercent(s.ExchangeReviewThresholdPercent, DefaultExchangeReviewThresholdPercent)
+	s.ExchangeTransferMinAmount = normalizePositiveAmount(s.ExchangeTransferMinAmount, DefaultExchangeTransferMinAmount)
 	if len(s.MgmtThresholds) != 10 {
 		s.MgmtThresholds = DefaultMgmtThresholds()
 	}

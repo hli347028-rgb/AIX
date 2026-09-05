@@ -32,6 +32,7 @@
                     <a-button-group>
                         <a-button type="primary" :loading="loading" @click="getListTwo">确定筛选</a-button>
                         <a-button :loading="loading" @click="resetSearch">重置</a-button>
+                        <a-button :loading="exporting" @click="exportList">导出</a-button>
                     </a-button-group>
                 </a-col>
             </a-row>
@@ -102,6 +103,7 @@ export default {
             typeOptions,
             stats: null,
             teamSummary: null,
+            exporting: false,
             columns: [
                 {
                     title: '时间',
@@ -188,6 +190,24 @@ export default {
                 this.total = parseInt(res.count || 0)
             }).catch(() => {
                 this.loading = false
+            })
+        },
+        exportList() {
+            this.exporting = true
+            const params = this.buildParams()
+            delete params.page
+            delete params.pageSize
+            Gai.reward_list_export(params).then((blob) => {
+                const url = window.URL.createObjectURL(new Blob([blob]))
+                const link = document.createElement('a')
+                link.href = url
+                link.setAttribute('download', `reward_${moment().format('YYYYMMDD_HHmmss')}.csv`)
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                window.URL.revokeObjectURL(url)
+            }).finally(() => {
+                this.exporting = false
             })
         },
     },

@@ -26,7 +26,8 @@ type UserPO struct {
 	OverflowDirect    decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`     // 直推奖溢出
 	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                         // 当前 AIX-USDT
 	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                     // 累计 AIX-USDT
-	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 邀请链任意上级划入额度；下级复投可产生 AIX-USDT（不限直推）
+	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 上级划入累计的复投额度；下级复投可产生 AIX-USDT
+	TransferReinvestBlocked decimal.Decimal `gorm:"column:transfer_reinvest_blocked;type:decimal(36,18);default:0;not null"`     // 阻断额；再转下级不产生复投 AIX-USDT
 	StaticUsdtTotal   decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`   // 静态总收益（USDT 金本位累计）
 	MgmtLevel         int32           `gorm:"column:mgmt_level;default:0;not null"`
 	MgmtLevelLocked   bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
@@ -301,3 +302,21 @@ type PartnerNoncePO struct {
 }
 
 func (PartnerNoncePO) TableName() string { return "partner_nonces" }
+
+// ExchangeTransferPO 用户向交易所划转 AIX-USDT（扣 points，调用第三方加款）。
+type ExchangeTransferPO struct {
+	ID            int64           `gorm:"primaryKey;autoIncrement"`
+	UserID        int64           `gorm:"column:user_id;index;not null"`
+	Address       string          `gorm:"column:address;size:42;not null;index"`
+	Asset         string          `gorm:"size:16;default:SDT;not null"`
+	Amount        decimal.Decimal `gorm:"type:decimal(36,18);not null"`
+	Status        string          `gorm:"size:16;default:pending;not null;index"` // pending | completed | failed
+	Nonce         string          `gorm:"column:nonce;size:64;not null;uniqueIndex"`
+	PartnerTxnID  string          `gorm:"column:partner_txn_id;size:128"`
+	PartnerCode   string          `gorm:"column:partner_code;size:32"`
+	Remark        string          `gorm:"size:512"`
+	CreatedTime   time.Time       `gorm:"column:created_time;autoCreateTime;index"`
+	UpdatedTime   time.Time       `gorm:"column:updated_time;autoUpdateTime"`
+}
+
+func (ExchangeTransferPO) TableName() string { return "exchange_transfers" }

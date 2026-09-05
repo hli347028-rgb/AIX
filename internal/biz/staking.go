@@ -36,6 +36,7 @@ var (
 	PartnerMaxAmount  = conf.DefaultPartnerMaxAmount
 	PartnerDailyLimit = conf.DefaultPartnerDailyLimit
 	ExchangeReviewThresholdPercent = conf.DefaultExchangeReviewThresholdPercent
+	ExchangeTransferMinAmount = conf.DefaultExchangeTransferMinAmount
 )
 
 // AixPriceDecimals AIX 价格对外展示与落库统一保留的小数位数。
@@ -120,6 +121,9 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	}
 	if snap.ExchangeReviewThresholdPercent != "" {
 		ExchangeReviewThresholdPercent = snap.ExchangeReviewThresholdPercent
+	}
+	if snap.ExchangeTransferMinAmount != "" {
+		ExchangeTransferMinAmount = snap.ExchangeTransferMinAmount
 	}
 }
 

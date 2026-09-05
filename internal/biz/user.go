@@ -188,6 +188,8 @@ type UserRepo interface {
 	GetBalances(ctx context.Context, userID int64) (recharge, reward, aix string, err error)
 	AddUsdtRecharge(ctx context.Context, userID int64, amount string) (string, error)
 	IsUplineOrDownline(ctx context.Context, a, b int64) (bool, error)
+	// IsUplineOf 判断 uplineID 是否为 downlineID 邀请链上的上级（任意层级）。
+	IsUplineOf(ctx context.Context, uplineID, downlineID int64) (bool, error)
 
 	// Legacy stubs kept for compile of unused paths
 	SetWithdrawReset(ctx context.Context, userID int64, reset bool) error

@@ -136,6 +136,7 @@ export default {
     directInviteData: '下级认购金额',
     downlineSubscribeAmount: '下级认购金额',
     downlineRechargeUsdt: '下级充值USDT金额',
+    downlineRechargeWin: '下级充值WIN金额',
     directLedgerTabs: '下级明细',
     teamIdoTotal: '团队IDO总量',
     personalRedeemed: '个人已赎回业绩',
@@ -173,7 +174,7 @@ export default {
     generation: '代数',
     reward: '奖励',
     time: '时间', directReferralReward: '直推奖励', managementReward: '管理奖',
-    usdtAmount: '充值USDT金额', subscribeAmount: '认购金额', subscribeType: '充值类型', subscribeTypeRecharge: 'USDT认购', subscribeTypeReward: '复投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
+    usdtAmount: '充值USDT金额', winAmount: '充值WIN金额', rechargeSource: '充值来源', rechargeSourceChain: '链上充值', rechargeSourceExchange: '交易所划转', subscribeAmount: '认购金额', subscribeType: '充值类型', subscribeTypeRecharge: 'USDT认购', subscribeTypeReward: '复投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
   },
   count: {
     myNodes: '我的节点', myIncome: '我的收益', matrix: '矩阵图', level: '级别', sharedNodes: '分享节点',
@@ -441,18 +442,27 @@ export default {
   },
   transfer: {
     title: '划转', type: '划转类型', toRewardWallet: '转到奖励钱包', toUser: '转给用户',
-    direction: '划转方向', rewardBalance: '奖励余额', recipientAddress: '收款地址',
+    userMode: '用户划转', exchangeMode: '向交易所划转',
+    direction: '划转方向', rewardBalance: '奖励余额', aixUsdtBalance: 'AIX-USDT 余额',
+    recipientAddress: '收款地址',
     recipientPlaceholder: '请输入关联用户地址', amount: '划转金额', all: '全部',
     processing: '划转中...', confirm: '确认划转', records: '划转记录', recordDirection: '记录方向',
     walletDirection: '钱包方向', directionAndUser: '方向 / 用户', amountColumn: '金额', time: '时间',
+    status: '状态', statusCompleted: '成功', statusFailed: '失败', statusPending: '处理中',
     rechargeToReward: '充值 → 奖励', in: '转入', out: '转出',
     recordsUnavailable: '划转记录暂未开放', noRecords: '暂无划转记录',
     rechargeWallet: '充值钱包', rewardWallet: '奖励钱包', myRewardWallet: '我的奖励钱包',
     userRewardWallet: '用户奖励钱包', selfHint: '充值余额转入奖励钱包，不产生直推奖励',
-    userHint: '仅支持上下级用户，资金转入对方奖励钱包', upline: '上级', downline: '下级',
+    userHint: '仅支持上级向邀请链下级划转，资金转入对方奖励钱包',
+    exchangeHint: '将 AIX-USDT 划转至交易所账户，使用已绑定钱包地址识别账户',
+    exchangeMinHint: '单笔最低 {min} AIX-USDT',
+    onlyDownline: '仅允许上级向邀请链下级划转',
+    upline: '上级', downline: '下级',
     fetchRecordsFailed: '获取划转记录失败', insufficientBalance: '{wallet}余额不足',
     amountMustBePositive: '划转金额必须大于 0', invalidRecipient: '收款地址无效',
-    cannotTransferToSelf: '不能转给自己', success: '划转成功', failed: '划转失败'
+    cannotTransferToSelf: '不能转给自己', success: '划转成功', failed: '划转失败',
+    disabled: '划转功能已关闭',
+    exchangeDisabled: '向交易所划转已关闭'
   },
   announcement: {
     title: '公告',

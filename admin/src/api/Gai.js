@@ -17,6 +17,14 @@ export default {
             params: parameter
         })
     },
+    reward_list_export: (parameter) => {
+        return axios({
+            url: `${api8005}/reward_list_export`,
+            method: 'get',
+            params: parameter,
+            responseType: 'blob'
+        })
+    },
     dividend_policy: (parameter) => {
         return axios({
             url: `${api8005}/lock_user_reward`,
@@ -140,6 +148,13 @@ export default {
     partner_credit_partners: (parameter) => {
         return axios({
             url: `${api8005}/partner_credit_partners`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    exchange_transfer_list: (parameter) => {
+        return axios({
+            url: `${api8005}/exchange_transfer_list`,
             method: 'get',
             params: parameter
         })

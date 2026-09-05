@@ -124,6 +124,7 @@ const local = {
     directInviteData: '下級認購金額',
     downlineSubscribeAmount: '下級認購金額',
     downlineRechargeUsdt: '下級USDT充值金額',
+    downlineRechargeWin: '下級WIN充值金額',
     directLedgerTabs: '下級明細',
     teamIdoTotal: 'チームIDO総量',
     personalRedeemed: '個人償還業績',
@@ -153,7 +154,7 @@ const local = {
     generation: '世代',
     reward: '報酬',
     time: '時間', directReferralReward: '直接紹介報酬', managementReward: '管理報酬',
-    usdtAmount: 'USDT 数量', subscribeAmount: '認購金額', subscribeType: 'タイプ', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '再投資', subscribeTypeWin: 'WIN支払', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: 'マイチーム', refresh: '更新', teamTotalMembers: 'チーム総人数', username: 'ユーザー名', usernameSetting: '名前設定', editUsername: '編集', saveUsername: '保存', cancelUsername: 'キャンセル', usernameSaved: 'ユーザー名を保存しました', usernameRequired: 'ユーザー名を入力してください', usernameTooLong: 'ユーザー名は24文字以内で入力してください', notSet: '未設定', teamMembers: 'チームメンバー情報', noTeamMembers: 'チームメンバーはいません', active: '有効', directMembers: '直属人数', joinedAt: '参加日時'
+    usdtAmount: 'USDT 数量', winAmount: 'WIN 数量', rechargeSource: '充值元', rechargeSourceChain: 'オンチェーン', rechargeSourceExchange: '取引所振替', subscribeAmount: '認購金額', subscribeType: 'タイプ', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '再投資', subscribeTypeWin: 'WIN支払', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: 'マイチーム', refresh: '更新', teamTotalMembers: 'チーム総人数', username: 'ユーザー名', usernameSetting: '名前設定', editUsername: '編集', saveUsername: '保存', cancelUsername: 'キャンセル', usernameSaved: 'ユーザー名を保存しました', usernameRequired: 'ユーザー名を入力してください', usernameTooLong: 'ユーザー名は24文字以内で入力してください', notSet: '未設定', teamMembers: 'チームメンバー情報', noTeamMembers: 'チームメンバーはいません', active: '有効', directMembers: '直属人数', joinedAt: '参加日時'
   },
   count: {
     myNodes: 'マイノード', myIncome: 'マイ収益', matrix: 'マトリックス', level: 'レベル', sharedNodes: '共有ノード',
@@ -422,7 +423,7 @@ const local = {
     recordsUnavailable: '振替履歴はまだ利用できません', noRecords: '振替履歴はありません',
     rechargeWallet: 'チャージウォレット', rewardWallet: '報酬ウォレット', myRewardWallet: '自分の報酬ウォレット',
     userRewardWallet: 'ユーザーの報酬ウォレット', selfHint: 'チャージ残高を報酬ウォレットへ移します。紹介報酬は発生しません。',
-    userHint: '上下関係のあるユーザーのみ。資金は相手の報酬ウォレットに入ります。', upline: '上位', downline: '下位',
+    userHint: '上位から招待チェーンの下位へのみ振替可能。資金は相手の報酬ウォレットに入ります。', upline: '上位', downline: '下位',
     fetchRecordsFailed: '振替履歴の取得に失敗しました', insufficientBalance: '{wallet}の残高が不足しています',
     amountMustBePositive: '振替金額は0より大きい必要があります', invalidRecipient: '受取アドレスが無効です',
     cannotTransferToSelf: '自分には送れません', success: '振替が完了しました', failed: '振替に失敗しました'

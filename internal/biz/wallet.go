@@ -23,7 +23,8 @@ const (
 	// PointsSource AIX-USDT 产生来源（写入 orders.points_source）
 	PointsSourceRecharge         = "recharge"          // USDT 认购
 	PointsSourceWin              = "win"               // WIN 认购
-	PointsSourceTransferReinvest = "transfer_reinvest" // 任意层级上级→下级划转后，下级复投产生（不限直推）
+	PointsSourceTransferReinvest = "transfer_reinvest" // 下级用上级划转额度复投产生
+	PointsSourceRewardLegacy     = "reward_legacy"     // 2026-09-02 前奖励复投积分（历史规则回补，启动迁移不可清）
 
 	OrderStatusActive    = "active"
 	OrderStatusExited    = "exited"
@@ -116,6 +117,14 @@ func GetExchangeReviewThresholdPercent() string {
 		return conf.DefaultExchangeReviewThresholdPercent
 	}
 	return ExchangeReviewThresholdPercent
+}
+
+// GetExchangeTransferMinAmount 向交易所划转 AIX-USDT 单笔最低额（管理端可配，默认 500）。
+func GetExchangeTransferMinAmount() string {
+	if strings.TrimSpace(ExchangeTransferMinAmount) == "" {
+		return conf.DefaultExchangeTransferMinAmount
+	}
+	return ExchangeTransferMinAmount
 }
 
 // GetPartnerDailyLimit 返回交易所划转单日累计上限（管理端可配）。
@@ -240,6 +249,22 @@ type LinealTransferRecord struct {
 	CreatedTime         time.Time
 }
 
+// ExchangeTransfer 向交易所划转 AIX-USDT 记录。
+type ExchangeTransfer struct {
+	ID           int64
+	UserID       int64
+	Address      string
+	Asset        string
+	Amount       string
+	Status       string
+	Nonce        string
+	PartnerTxnID string
+	PartnerCode  string
+	Remark       string
+	CreatedTime  time.Time
+	UpdatedTime  time.Time
+}
+
 // RewardLog AIX reward ledger row.
 type RewardLog struct {
 	ID             int64
@@ -355,7 +380,7 @@ type Order struct {
 	FromWin      string
 	FromWinA     string
 	Points       string // 本单获得 AIX-USDT
-	PointsSource string // AIX-USDT 产生来源：recharge | win | transfer_reinvest
+	PointsSource string // AIX-USDT 产生来源：recharge | win | transfer_reinvest | reward_legacy
 	WinPrice     string // 认购时 WIN 价格快照（仅 pay_from=win）
 	WinAPrice    string // 认购时 WIN-A 价格快照（仅 pay_from=win_a）
 	FundSource   string
@@ -413,6 +438,8 @@ type WalletRepo interface {
 	ListRechargesByUser(ctx context.Context, userID int64) ([]*Recharge, error)
 	ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*Recharge, error)
 	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
+	// ListConfirmedWINRechargesByUserIDs 下级已确认 WIN 充值：含链上充值与交易所划转入账（tx_hash 以 partner: 开头）。
+	ListConfirmedWINRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
 	// ListOrdersByUserIDs 按用户 ID 集合分页认购订单（含地址），供下级认购列表。
 	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*AdminOrderDetail, int64, error)
 
@@ -427,6 +454,15 @@ type WalletRepo interface {
 
 	CreateTransfer(ctx context.Context, t *Transfer) (*Transfer, error)
 	ListTransfersByUser(ctx context.Context, userID int64) ([]*Transfer, error)
+
+	// CreateExchangeTransfer 扣 points 并创建向交易所划转记录（status=pending）。
+	// nonce 参数存 WinBit 幂等键 request_no。
+	CreateExchangeTransfer(ctx context.Context, userID int64, address, amount, nonce string) (*ExchangeTransfer, string, error)
+	// CompleteExchangeTransfer 标记划转成功。
+	CompleteExchangeTransfer(ctx context.Context, id int64, partnerTxnID, partnerCode string) error
+	// FailAndRefundExchangeTransfer 划转失败并退回 points。
+	FailAndRefundExchangeTransfer(ctx context.Context, id int64, partnerCode, remark string) error
+	ListExchangeTransfersByUser(ctx context.Context, userID int64) ([]*ExchangeTransfer, error)
 
 	CreateRewardLog(ctx context.Context, log *RewardLog) error
 	ListRewardLogsByUser(ctx context.Context, userID int64) ([]*RewardLog, error)

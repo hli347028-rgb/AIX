@@ -356,6 +356,7 @@ func (uc *AdminUsecase) buildConfigSnapshot() *conf.SystemConfigSnapshot {
 		PartnerMaxAmount:           PartnerMaxAmount,
 		PartnerDailyLimit:          PartnerDailyLimit,
 		ExchangeReviewThresholdPercent: ExchangeReviewThresholdPercent,
+		ExchangeTransferMinAmount:      ExchangeTransferMinAmount,
 		AdminSubAccounts:           append([]conf.AdminSubAccount(nil), uc.authCfg.GetAdminSubAccounts()...),
 	}
 	conf.NormalizeBusinessDefaults(snap)

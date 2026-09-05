@@ -312,28 +312,30 @@ func IsInSmallAreaBranch(branchStakes map[int64]decimal.Decimal, sourceBranchChi
 	return sourceBranchChildID != largeID
 }
 
+// IsAncestorOf reports whether ancestor is on node's inviter chain (any depth).
+func IsAncestorOf(ancestor, node int64, parentByUser map[int64]int64) bool {
+	if ancestor <= 0 || node <= 0 || ancestor == node {
+		return false
+	}
+	seen := map[int64]bool{node: true}
+	current := node
+	for {
+		parent, ok := parentByUser[current]
+		if !ok || seen[parent] {
+			return false
+		}
+		if parent == ancestor {
+			return true
+		}
+		seen[parent] = true
+		current = parent
+	}
+}
+
 // IsLinealRelation reports whether one user is an ancestor of the other.
 // Siblings and users in different invitation branches are not lineal.
 func IsLinealRelation(a, b int64, parentByUser map[int64]int64) bool {
-	if a <= 0 || b <= 0 || a == b {
-		return false
-	}
-	isAncestor := func(ancestor, node int64) bool {
-		seen := map[int64]bool{node: true}
-		current := node
-		for {
-			parent, ok := parentByUser[current]
-			if !ok || seen[parent] {
-				return false
-			}
-			if parent == ancestor {
-				return true
-			}
-			seen[parent] = true
-			current = parent
-		}
-	}
-	return isAncestor(a, b) || isAncestor(b, a)
+	return IsAncestorOf(a, b, parentByUser) || IsAncestorOf(b, a, parentByUser)
 }
 
 // Legacy eco helpers (no-op / defaults for admin config compatibility)

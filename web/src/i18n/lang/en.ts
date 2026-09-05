@@ -150,6 +150,7 @@ export default {
     directInviteData: 'Subordinate Subscription Amount',
     downlineSubscribeAmount: 'Subordinate Subscription Amount',
     downlineRechargeUsdt: 'Subordinate USDT Recharge Amount',
+    downlineRechargeWin: 'Subordinate WIN Recharge Amount',
     directLedgerTabs: 'Downline records',
     teamIdoTotal: 'Team IDO Total',
     personalRedeemed: 'Personal Redeemed',
@@ -187,7 +188,7 @@ export default {
     generation: 'Generation',
     reward: 'Reward',
     time: 'Time', directReferralReward: 'Direct Referral Reward', managementReward: 'Management Reward',
-    usdtAmount: 'USDT Amount', subscribeAmount: 'Subscription Amount', subscribeType: 'Type', subscribeTypeRecharge: 'USDT Subscribe', subscribeTypeReward: 'Reinvest', subscribeTypeWin: 'WIN Pay', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 Amount', myTeam: 'My Team', refresh: 'Refresh', teamTotalMembers: 'Total Team Members', username: 'Username', usernameSetting: 'Name Setting', editUsername: 'Edit', saveUsername: 'Save', cancelUsername: 'Cancel', usernameSaved: 'Username saved', usernameRequired: 'Enter a username', usernameTooLong: 'Username must be 24 characters or fewer', notSet: 'Not set', teamMembers: 'Team Member Profiles', noTeamMembers: 'No team members', active: 'Active', directMembers: 'Direct Members', joinedAt: 'Joined'
+    usdtAmount: 'USDT Amount', winAmount: 'WIN Amount', rechargeSource: 'Source', rechargeSourceChain: 'On-chain', rechargeSourceExchange: 'Exchange Transfer', subscribeAmount: 'Subscription Amount', subscribeType: 'Type', subscribeTypeRecharge: 'USDT Subscribe', subscribeTypeReward: 'Reinvest', subscribeTypeWin: 'WIN Pay', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 Amount', myTeam: 'My Team', refresh: 'Refresh', teamTotalMembers: 'Total Team Members', username: 'Username', usernameSetting: 'Name Setting', editUsername: 'Edit', saveUsername: 'Save', cancelUsername: 'Cancel', usernameSaved: 'Username saved', usernameRequired: 'Enter a username', usernameTooLong: 'Username must be 24 characters or fewer', notSet: 'Not set', teamMembers: 'Team Member Profiles', noTeamMembers: 'No team members', active: 'Active', directMembers: 'Direct Members', joinedAt: 'Joined'
   },
   count: {
     myNodes: 'My Nodes', myIncome: 'My Income', matrix: 'Matrix', level: 'Level', sharedNodes: 'Shared Nodes',
@@ -455,18 +456,27 @@ export default {
   },
   transfer: {
     title: 'Transfer', type: 'Transfer Type', toRewardWallet: 'To Reward Wallet', toUser: 'To User',
-    direction: 'Transfer Direction', rewardBalance: 'Reward Balance', recipientAddress: 'Recipient Address',
+    userMode: 'User Transfer', exchangeMode: 'Transfer to Exchange',
+    direction: 'Transfer Direction', rewardBalance: 'Reward Balance', aixUsdtBalance: 'AIX-USDT Balance',
+    recipientAddress: 'Recipient Address',
     recipientPlaceholder: "Enter the related user's address", amount: 'Transfer Amount', all: 'All',
     processing: 'Transferring...', confirm: 'Confirm Transfer', records: 'Transfer Records', recordDirection: 'Record Direction',
     walletDirection: 'Wallet Direction', directionAndUser: 'Direction / User', amountColumn: 'Amount', time: 'Time',
+    status: 'Status', statusCompleted: 'Completed', statusFailed: 'Failed', statusPending: 'Processing',
     rechargeToReward: 'Recharge → Reward', in: 'Incoming', out: 'Outgoing',
     recordsUnavailable: 'Transfer records are not available yet', noRecords: 'No transfer records',
     rechargeWallet: 'Recharge Wallet', rewardWallet: 'Reward Wallet', myRewardWallet: 'My Reward Wallet',
     userRewardWallet: "User's Reward Wallet", selfHint: 'Move recharge balance to the reward wallet without referral rewards.',
-    userHint: "Upline and downline users only. Funds go to the recipient's reward wallet.", upline: 'Upline', downline: 'Downline',
+    userHint: "Only upline can transfer to invite-chain downline. Funds go to the recipient's reward wallet.",
+    exchangeHint: 'Transfer AIX-USDT to your exchange account. The linked wallet address identifies the account.',
+    exchangeMinHint: 'Minimum {min} AIX-USDT per transfer',
+    onlyDownline: 'Only upline-to-downline transfers are allowed',
+    upline: 'Upline', downline: 'Downline',
     fetchRecordsFailed: 'Failed to fetch transfer records', insufficientBalance: 'Insufficient balance in {wallet}',
     amountMustBePositive: 'Transfer amount must be greater than 0', invalidRecipient: 'Invalid recipient address',
-    cannotTransferToSelf: 'You cannot transfer to yourself', success: 'Transfer successful', failed: 'Transfer failed'
+    cannotTransferToSelf: 'You cannot transfer to yourself', success: 'Transfer successful', failed: 'Transfer failed',
+    disabled: 'Transfers are temporarily closed',
+    exchangeDisabled: 'Transfer to exchange is closed'
   },
   announcement: {
     title: 'Announcement',

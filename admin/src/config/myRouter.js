@@ -68,6 +68,12 @@ export const asyncRouterMap = [
                 meta: { title: '交易所划转', keepAlive: true, icon: "transaction", permission: ['dashboard'] },
             },
             {
+                path: '/toExchangeTransfer',
+                name: 'toExchangeTransfer',
+                component: () => import('@/views/orders/toExchangeTransfer'),
+                meta: { title: '向交易所划转', keepAlive: true, icon: "export", permission: ['dashboard'] },
+            },
+            {
                 path: '/settlement',
                 name: 'settlement',
                 component: () => import('@/views/orders/settlement'),

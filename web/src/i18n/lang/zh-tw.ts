@@ -124,6 +124,7 @@ const local = {
     directInviteData: '下級認購金額',
     downlineSubscribeAmount: '下級認購金額',
     downlineRechargeUsdt: '下級充值USDT金額',
+    downlineRechargeWin: '下級充值WIN金額',
     directLedgerTabs: '下級明細',
     teamIdoTotal: '團隊IDO總量',
     personalRedeemed: '個人已贖回業績',
@@ -153,7 +154,7 @@ const local = {
     generation: '代數',
     reward: '獎勵',
     time: '時間', directReferralReward: '直推獎勵', managementReward: '管理獎',
-    usdtAmount: 'USDT 數量', subscribeAmount: '認購金額', subscribeType: '充值類型', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '復投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 數量', myTeam: '我的團隊', refresh: '重新整理', teamTotalMembers: '團隊總人數', username: '使用者名稱', usernameSetting: '名稱設定', editUsername: '編輯', saveUsername: '儲存', cancelUsername: '取消', usernameSaved: '使用者名稱已儲存', usernameRequired: '請輸入使用者名稱', usernameTooLong: '使用者名稱最多 24 個字元', notSet: '未設定', teamMembers: '團隊成員資料', noTeamMembers: '暫無團隊成員', active: '有效', directMembers: '直屬人數', joinedAt: '加入時間'
+    usdtAmount: 'USDT 數量', winAmount: 'WIN 數量', rechargeSource: '充值來源', rechargeSourceChain: '鏈上充值', rechargeSourceExchange: '交易所劃轉', subscribeAmount: '認購金額', subscribeType: '充值類型', subscribeTypeRecharge: 'USDT認購', subscribeTypeReward: '復投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 數量', myTeam: '我的團隊', refresh: '重新整理', teamTotalMembers: '團隊總人數', username: '使用者名稱', usernameSetting: '名稱設定', editUsername: '編輯', saveUsername: '儲存', cancelUsername: '取消', usernameSaved: '使用者名稱已儲存', usernameRequired: '請輸入使用者名稱', usernameTooLong: '使用者名稱最多 24 個字元', notSet: '未設定', teamMembers: '團隊成員資料', noTeamMembers: '暫無團隊成員', active: '有效', directMembers: '直屬人數', joinedAt: '加入時間'
   },
   count: {
     myNodes: '我的節點', myIncome: '我的收益', matrix: '矩陣圖', level: '級別', sharedNodes: '分享節點',
@@ -416,18 +417,25 @@ const local = {
   },
   transfer: {
     title: '劃轉', type: '劃轉類型', toRewardWallet: '轉到獎勵錢包', toUser: '轉給用戶',
-    direction: '劃轉方向', rewardBalance: '獎勵餘額', recipientAddress: '收款地址',
+    userMode: '用戶劃轉', exchangeMode: '向交易所劃轉',
+    direction: '劃轉方向', rewardBalance: '獎勵餘額', aixUsdtBalance: 'AIX-USDT 餘額',
+    recipientAddress: '收款地址',
     recipientPlaceholder: '請輸入關聯用戶地址', amount: '劃轉金額', all: '全部',
     processing: '劃轉中...', confirm: '確認劃轉', records: '劃轉記錄', recordDirection: '記錄方向',
     walletDirection: '錢包方向', directionAndUser: '方向 / 用戶', amountColumn: '金額', time: '時間',
+    status: '狀態', statusCompleted: '成功', statusFailed: '失敗', statusPending: '處理中',
     rechargeToReward: '充值 → 獎勵', in: '轉入', out: '轉出',
     recordsUnavailable: '劃轉記錄暫未開放', noRecords: '暫無劃轉記錄',
     rechargeWallet: '充值錢包', rewardWallet: '獎勵錢包', myRewardWallet: '我的獎勵錢包',
     userRewardWallet: '用戶獎勵錢包', selfHint: '充值餘額轉入獎勵錢包，不產生直推獎勵',
-    userHint: '僅支持上下級用戶，資金轉入對方獎勵錢包', upline: '上級', downline: '下級',
+    userHint: '僅支持上級向邀請鏈下級劃轉，資金轉入對方獎勵錢包',
+    exchangeHint: '將 AIX-USDT 劃轉至交易所帳戶，使用已綁定錢包地址識別帳戶',
+    exchangeMinHint: '單筆最低 {min} AIX-USDT',
+    upline: '上級', downline: '下級',
     fetchRecordsFailed: '獲取劃轉記錄失敗', insufficientBalance: '{wallet}餘額不足',
     amountMustBePositive: '劃轉金額必須大於 0', invalidRecipient: '收款地址無效',
-    cannotTransferToSelf: '不能轉給自己', success: '劃轉成功', failed: '劃轉失敗'
+    cannotTransferToSelf: '不能轉給自己', success: '劃轉成功', failed: '劃轉失敗',
+    disabled: '劃轉功能已關閉'
   },
   announcement: {
     title: '公告',

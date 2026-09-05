@@ -51,7 +51,7 @@ func NewAdminLegacyService(
 var legacyMenuPaths = []string{
 	"/home", "/member", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
-	"/exchangeTransfer", "/settlement", "/news", "/newsEdit", "/feedbackList", "/lookChildren",
+	"/exchangeTransfer", "/toExchangeTransfer", "/settlement", "/news", "/newsEdit", "/feedbackList", "/lookChildren",
 }
 
 var legacyMainOnlyMenuPaths = []string{
@@ -197,6 +197,7 @@ var legacyConfigDefs = []struct {
 	{39, "交易所划转单笔上限(WIN)"},
 	{40, "交易所划转单日上限(WIN)"},
 	{41, "AIX兑换审核阈值(%)"},
+	{42, "向交易所划转AIX-USDT最低额"},
 	{11, "W1 收益系数"},
 	{12, "W2 收益系数"},
 	{13, "W3 收益系数"},
@@ -848,6 +849,21 @@ func (s *AdminLegacyService) HandleRecordListExport(ctx khttp.Context) error {
 	}
 	w := ctx.Response()
 	return writeRechargeCSV(w, rows)
+}
+
+func (s *AdminLegacyService) HandleRewardListExport(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	q := ctx.Request().URL.Query()
+	var rows []rewardListRow
+	if err := s.rewardListDB(ctx, q).
+		Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
+			COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
+		Order("rl.id desc").Scan(&rows).Error; err != nil {
+		return err
+	}
+	return writeRewardCSV(ctx.Response(), rows)
 }
 
 func classifyRechargeType(asset, txHash, message string) (remark, typeCode string) {
@@ -2032,7 +2048,9 @@ func pointsSourceLabel(src string) string {
 	case biz.PointsSourceWin:
 		return "WIN认购"
 	case biz.PointsSourceTransferReinvest:
-		return "复投（上级划转，含隔代）"
+		return "复投（上级划转）"
+	case biz.PointsSourceRewardLegacy:
+		return "复投（历史规则回补）"
 	default:
 		if src == "" {
 			return "-"
@@ -2254,6 +2272,11 @@ func legacyConfigValue(cfg *conf.SystemConfigSnapshot, walletCfg *conf.WalletCon
 			return cfg.ExchangeReviewThresholdPercent
 		}
 		return conf.DefaultExchangeReviewThresholdPercent
+	case 42:
+		if cfg != nil && strings.TrimSpace(cfg.ExchangeTransferMinAmount) != "" {
+			return cfg.ExchangeTransferMinAmount
+		}
+		return conf.DefaultExchangeTransferMinAmount
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		idx := id - 11
 		rates := conf.DefaultMgmtRates()
@@ -2408,6 +2431,12 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 			return errors.BadRequest("INVALID_VALUE", "AIX兑换审核阈值须为 ≥0 的数字（百分数，如 40 表示 40%；100 表示兑完今日AIX后才审）")
 		}
 		snapshot.ExchangeReviewThresholdPercent = strconv.FormatFloat(pct, 'f', -1, 64)
+	case 42:
+		amt, err := strconv.ParseFloat(value, 64)
+		if err != nil || amt <= 0 {
+			return errors.BadRequest("INVALID_VALUE", "向交易所划转最低额必须为大于 0 的数字")
+		}
+		snapshot.ExchangeTransferMinAmount = strconv.FormatFloat(amt, 'f', -1, 64)
 	case 11, 12, 13, 14, 15, 16, 17, 18, 19, 20:
 		rate, err := strconv.ParseFloat(value, 64)
 		if err != nil || rate < 0 {

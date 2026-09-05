@@ -367,6 +367,61 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	return out, total, nil
 }
 
+func (r *walletRepo) ListConfirmedWINRechargesByUserIDs(
+	ctx context.Context, userIDs []int64, offset, limit int,
+) ([]*biz.Recharge, int64, error) {
+	if len(userIDs) == 0 {
+		return nil, 0, nil
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	// 下级 WIN 充值：链上 WIN + 交易所划转入账（partner:*）；不含 WIN-A。
+	base := r.data.db.WithContext(ctx).
+		Model(&RechargePO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status = ?", biz.RechargeStatusConfirmed).
+		Where("UPPER(asset) = ?", biz.TokenWIN)
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	type rechargeRow struct {
+		RechargePO
+		UserAddress string `gorm:"column:user_address"`
+	}
+	var rows []rechargeRow
+	if err := r.data.db.WithContext(ctx).
+		Table("recharges r").
+		Select("r.*, u.address AS user_address").
+		Joins("JOIN users u ON u.id = r.user_id").
+		Where("r.user_id IN ?", userIDs).
+		Where("r.status = ?", biz.RechargeStatusConfirmed).
+		Where("UPPER(r.asset) = ?", biz.TokenWIN).
+		Order("r.id DESC").
+		Offset(offset).
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.Recharge, 0, len(rows))
+	for i := range rows {
+		rec := r.rechargeToBiz(&rows[i].RechargePO)
+		if addr := strings.TrimSpace(rows[i].UserAddress); addr != "" {
+			rec.Address = addr
+		}
+		if strings.TrimSpace(rec.Asset) == "" {
+			rec.Asset = biz.TokenWIN
+		}
+		out = append(out, rec)
+	}
+	return out, total, nil
+}
+
 func (r *walletRepo) ListOrdersByUserIDs(
 	ctx context.Context, userIDs []int64, offset, limit int,
 ) ([]*biz.AdminOrderDetail, int64, error) {
@@ -471,7 +526,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 			orderPoints = principal
 			pointsSource = biz.PointsSourceWin
 		case biz.PayFromReward:
-			// 仅消耗「邀请链上级划入」额度；额度来自任意层级上级→下级划转，不限直推。
+			// 消耗上级划转累计的复投额度；有额度的复投才产生 AIX-USDT。
 			orderPoints = decimal.Min(principal, user.TransferReinvestCredit)
 			if orderPoints.IsPositive() {
 				user.TransferReinvestCredit = user.TransferReinvestCredit.Sub(orderPoints)
@@ -1145,32 +1200,32 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 			"usdt_reward": to.UsdtReward,
 			"aix_balance": to.AixBalance,
 		}
-		// 额度按邀请链祖先关系处理：任意层级上级均可，不要求直推。
-		if uplineToDownline, err := isAncestorInTx(tx, t.FromUserID, t.ToUserID); err != nil {
+		// 仅允许上级→下级；下级→上级及其他关系一律拒绝。
+		uplineToDownline, err := isAncestorInTx(tx, t.FromUserID, t.ToUserID)
+		if err != nil {
 			return err
-		} else if uplineToDownline {
-			// 任意上级→下级：无存量额度时全额记给接收方（如 A→B / A→隔代C）；
-			// 有存量额度时只传递额度并扣减发送方（如 B→C），避免同一笔资金重复产生 AIX-USDT。
-			var creditAdd decimal.Decimal
-			if from.TransferReinvestCredit.IsPositive() {
-				creditAdd = decimal.Min(amount, from.TransferReinvestCredit)
-				from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(creditAdd)
-				fromUpdates["transfer_reinvest_credit"] = from.TransferReinvestCredit
-			} else {
-				creditAdd = amount
-			}
-			if creditAdd.IsPositive() {
-				to.TransferReinvestCredit = to.TransferReinvestCredit.Add(creditAdd)
-				toUpdates["transfer_reinvest_credit"] = to.TransferReinvestCredit
-			}
-		} else if downlineToUpline, err := isAncestorInTx(tx, t.ToUserID, t.FromUserID); err != nil {
-			return err
-		} else if downlineToUpline {
-			deduct := decimal.Min(amount, from.TransferReinvestCredit)
-			if deduct.IsPositive() {
-				from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(deduct)
-				fromUpdates["transfer_reinvest_credit"] = from.TransferReinvestCredit
-			}
+		}
+		if !uplineToDownline {
+			return fmt.Errorf("transfer only allowed from upline to downline")
+		}
+		// 上级→下级每笔划转都给下级增加复投 AIX-USDT 额度（阻断额除外）。
+		blockedPass := decimal.Min(amount, from.TransferReinvestBlocked)
+		if blockedPass.IsPositive() {
+			from.TransferReinvestBlocked = from.TransferReinvestBlocked.Sub(blockedPass)
+			fromUpdates["transfer_reinvest_blocked"] = from.TransferReinvestBlocked
+			to.TransferReinvestBlocked = to.TransferReinvestBlocked.Add(blockedPass)
+			toUpdates["transfer_reinvest_blocked"] = to.TransferReinvestBlocked
+		}
+		creditAdd := amount.Sub(blockedPass)
+		if creditAdd.IsPositive() {
+			to.TransferReinvestCredit = to.TransferReinvestCredit.Add(creditAdd)
+			toUpdates["transfer_reinvest_credit"] = to.TransferReinvestCredit
+		}
+		// 上级自身若仍有可复投额度，按本次实际新增额度扣减，避免钱转走后仍用旧额度复投。
+		if from.TransferReinvestCredit.IsPositive() && creditAdd.IsPositive() {
+			deduct := decimal.Min(creditAdd, from.TransferReinvestCredit)
+			from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(deduct)
+			fromUpdates["transfer_reinvest_credit"] = from.TransferReinvestCredit
 		}
 		if err := tx.Model(&from).Updates(fromUpdates).Error; err != nil {
 			return err

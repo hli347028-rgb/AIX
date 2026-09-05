@@ -9,24 +9,47 @@
     />
 
     <main class="page-main">
+      <div class="transfer-mode" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: transferMode === 'user' }"
+          :aria-selected="transferMode === 'user'"
+          @click="switchMode('user')"
+        >
+          {{ $t('transfer.userMode') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: transferMode === 'exchange' }"
+          :aria-selected="transferMode === 'exchange'"
+          @click="switchMode('exchange')"
+        >
+          {{ $t('transfer.exchangeMode') }}
+        </button>
+      </div>
+
       <div class="reward-balance-row">
-        <span>{{ $t('transfer.rewardBalance') }}</span>
-        <strong>{{ rewardBalance }} USDT</strong>
+        <span>{{ balanceLabel }}</span>
+        <strong>{{ sourceBalance }} {{ currencyLabel }}</strong>
       </div>
 
       <section class="transfer-form">
-        <label class="field-label" for="transfer-recipient">{{ $t('transfer.recipientAddress') }}</label>
-        <div class="input-shell">
-          <van-icon name="contact-o" aria-hidden="true" />
-          <input
-            id="transfer-recipient"
-            v-model.trim="recipient"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            :placeholder="$t('transfer.recipientPlaceholder')"
-          />
-        </div>
+        <template v-if="transferMode === 'user'">
+          <label class="field-label" for="transfer-recipient">{{ $t('transfer.recipientAddress') }}</label>
+          <div class="input-shell">
+            <van-icon name="contact-o" aria-hidden="true" />
+            <input
+              id="transfer-recipient"
+              v-model.trim="recipient"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              :placeholder="$t('transfer.recipientPlaceholder')"
+            />
+          </div>
+        </template>
 
         <div class="amount-heading">
           <label class="field-label" for="transfer-amount">{{ $t('transfer.amount') }}</label>
@@ -41,8 +64,11 @@
             placeholder="0.00"
             @input="normalizeAmount"
           />
-          <span class="currency">USDT</span>
+          <span class="currency">{{ currencyLabel }}</span>
         </div>
+        <p v-if="transferMode === 'exchange'" class="min-hint">
+          {{ $t('transfer.exchangeMinHint', { min: exchangeMinAmount }) }}
+        </p>
 
         <button
           type="button"
@@ -63,7 +89,11 @@
         <div class="section-title-wrap">
           <div class="title-bar"></div>
           <h3 class="section-title">{{ $t('transfer.records') }}</h3>
-          <div class="direction-filter" :aria-label="$t('transfer.recordDirection')">
+          <div
+            v-if="transferMode === 'user'"
+            class="direction-filter"
+            :aria-label="$t('transfer.recordDirection')"
+          >
             <button
               v-for="item in directionOptions"
               :key="item.value"
@@ -78,23 +108,28 @@
 
         <div class="table-card" :aria-busy="recordLoading">
           <div class="table-header">
-            <span>{{ $t('transfer.directionAndUser') }}</span>
-            <span>{{ $t('transfer.amountColumn') }}</span>
-            <span>{{ $t('transfer.time') }}</span>
+            <template v-if="transferMode === 'user'">
+              <span>{{ $t('transfer.directionAndUser') }}</span>
+              <span>{{ $t('transfer.amountColumn') }}</span>
+              <span>{{ $t('transfer.time') }}</span>
+            </template>
+            <template v-else>
+              <span>{{ $t('transfer.amountColumn') }}</span>
+              <span>{{ $t('transfer.status') }}</span>
+              <span>{{ $t('transfer.time') }}</span>
+            </template>
           </div>
 
           <div v-if="recordLoading" class="record-loading">
-            <!-- 原来硬编码 var(--accent)，那正是设计令牌里被换掉的旧电光蓝。
-                 改为读取当前品牌色令牌，不再各处留一份旧色。 -->
             <van-loading type="spinner" color="var(--accent)" />
           </div>
           <div v-else-if="recordError" class="empty-state record-error">
             <p>{{ $t('transfer.fetchRecordsFailed') }}</p>
-            <button type="button" class="retry-btn" @click="loadTransferRecords(recordPage)">
+            <button type="button" class="retry-btn" @click="reloadRecords(recordPage)">
               {{ $t('common.retry') }}
             </button>
           </div>
-          <template v-else-if="records.length > 0">
+          <template v-else-if="transferMode === 'user' && records.length > 0">
             <div class="order-list" v-for="item in records" :key="item.id">
               <div class="table-row">
                 <span class="counterparty-cell">
@@ -103,6 +138,17 @@
                 </span>
                 <span class="amount-cell" :class="recordDirection(item) === 'in' ? 'income' : 'outcome'">
                   {{ signedAmount(item) }} USDT
+                </span>
+                <span class="time-cell">{{ formatUnixTime(item.created_at) }}</span>
+              </div>
+            </div>
+          </template>
+          <template v-else-if="transferMode === 'exchange' && exchangeRecords.length > 0">
+            <div class="order-list" v-for="item in exchangeRecords" :key="item.id">
+              <div class="table-row">
+                <span class="amount-cell outcome">-{{ item.amount }} AIX-USDT</span>
+                <span class="status-cell" :class="`is-${String(item.status || '').toLowerCase()}`">
+                  {{ exchangeStatusText(item.status) }}
                 </span>
                 <span class="time-cell">{{ formatUnixTime(item.created_at) }}</span>
               </div>
@@ -117,7 +163,7 @@
               v-model="recordPage"
               :page-count="recordPageCount"
               mode="simple"
-              @change="loadTransferRecords"
+              @change="reloadRecords"
             />
           </div>
         </div>
@@ -134,6 +180,7 @@ import { Pagination, showFailToast, showSuccessToast, showToast } from 'vant'
 import userPerson from '@/pinia/person'
 import request from '@/tools/request'
 
+type TransferMode = 'user' | 'exchange'
 type TransferDirection = 'all' | 'in' | 'out'
 
 interface PageResult<T> {
@@ -156,18 +203,30 @@ interface LinealTransferRecord {
   created_at: number
 }
 
+interface ExchangeTransferRecord {
+  id: number
+  asset: string
+  amount: string
+  status: string
+  partner_txn_id?: string
+  created_at: number
+}
+
 type TransferRecord = LinealTransferRecord
 
 const RECORD_PAGE_SIZE = 10
+const DEFAULT_EXCHANGE_MIN = '500'
 
 const router = useRouter()
 const { t: $t, locale } = useI18n()
 const person = userPerson()
 
+const transferMode = ref<TransferMode>('user')
 const recipient = ref('')
 const amount = ref('')
 const loading = ref(false)
 const records = ref<TransferRecord[]>([])
+const exchangeRecords = ref<ExchangeTransferRecord[]>([])
 const recordPage = ref(1)
 const recordPageCount = ref(1)
 const recordLoading = ref(false)
@@ -182,9 +241,22 @@ const directionOptions = computed<Array<{ label: string; value: TransferDirectio
 ])
 
 const rewardBalance = computed(() => String((person.userinfo as any)?.reward || person.profile?.usdt_reward || '0'))
-const sourceBalance = computed(() => rewardBalance.value)
-const sourceWalletName = computed(() => $t('transfer.rewardWallet'))
-const transferHint = computed(() => $t('transfer.userHint'))
+const pointsBalance = computed(() => String(person.profile?.points || (person.userinfo as any)?.points || '0'))
+const exchangeMinAmount = computed(() => {
+  const raw = String((person.profile as any)?.exchange_transfer_min_amount || '').trim()
+  return raw || DEFAULT_EXCHANGE_MIN
+})
+const sourceBalance = computed(() => (transferMode.value === 'exchange' ? pointsBalance.value : rewardBalance.value))
+const currencyLabel = computed(() => (transferMode.value === 'exchange' ? 'AIX-USDT' : 'USDT'))
+const balanceLabel = computed(() =>
+  transferMode.value === 'exchange' ? $t('transfer.aixUsdtBalance') : $t('transfer.rewardBalance'),
+)
+const sourceWalletName = computed(() =>
+  transferMode.value === 'exchange' ? 'AIX-USDT' : $t('transfer.rewardWallet'),
+)
+const transferHint = computed(() =>
+  transferMode.value === 'exchange' ? $t('transfer.exchangeHint') : $t('transfer.userHint'),
+)
 
 const isPositiveAmount = (value: string) => /^\d+(?:\.\d+)?$/.test(value) && /[1-9]/.test(value)
 
@@ -206,7 +278,19 @@ const compareDecimalStrings = (left: string, right: string) => {
   return aFraction === bFraction ? 0 : aFraction > bFraction ? 1 : -1
 }
 
-const canSubmit = computed(() => recipient.value.length > 0 && isPositiveAmount(amount.value))
+const canSubmit = computed(() => {
+  if (!isPositiveAmount(amount.value)) return false
+  if (transferMode.value === 'user') return recipient.value.length > 0
+  return true
+})
+
+const switchMode = (next: TransferMode) => {
+  if (transferMode.value === next) return
+  transferMode.value = next
+  amount.value = ''
+  recipient.value = ''
+  reloadRecords(1)
+}
 
 const changeDirection = (nextDirection: TransferDirection) => {
   if (direction.value === nextDirection) return
@@ -233,16 +317,27 @@ const formatUnixTime = (timestamp: number) => {
 }
 
 const recordDirection = (item: TransferRecord) => item.direction
-
 const counterpartyAddress = (item: TransferRecord) => item.counterparty_address
-
 const relationshipText = (item: TransferRecord) => {
   if (item.relationship === 'upline') return $t('transfer.upline')
   if (item.relationship === 'downline') return $t('transfer.downline')
   return '-'
 }
-
 const signedAmount = (item: TransferRecord) => `${item.direction === 'in' ? '+' : '-'}${item.amount}`
+
+const exchangeStatusText = (status: string) => {
+  switch (String(status || '').toLowerCase()) {
+    case 'completed': return $t('transfer.statusCompleted')
+    case 'failed': return $t('transfer.statusFailed')
+    case 'pending': return $t('transfer.statusPending')
+    default: return status || '-'
+  }
+}
+
+const reloadRecords = (page = 1) => {
+  if (transferMode.value === 'exchange') return loadExchangeRecords(page)
+  return loadTransferRecords(page)
+}
 
 const loadTransferRecords = async (page = 1) => {
   const parsedPage = Number(page)
@@ -265,6 +360,7 @@ const loadTransferRecords = async (page = 1) => {
     })
     if (
       requestId !== recordRequestId ||
+      transferMode.value !== 'user' ||
       requestedDirection !== direction.value
     ) return
 
@@ -280,6 +376,43 @@ const loadTransferRecords = async (page = 1) => {
   } catch (error: any) {
     if (requestId !== recordRequestId) return
     records.value = []
+    recordPageCount.value = 1
+    recordError.value = true
+    if (error?.response?.status !== 401) {
+      showFailToast(error?.response?.data?.message || error?.message || $t('transfer.fetchRecordsFailed'))
+    }
+  } finally {
+    if (requestId === recordRequestId) recordLoading.value = false
+  }
+}
+
+const loadExchangeRecords = async (page = 1) => {
+  const parsedPage = Number(page)
+  const requestedPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
+  const requestId = ++recordRequestId
+  recordPage.value = requestedPage
+  recordLoading.value = true
+  recordError.value = false
+
+  try {
+    const result: PageResult<ExchangeTransferRecord> = await request.get<PageResult<ExchangeTransferRecord>>('/v1/wallet/transfer-exchange-records', {
+      params: { page: requestedPage, page_size: RECORD_PAGE_SIZE },
+      silent: true,
+    })
+    if (requestId !== recordRequestId || transferMode.value !== 'exchange') return
+
+    const responsePage = Number(result.page)
+    const responsePageSize = Number(result.page_size)
+    const responseTotal = Number(result.total)
+    exchangeRecords.value = Array.isArray(result.list) ? result.list : []
+    recordPage.value = Number.isInteger(responsePage) && responsePage > 0 ? responsePage : requestedPage
+    recordPageCount.value = Math.max(1, Math.ceil(
+      (Number.isFinite(responseTotal) ? responseTotal : 0) /
+      (Number.isInteger(responsePageSize) && responsePageSize > 0 ? responsePageSize : RECORD_PAGE_SIZE),
+    ))
+  } catch (error: any) {
+    if (requestId !== recordRequestId) return
+    exchangeRecords.value = []
     recordPageCount.value = 1
     recordError.value = true
     if (error?.response?.status !== 401) {
@@ -316,6 +449,30 @@ const submitTransfer = async () => {
     showFailToast($t('transfer.insufficientBalance', { wallet: sourceWalletName.value }))
     return
   }
+
+  if (transferMode.value === 'exchange') {
+    if (compareDecimalStrings(amount.value, exchangeMinAmount.value) < 0) {
+      showFailToast($t('transfer.exchangeMinHint', { min: exchangeMinAmount.value }))
+      return
+    }
+    loading.value = true
+    try {
+      await request.post('/v1/wallet/transfer-exchange', { amount: amount.value })
+      amount.value = ''
+      await Promise.all([
+        person.getUser?.(),
+        person.refreshProfile?.(),
+      ])
+      await loadExchangeRecords(1)
+      showSuccessToast($t('transfer.success'))
+    } catch (error: any) {
+      if (!error?.response) showFailToast(error?.message || $t('transfer.failed'))
+    } finally {
+      loading.value = false
+    }
+    return
+  }
+
   if (!/^0x[a-fA-F0-9]{40}$/.test(recipient.value)) {
     showFailToast($t('transfer.invalidRecipient'))
     return
@@ -342,8 +499,12 @@ const submitTransfer = async () => {
     await loadTransferRecords(1)
     showSuccessToast($t('transfer.success'))
   } catch (error: any) {
-    // request 已优先展示后端 message，此处仅兜底非 Axios 错误。
-    if (!error?.response) showFailToast(error?.message || $t('transfer.failed'))
+    const reason = error?.response?.data?.reason
+    if (reason === 'NOT_DOWNLINE') {
+      showFailToast($t('transfer.onlyDownline'))
+    } else if (!error?.response) {
+      showFailToast(error?.message || $t('transfer.failed'))
+    }
   } finally {
     loading.value = false
   }
@@ -354,7 +515,7 @@ onMounted(async () => {
     person.getUser?.(),
     person.refreshProfile?.(),
   ])
-  await loadTransferRecords(1)
+  await reloadRecords(1)
 })
 </script>
 
@@ -872,5 +1033,20 @@ onMounted(async () => {
       grid-template-columns: minmax(0, 1.2fr) minmax(72px, 0.8fr) minmax(0, 0.9fr);
     }
   }
+}
+
+.min-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.table-card .status-cell {
+  text-align: center;
+  font-size: 12px;
+  &.is-completed { color: var(--up-readable); }
+  &.is-failed { color: var(--down); }
+  &.is-pending { color: #0052ff; }
 }
 </style>

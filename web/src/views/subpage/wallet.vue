@@ -83,7 +83,7 @@
           </div>
           <div class="pledge-item">
             <p>{{ $t('wallet.aixUsdt') }}</p>
-            <p>{{ formatFour(profile.points || userinfo.points || profile.points_all || userinfo.points_all || 0) }}</p>
+            <p>{{ formatFour(firstAmount(profile.points, userinfo.points)) }}</p>
           </div>
         </div>
       </div>
@@ -263,6 +263,13 @@ const emptyRecordsText = computed(() => {
 const formatShortAddr = (value) => {
   if (!value) return ''
   return `${value.slice(0, 6)}...${value.slice(-4)}`
+}
+
+const firstAmount = (...vals) => {
+  for (const v of vals) {
+    if (v !== null && v !== undefined && v !== '') return v
+  }
+  return 0
 }
 
 const formatFour = (value) => {
@@ -603,6 +610,12 @@ const handleBack = () => {
           border-color var(--t-fast) var(--ease),
           background-color var(--t-fast) var(--ease),
           transform var(--t-fast) var(--ease-spring);
+
+        &:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
 
         .van-icon {
           color: currentColor;

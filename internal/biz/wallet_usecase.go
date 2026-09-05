@@ -340,6 +340,32 @@ func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 	return uc.walletRepo.ListConfirmedUSDTRechargesByUserIDs(ctx, ids, offset, pageSize)
 }
 
+// ListDownlineWINRecharges 当前用户所有下级 WIN 充值记录（已确认）。
+// 含链上 WIN 充值，以及交易所划转入账（recharges.tx_hash 以 partner: 开头）。
+func (uc *WalletUsecase) ListDownlineWINRecharges(
+	ctx context.Context, tokenString string, page, pageSize int,
+) ([]*Recharge, int64, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return nil, 0, err
+	}
+	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	return uc.walletRepo.ListConfirmedWINRechargesByUserIDs(ctx, ids, offset, pageSize)
+}
+
 // ListDownlineSubscribeOrders 当前用户所有下级的认购订单（含复投 / WIN 支付）。
 func (uc *WalletUsecase) ListDownlineSubscribeOrders(
 	ctx context.Context, tokenString string, page, pageSize int,
@@ -804,19 +830,19 @@ func (uc *WalletUsecase) Transfer(ctx context.Context, tokenString, toAddress, a
 	if toUser.ID == user.ID {
 		return nil, errors.BadRequest("INVALID_TRANSFER", "不能转给自己")
 	}
-	ok, err := uc.userRepo.IsUplineOrDownline(ctx, user.ID, toUser.ID)
+	ok, err := uc.userRepo.IsUplineOf(ctx, user.ID, toUser.ID)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, errors.BadRequest("NOT_UPLINE_DOWNLINE", "仅允许邀请树上下级互转")
+		return nil, errors.BadRequest("NOT_DOWNLINE", "仅允许上级向邀请链下级划转")
 	}
 	asset = strings.ToUpper(strings.TrimSpace(asset))
 	if asset == "" {
 		asset = TokenUSDT
 	}
 	if asset != TokenUSDT {
-		return nil, errors.BadRequest("INVALID_ASSET", "上下级互转仅支持奖励钱包 USDT")
+		return nil, errors.BadRequest("INVALID_ASSET", "用户划转仅支持奖励钱包 USDT")
 	}
 	amt, err := ParseAmount(amount)
 	if err != nil || !amt.GreaterThan(decimal.Zero) {
@@ -824,7 +850,7 @@ func (uc *WalletUsecase) Transfer(ctx context.Context, tokenString, toAddress, a
 	}
 	payFrom = strings.ToLower(strings.TrimSpace(payFrom))
 	if payFrom != PayFromReward {
-		return nil, errors.BadRequest("INVALID_PAY_FROM", "上下级互转只能从奖励钱包扣款")
+		return nil, errors.BadRequest("INVALID_PAY_FROM", "用户划转只能从奖励钱包扣款")
 	}
 	t := &Transfer{
 		FromUserID: user.ID,

@@ -188,7 +188,14 @@ const routes: Record<string, Handler> = {
   '/v1/wallet/withdrawals': () => ({ records: [], list: [], count: 0 }),
   '/v1/wallet/recharges': () => ({ recharges: [{ id: 1, amount: '1000.0000', asset: 'USDT', status: 'completed', tx_hash: '0xdevusdt', created_at: nowSec() - 26 * DAY }], count: 1 }),
   '/v1/wallet/recharges-win': () => ({ recharges: [{ id: 2, amount: '300.0000', asset: 'WIN', status: 'completed', tx_hash: '0xdevwin', created_at: nowSec() - 14 * DAY }], count: 1 }),
-  '/v1/wallet/downline-usdt-recharges': () => ({ recharges: INVITEES.map((v, i) => ({ id: 10 + i, address: v.address, amount: v.team_stake, status: 'completed', created_at: v.created_at })), count: INVITEES.length }),
+  '/v1/wallet/downline-usdt-recharges': () => ({ records: INVITEES.map((v, i) => ({ id: 10 + i, address: v.address, amount: v.team_stake, asset: 'USDT', status: 'completed', created_at: v.created_at })), count: INVITEES.length }),
+  '/v1/wallet/downline-win-recharges': () => ({
+    records: [
+      { id: 20, address: INVITEES[0]?.address || addr(), amount: '100.0000', asset: 'WIN', source: 'chain', status: 'completed', created_at: nowSec() - DAY },
+      { id: 21, address: INVITEES[1]?.address || addr(), amount: '250.0000', asset: 'WIN', source: 'exchange', status: 'completed', created_at: nowSec() - 2 * DAY },
+    ],
+    count: 2,
+  }),
   '/v1/wallet/transfer-records/lineal': () => ({ records: [], count: 0 }),
 
   '/v1/announcements': () => ({ list: ANNOUNCEMENTS, count: ANNOUNCEMENTS.length, page: 1 }),

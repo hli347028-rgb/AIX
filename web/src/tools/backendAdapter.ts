@@ -373,8 +373,8 @@ async function fetchUserInfo() {
       ),
       exchange_enabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
       exchangeEnabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
-      points: String(aixProfile.points || pickField(aixProfile, 'points') || '0'),
-      points_all: String(aixProfile.points_all || pickField(aixProfile, 'points_all', 'pointsAll') || '0'),
+      points: String(aixProfile.points ?? pickField(aixProfile, 'points') ?? '0'),
+      points_all: String(aixProfile.points_all ?? pickField(aixProfile, 'points_all', 'pointsAll') ?? '0'),
       // 代数奖励合计（1代+≥2代，累计）
       generationReward: String(generationProfit),
       // 社区基础奖累计（不含平级）
@@ -1010,6 +1010,29 @@ export async function adaptRequest(
           amount: trimAmountText(item.amount),
           asset,
           type: asset === 'WIN' ? 'WIN' : 'USDT',
+          createdAt,
+        }
+      })
+      return {
+        count: Number(body.count || 0),
+        list: records,
+        page: Number(body.page || page),
+      }
+    }
+    case 'app_server/downline_win_recharges': {
+      const page = Math.max(1, Number(mergedParams.page) || 1)
+      const res = await authGet('/v1/wallet/downline-win-recharges', { page, page_size: 10 })
+      const body = apiBody(res)
+      const records = (body.records || []).map((item: any) => {
+        const createdAt = formatUnixTime(item.created_at ?? item.createdAt)
+        const source = String(item.source || '').toLowerCase() === 'exchange' ? 'exchange' : 'chain'
+        return {
+          id: item.id,
+          address: item.address || '',
+          amount: trimAmountText(item.amount),
+          asset: 'WIN',
+          source,
+          type: 'WIN',
           createdAt,
         }
       })

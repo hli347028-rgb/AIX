@@ -173,6 +173,14 @@
             :aria-selected="directLedgerTab === 'recharge'"
             @click="switchDirectLedgerTab('recharge')"
           >{{ $t('community.downlineRechargeUsdt') }}</button>
+          <button
+            type="button"
+            role="tab"
+            class="direct-ledger-tab"
+            :class="{ active: directLedgerTab === 'rechargeWin' }"
+            :aria-selected="directLedgerTab === 'rechargeWin'"
+            @click="switchDirectLedgerTab('rechargeWin')"
+          >{{ $t('community.downlineRechargeWin') }}</button>
         </div>
       </div>
 
@@ -217,6 +225,28 @@
             :page-count="downlineRechargePageCount"
             mode="simple"
             @change="getDownlineRecharges"
+          />
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
+      </div>
+
+      <div v-show="directLedgerTab === 'rechargeWin'" class="ledger is-three-col" role="tabpanel">
+        <div class="ledger-head">
+          <span>{{ $t('community.walletAddress') }}</span>
+          <span class="num">{{ $t('community.winAmount') }}</span>
+          <span class="time">{{ $t('community.time') }}</span>
+        </div>
+        <template v-if="downlineWinRechargeList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineWinRechargeList" :key="item.id || index">
+            <span class="aix-mono">{{ formatAddr(item.address) }}</span>
+            <span class="num">{{ formatRechargeAmount(item.amount) }}</span>
+            <span class="time">{{ item.createdAt }}</span>
+          </div>
+          <Pagination
+            v-model="downlineWinRechargePage"
+            :page-count="downlineWinRechargePageCount"
+            mode="simple"
+            @change="getDownlineWinRecharges"
           />
         </template>
         <p v-else class="empty-state">{{ $t('common.noData') }}</p>
@@ -366,7 +396,10 @@ let downlinePageCount = $ref(1)
 let downlineRechargeList = $ref<any[]>([])
 let downlineRechargePage = $ref(1)
 let downlineRechargePageCount = $ref(1)
-let directLedgerTab = $ref<'subscribe' | 'recharge'>('subscribe')
+let downlineWinRechargeList = $ref<any[]>([])
+let downlineWinRechargePage = $ref(1)
+let downlineWinRechargePageCount = $ref(1)
+let directLedgerTab = $ref<'subscribe' | 'recharge' | 'rechargeWin'>('subscribe')
 
 const formatAddress = (value: string) => {
   if (!value) return ''
@@ -473,11 +506,22 @@ const getDownlineRecharges = async (pageNum: number = 1) => {
   downlineRechargeList = res.list || []
 }
 
-const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge') => {
+const getDownlineWinRecharges = async (pageNum: number = 1) => {
+  const res: any = await request.get('app_server/downline_win_recharges', {
+    params: { page: pageNum },
+  })
+  downlineWinRechargePageCount = Math.ceil((res.count || 0) / 10) || 1
+  downlineWinRechargeList = res.list || []
+}
+
+const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin') => {
   if (directLedgerTab === tab) return
   directLedgerTab = tab
   if (tab === 'recharge' && downlineRechargeList.length === 0) {
     void getDownlineRecharges(downlineRechargePage)
+  }
+  if (tab === 'rechargeWin' && downlineWinRechargeList.length === 0) {
+    void getDownlineWinRecharges(downlineWinRechargePage)
   }
 }
 
@@ -489,6 +533,7 @@ const refreshTeamPage = async () => {
     await Promise.allSettled([
       getDownlineOrders(downlinePage),
       getDownlineRecharges(downlineRechargePage),
+      getDownlineWinRecharges(downlineWinRechargePage),
       loadTeamMembers(),
     ])
   } finally {
@@ -734,21 +779,29 @@ onBeforeUnmount(() => {
 }
 
 .direct-ledger-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   margin-top: 2px;
+  width: 100%;
 }
 
 .direct-ledger-tab {
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 30px;
+  min-width: 0;
+  width: 100%;
+  padding: 0 6px;
   border: 1px solid var(--hair-2);
   border-radius: 999px;
   background: transparent;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }

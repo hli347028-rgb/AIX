@@ -100,3 +100,9 @@ wallet:
   # AVE K 线（密钥用环境变量 AVE_API_KEY 或 ave_api_key_file）
   ave_kline_base_url: "https://prod.ave-api.com"
   ave_kline_token_id: "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
+  # 向交易所划转 AIX-USDT（WinBit 入金 POST /v2/winA/aixInbound）
+  # 最低额默认 500，管理后台可调。
+  exchange_transfer_enabled: true
+  exchange_transfer_api_url: "https://api.bitwinex.cloud/v2/winA/aixInbound"
+  exchange_transfer_partner_id: "AIX10001"
+  exchange_transfer_secret_keys_file: "configs/secrets/partner-AIX10001.test.key"

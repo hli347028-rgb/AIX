@@ -124,6 +124,7 @@ const local = {
     directInviteData: '하위 구독 금액',
     downlineSubscribeAmount: '하위 구독 금액',
     downlineRechargeUsdt: '하위 USDT 충전 금액',
+    downlineRechargeWin: '하위 WIN 충전 금액',
     directLedgerTabs: '하위 내역',
     teamIdoTotal: '팀 IDO 총량',
     personalRedeemed: '개인 상환 실적',
@@ -153,7 +154,7 @@ const local = {
     generation: '세대',
     reward: '보상',
     time: '시간', directReferralReward: '직접 추천 보상', managementReward: '관리 보상',
-    usdtAmount: 'USDT 수량', subscribeAmount: '구독 금액', subscribeType: '유형', subscribeTypeRecharge: 'USDT 구독', subscribeTypeReward: '재투자', subscribeTypeWin: 'WIN 결제', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 수량', myTeam: '내 팀', refresh: '새로고침', teamTotalMembers: '전체 팀원', username: '사용자 이름', usernameSetting: '이름 설정', editUsername: '편집', saveUsername: '저장', cancelUsername: '취소', usernameSaved: '사용자 이름이 저장되었습니다', usernameRequired: '사용자 이름을 입력하세요', usernameTooLong: '사용자 이름은 24자 이하여야 합니다', notSet: '미설정', teamMembers: '팀원 정보', noTeamMembers: '팀원이 없습니다', active: '활성', directMembers: '직속 인원', joinedAt: '가입일'
+    usdtAmount: 'USDT 수량', winAmount: 'WIN 수량', rechargeSource: '충전 출처', rechargeSourceChain: '온체인 충전', rechargeSourceExchange: '거래소 이체', subscribeAmount: '구독 금액', subscribeType: '유형', subscribeTypeRecharge: 'USDT 구독', subscribeTypeReward: '재투자', subscribeTypeWin: 'WIN 결제', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 수량', myTeam: '내 팀', refresh: '새로고침', teamTotalMembers: '전체 팀원', username: '사용자 이름', usernameSetting: '이름 설정', editUsername: '편집', saveUsername: '저장', cancelUsername: '취소', usernameSaved: '사용자 이름이 저장되었습니다', usernameRequired: '사용자 이름을 입력하세요', usernameTooLong: '사용자 이름은 24자 이하여야 합니다', notSet: '미설정', teamMembers: '팀원 정보', noTeamMembers: '팀원이 없습니다', active: '활성', directMembers: '직속 인원', joinedAt: '가입일'
   },
   count: {
     myNodes: '내 노드', myIncome: '내 수익', matrix: '매트릭스', level: '등급', sharedNodes: '공유 노드',
@@ -422,7 +423,7 @@ const local = {
     recordsUnavailable: '이체 내역은 아직 제공되지 않습니다', noRecords: '이체 내역이 없습니다',
     rechargeWallet: '충전 지갑', rewardWallet: '보상 지갑', myRewardWallet: '내 보상 지갑',
     userRewardWallet: '사용자 보상 지갑', selfHint: '충전 잔액을 보상 지갑으로 옮기며 추천 보상은 발생하지 않습니다.',
-    userHint: '상하위 사용자만 가능하며 자금은 상대방 보상 지갑으로 들어갑니다.', upline: '상위', downline: '하위',
+    userHint: '상위만 초대 체인 하위로 이체 가능하며 자금은 상대방 보상 지갑으로 들어갑니다.', upline: '상위', downline: '하위',
     fetchRecordsFailed: '이체 내역을 불러오지 못했습니다', insufficientBalance: '{wallet} 잔액이 부족합니다',
     amountMustBePositive: '이체 금액은 0보다 커야 합니다', invalidRecipient: '받는 주소가 올바르지 않습니다',
     cannotTransferToSelf: '본인에게 이체할 수 없습니다', success: '이체 성공', failed: '이체 실패'

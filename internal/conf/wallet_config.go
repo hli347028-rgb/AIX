@@ -64,6 +64,13 @@ type WalletConfig struct {
 	AveAPIKeyFile      string `json:"ave_api_key_file" yaml:"ave_api_key_file"`
 	AveKlineBaseURL    string `json:"ave_kline_base_url" yaml:"ave_kline_base_url"`
 	AveKlineTokenID    string `json:"ave_kline_token_id" yaml:"ave_kline_token_id"`
+
+	// 向交易所划转 AIX-USDT（WinBit 入金 /v2/winA/aixInbound；enabled=false 或密钥未配齐时不开通）
+	ExchangeTransferEnabled        bool     `json:"exchange_transfer_enabled" yaml:"exchange_transfer_enabled"`
+	ExchangeTransferAPIURL         string   `json:"exchange_transfer_api_url" yaml:"exchange_transfer_api_url"`
+	ExchangeTransferPartnerID      string   `json:"exchange_transfer_partner_id" yaml:"exchange_transfer_partner_id"`
+	ExchangeTransferSecretKeys     []string `json:"exchange_transfer_secret_keys" yaml:"exchange_transfer_secret_keys"`
+	ExchangeTransferSecretKeysFile string   `json:"exchange_transfer_secret_keys_file" yaml:"exchange_transfer_secret_keys_file"`
 }
 
 const (
@@ -438,4 +445,49 @@ func (w *WalletConfig) GetAveKlineTokenID() string {
 		}
 	}
 	return DefaultAveKlineTokenID
+}
+
+// ExchangeTransferConfigured reports whether outbound exchange transfer can be attempted.
+func (w *WalletConfig) ExchangeTransferConfigured() bool {
+	if w == nil || !w.ExchangeTransferEnabled {
+		return false
+	}
+	if strings.TrimSpace(w.ExchangeTransferAPIURL) == "" {
+		return false
+	}
+	if strings.TrimSpace(w.ExchangeTransferPartnerID) == "" {
+		return false
+	}
+	return len(w.ExchangeTransferActiveSecrets()) > 0
+}
+
+// ExchangeTransferActiveSecrets returns signing secrets for outbound exchange transfer.
+// Priority: AIX_EXCHANGE_TRANSFER_SECRET → secret file → inline keys.
+func (w *WalletConfig) ExchangeTransferActiveSecrets() []string {
+	if w == nil {
+		return nil
+	}
+	if env := strings.TrimSpace(os.Getenv("AIX_EXCHANGE_TRANSFER_SECRET")); env != "" {
+		return nonEmptyLines(strings.Split(env, ","))
+	}
+	if path := strings.TrimSpace(w.ExchangeTransferSecretKeysFile); path != "" {
+		if b, err := os.ReadFile(path); err == nil {
+			if keys := nonEmptyLines(strings.Split(string(b), "\n")); len(keys) > 0 {
+				return keys
+			}
+		}
+	}
+	return nonEmptyLines(w.ExchangeTransferSecretKeys)
+}
+
+func nonEmptyLines(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s == "" || strings.HasPrefix(s, "#") {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }

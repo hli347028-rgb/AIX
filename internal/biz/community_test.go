@@ -88,6 +88,19 @@ func TestIsInSmallAreaBranch(t *testing.T) {
 	}
 }
 
+func TestIsAncestorOf(t *testing.T) {
+	parents := map[int64]int64{2: 1, 3: 1, 4: 2, 5: 3}
+	if !IsAncestorOf(1, 4, parents) {
+		t.Fatal("1 should be ancestor of 4")
+	}
+	if IsAncestorOf(4, 1, parents) {
+		t.Fatal("4 should not be ancestor of 1")
+	}
+	if IsAncestorOf(2, 3, parents) {
+		t.Fatal("siblings are not ancestors")
+	}
+}
+
 func TestIsLinealRelation(t *testing.T) {
 	// 1 -> 2 -> 4, 1 -> 3 -> 5, and 6 is unrelated.
 	parents := map[int64]int64{2: 1, 3: 1, 4: 2, 5: 3}

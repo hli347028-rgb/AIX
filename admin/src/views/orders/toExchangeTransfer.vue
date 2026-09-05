@@ -1,29 +1,16 @@
 <template>
     <PageView>
-        <a-card :title="`订单列表（共 ${total} 条）`">
+        <a-card :title="`向交易所划转（共 ${total} 条）`">
             <a-row :gutter="10" class="inputGroup">
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-input v-model="searchData.address" placeholder="用户地址" allowClear @keyup.enter="getListTwo" />
                 </a-col>
-                <a-col :xs="12" :md="8" :lg="8" :xl="5">
-                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
-                        <a-radio-button :value="false">查本人</a-radio-button>
-                        <a-radio-button :value="true">查全团队</a-radio-button>
-                    </a-radio-group>
-                </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select allowClear v-model="searchData.status" style="width:100%" placeholder="状态"
                         @change="getListTwo">
-                        <a-select-option value="active">进行中</a-select-option>
-                        <a-select-option value="exited">已出局</a-select-option>
-                    </a-select>
-                </a-col>
-                <a-col :xs="12" :md="6" :lg="6" :xl="4">
-                    <a-select allowClear v-model="searchData.fund_source" style="width:100%" placeholder="资金来源"
-                        @change="getListTwo">
-                        <a-select-option v-for="opt in fundSourceOptions" :key="opt.value" :value="opt.value">
-                            {{ opt.label }}
-                        </a-select-option>
+                        <a-select-option value="pending">处理中</a-select-option>
+                        <a-select-option value="completed">成功</a-select-option>
+                        <a-select-option value="failed">失败</a-select-option>
                     </a-select>
                 </a-col>
                 <a-col :xs="24" :md="12" :lg="10" :xl="8">
@@ -41,12 +28,11 @@
                     </a-button-group>
                 </a-col>
             </a-row>
-            <div class="stats-bar stats-bar-team" v-if="teamSummary && searchData.teamQuery">
-                <span>团队概览：<b>{{ teamSummaryText(teamSummary) }}</b></span>
-            </div>
             <div class="stats-bar" v-if="stats">
                 <span>筛选笔数：<b>{{ stats.totalCount || 0 }}</b></span>
-                <span>报单总额：<b>{{ formatAmount4(stats.principalTotal) }}</b> USDT</span>
+                <span>成功笔数：<b>{{ stats.completedCount || 0 }}</b></span>
+                <span>失败笔数：<b>{{ stats.failedCount || 0 }}</b></span>
+                <span>成功总额：<b>{{ stats.completedTotal || 0 }}</b> AIX-USDT</span>
             </div>
             <a-table
                 rowKey="id"
@@ -65,106 +51,71 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
-import teamQueryMixin from '../mixin/teamQueryMixin'
-import { formatAmount4 } from '../../utils/formatAmount'
 import moment from 'moment'
 
 const statusText = {
-    active: '进行中',
-    exited: '已出局',
-    completed: '已出局',
+    pending: '处理中',
+    completed: '成功',
+    failed: '失败',
 }
-
-const fundSourceText = {
-    recharge: '充值账本',
-    reward: '奖励账本',
-    win: 'WIN',
-    win_a: 'WIN-A',
-    'recharge+win': '充值+WIN',
-    'recharge+win_a': '充值+WIN-A',
-    'win+win_a': 'WIN+WIN-A',
-    'win+recharge': 'WIN+充值',
-    'win_a+recharge': 'WIN-A+充值',
-    'win_a+win': 'WIN-A+WIN',
-}
-
-const pointsSourceText = {
-    recharge: 'USDT认购',
-    win: 'WIN认购',
-    transfer_reinvest: '复投（上级划转）',
-}
-
-const fundSourceOptions = Object.keys(fundSourceText).map((value) => ({
-    value,
-    label: fundSourceText[value],
-}))
 
 export default {
-    name: 'subscription',
-    mixins: [listMixin, teamQueryMixin],
+    name: 'toExchangeTransfer',
+    mixins: [listMixin],
     data() {
         return {
             stats: null,
-            teamSummary: null,
-            fundSourceOptions,
             columns: [
                 {
                     title: '时间',
                     dataIndex: 'createdAt',
                 },
                 {
-                    title: '报单本金',
-                    dataIndex: 'amount',
-                },
-                {
-                    title: '出局倍数',
-                    dataIndex: 'exitAmount',
-                },
-                {
-                    title: '出局目标',
-                    dataIndex: 'money',
-                },
-                {
-                    title: '已获收益',
-                    dataIndex: 'amountGet',
-                },
-                {
-                    title: '剩余额度',
-                    dataIndex: 'amountLast',
-                },
-                {
-                    title: '积分',
-                    dataIndex: 'points',
-                    customRender: (v) => v || '0',
-                },
-                {
-                    title: 'AIX-USDT来源',
-                    dataIndex: 'points_source',
-                    customRender: (v, row) => {
-                        if (row && row.points_source_label) return row.points_source_label
-                        return pointsSourceText[v] || (v ? v : '-')
-                    },
-                },
-                {
-                    title: '资金来源',
-                    dataIndex: 'fund_source',
-                    customRender: (v) => fundSourceText[v] || v || '-',
-                },
-                {
                     title: '用户地址',
                     dataIndex: 'address',
                 },
                 {
+                    title: '资产',
+                    dataIndex: 'asset',
+                    customRender: (v) => v || 'AIX-USDT',
+                },
+                {
+                    title: '金额',
+                    dataIndex: 'amount',
+                },
+                {
                     title: '状态',
                     dataIndex: 'status',
-                    customRender: (v) => statusText[v] || v || '-',
+                    customRender: (v) => {
+                        const label = statusText[v] || v || '-'
+                        const color = v === 'completed' ? 'green' : (v === 'failed' ? 'red' : 'blue')
+                        return <a-tag color={color}>{label}</a-tag>
+                    },
+                },
+                {
+                    title: '单号(request_no)',
+                    dataIndex: 'requestNo',
+                    customRender: (v) => v || '-',
+                },
+                {
+                    title: '对方单号',
+                    dataIndex: 'partnerTxnId',
+                    customRender: (v) => v || '-',
+                },
+                {
+                    title: '对方码',
+                    dataIndex: 'partnerCode',
+                    customRender: (v) => v || '-',
+                },
+                {
+                    title: '备注',
+                    dataIndex: 'remark',
+                    customRender: (v) => v || '-',
                 },
             ],
             searchData: {
                 address: '',
                 status: undefined,
-                fund_source: undefined,
-                teamQuery: false,
                 dateRange: [],
             },
             pageSize: 50,
@@ -175,16 +126,13 @@ export default {
     },
     methods: {
         buildParams() {
-            const params = this.appendTeamQueryParams({
+            const params = {
                 page: this.current || 1,
                 pageSize: this.pageSize || 50,
-            })
+            }
             const address = (this.searchData.address || '').trim()
             if (address) params.address = address
-            const status = this.searchData.status
-            if (status) params.status = status
-            const fundSource = this.searchData.fund_source
-            if (fundSource) params.fund_source = fundSource
+            if (this.searchData.status) params.status = this.searchData.status
             if (this.searchData.dateRange && this.searchData.dateRange.length === 2) {
                 params.startTime = moment(this.searchData.dateRange[0]).format('YYYY-MM-DD HH:mm:ss')
                 params.endTime = moment(this.searchData.dateRange[1]).format('YYYY-MM-DD HH:mm:ss')
@@ -193,8 +141,8 @@ export default {
         },
         getList() {
             this.loading = true
-            Gai.buy_list(this.buildParams()).then((res) => {
-                const list = (res && res.rewards) ? res.rewards : []
+            Gai.exchange_transfer_list(this.buildParams()).then((res) => {
+                const list = (res && res.list) ? res.list : []
                 this.data = list.map((value, key) => ({
                     ...value,
                     id: value.id != null ? value.id : key,
@@ -202,7 +150,6 @@ export default {
                 }))
                 this.total = parseInt((res && res.count) || 0, 10) || 0
                 this.stats = (res && res.stats) || null
-                this.teamSummary = (res && res.teamSummary) || null
             }).catch(() => {
                 this.data = []
                 this.total = 0
@@ -235,15 +182,6 @@ export default {
 
     b {
         color: #389e0d;
-    }
-}
-
-.stats-bar-team {
-    background: #fff7e6;
-    border-color: #ffd591;
-
-    b {
-        color: #d46b08;
     }
 }
 </style>

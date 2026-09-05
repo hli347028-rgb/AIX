@@ -628,9 +628,28 @@ func (r *userRepo) IsUplineOrDownline(ctx context.Context, a, b int64) (bool, er
 	if a == b {
 		return false, nil
 	}
+	parents, err := r.loadInviterParents(ctx)
+	if err != nil {
+		return false, err
+	}
+	return biz.IsLinealRelation(a, b, parents), nil
+}
+
+func (r *userRepo) IsUplineOf(ctx context.Context, uplineID, downlineID int64) (bool, error) {
+	if uplineID == downlineID {
+		return false, nil
+	}
+	parents, err := r.loadInviterParents(ctx)
+	if err != nil {
+		return false, err
+	}
+	return biz.IsAncestorOf(uplineID, downlineID, parents), nil
+}
+
+func (r *userRepo) loadInviterParents(ctx context.Context) (map[int64]int64, error) {
 	var users []UserPO
 	if err := r.data.db.WithContext(ctx).Select("id", "inviter_id").Find(&users).Error; err != nil {
-		return false, err
+		return nil, err
 	}
 	parents := make(map[int64]int64, len(users))
 	for _, user := range users {
@@ -638,7 +657,7 @@ func (r *userRepo) IsUplineOrDownline(ctx context.Context, a, b int64) (bool, er
 			parents[user.ID] = *user.InviterID
 		}
 	}
-	return biz.IsLinealRelation(a, b, parents), nil
+	return parents, nil
 }
 
 func (r *userRepo) SetWithdrawReset(ctx context.Context, userID int64, reset bool) error {

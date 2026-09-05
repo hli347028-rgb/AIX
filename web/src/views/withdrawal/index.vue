@@ -9,42 +9,18 @@
     />
 
     <div class="content">
-      <div class="asset-tabs">
-        <button
-          type="button"
-          class="asset-tab"
-          :class="{ active: assetType === 'SDT', disabled: sdtWithdrawDisabled }"
-          :disabled="sdtWithdrawDisabled"
-          @click="switchAsset('SDT')"
-        >
-          AIX-USDT
-        </button>
-        <button
-          type="button"
-          class="asset-tab"
-          :class="{ active: assetType === 'USDT' }"
-          @click="switchAsset('USDT')"
-        >
-          USDT
-        </button>
-      </div>
-
       <div class="page-header">
-        <!-- 标签走小号，数字才放大：原先整行（含资产名称和“余额”）被一起放大，
-             标签和数字同样醒目，等于没有层级。 -->
-        <h1 class="page-title">{{ balanceLabel }}</h1>
+        <h1 class="page-title">{{ $t('withdraw.usdtAvailableBalance') }}</h1>
         <p class="page-balance">
-          {{ displayAmount(currentBalance) }}<span class="page-balance-unit">{{ assetLabel }}</span>
+          {{ displayAmount(usdtBalance) }}<span class="page-balance-unit">USDT</span>
         </p>
-        <p v-if="assetType === 'USDT'" class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
-        <p v-else-if="sdtWithdrawDisabled" class="page-hint">{{ $t('withdraw.sdtWithdrawDisabled') }}</p>
-        <p v-else class="page-hint">{{ $t('withdraw.sdtExchangeHint') }}</p>
+        <p class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
       </div>
 
       <div class="withdraw-form">
         <div class="form-hint-row">
           <p class="form-hint">{{ $t('withdraw.amount') }}</p>
-          <button type="button" class="all-btn" :disabled="sdtWithdrawDisabled && assetType === 'SDT'" @click="handleAllAmount">
+          <button type="button" class="all-btn" @click="handleAllAmount">
             {{ $t('withdraw.all') }}
           </button>
         </div>
@@ -55,23 +31,22 @@
             @input="checkAmount"
             type="text"
             inputmode="decimal"
-            :disabled="sdtWithdrawDisabled && assetType === 'SDT'"
             :placeholder="$t('withdraw.enterAmount')"
           />
-          <span class="asset-tag">{{ assetLabel }}</span>
+          <span class="asset-tag">USDT</span>
         </div>
         <p v-if="amountError" class="error-text">{{ amountError }}</p>
 
         <button
           class="subscribe-btn custom-btn"
-          :disabled="!canSubmit || loading || (sdtWithdrawDisabled && assetType === 'SDT')"
+          :disabled="!canSubmit || loading"
           @click="handleWithdrawal"
         >
           {{ loading ? $t('withdraw.processing') : $t('withdraw.confirm') }}
         </button>
 
         <div class="form-info">
-          <p>{{ $t('withdraw.fee') }}: 0 {{ assetLabel }}</p>
+          <p>{{ $t('withdraw.fee') }}: 0 USDT</p>
         </div>
       </div>
 
@@ -92,11 +67,11 @@
             <div class="table-row table-row-4">
               <span class="amount-cell">
                 <strong>{{ displayAmount(item.amount) }}</strong>
-                <small>{{ recordAssetLabel(item.asset) }}</small>
+                <small>USDT</small>
               </span>
               <span class="amount-cell">
                 <strong>{{ displayAmount(item.net_amount) }}</strong>
-                <small>{{ recordAssetLabel(item.asset) }}</small>
+                <small>USDT</small>
               </span>
               <span class="address-cell">{{ formatAddress(item.to_address) }}</span>
               <span class="status-cell" :class="`is-${String(item.status || '').toLowerCase()}`">
@@ -120,7 +95,7 @@
 
 <script setup lang="ts">
 import userPerson from '@/pinia/person'
-import { getWinWithdrawRecords, withdrawSdt, withdrawUsdt } from '@/api/aix'
+import { getWinWithdrawRecords, withdrawUsdt } from '@/api/aix'
 import type { WinWithdrawRecord } from '@/api/aix'
 import { compareDecimals, displayDecimal, isPositiveDecimal } from '@/tools/decimal'
 import { showToast } from 'vant'
@@ -128,44 +103,20 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
-type AssetType = 'SDT' | 'USDT'
-
-const SDT_WITHDRAW_DISABLED = true
-
 const { t: $t } = useI18n()
 const router = useRouter()
 const person = userPerson()
 
-const assetType = ref<AssetType>('USDT')
 const amountInput = ref('')
 const loading = ref(false)
 const recordLoading = ref(false)
 const amountList = ref<WinWithdrawRecord[]>([])
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const sdtWithdrawDisabled = computed(() => SDT_WITHDRAW_DISABLED)
 
-const assetLabel = computed(() => {
-  if (assetType.value === 'USDT') return 'USDT'
-  return 'AIX-USDT'
-})
-const balanceLabel = computed(() => {
-  if (assetType.value === 'USDT') return $t('withdraw.usdtAvailableBalance')
-  return $t('withdraw.sdtAvailableBalance')
-})
-
-const sdtBalance = computed(() => String(person.profile?.points || person.userinfo?.points || '0'))
 const usdtBalance = computed(() => String(person.profile?.usdt_withdrawable || '0'))
-const currentBalance = computed(() => {
-  if (assetType.value === 'USDT') return usdtBalance.value
-  return sdtBalance.value
-})
 
 const filteredRecords = computed(() =>
-  amountList.value.filter((item) => {
-    const asset = String(item.asset || '').toUpperCase()
-    if (assetType.value === 'SDT') return asset === 'SDT'
-    return asset === 'USDT'
-  })
+  amountList.value.filter((item) => String(item.asset || '').toUpperCase() === 'USDT')
 )
 
 const hasPendingRecords = computed(() => filteredRecords.value.some((item) => item.status === 'pending'))
@@ -173,21 +124,13 @@ const hasPendingRecords = computed(() => filteredRecords.value.some((item) => it
 const amountError = computed(() => {
   if (!amountInput.value) return ''
   if (!isPositiveDecimal(amountInput.value)) return $t('withdraw.enterAmount')
-  if (compareDecimals(amountInput.value, currentBalance.value) > 0) {
-    if (assetType.value === 'USDT') return $t('withdraw.insufficientUsdt')
-    return $t('withdraw.insufficientSdt')
+  if (compareDecimals(amountInput.value, usdtBalance.value) > 0) {
+    return $t('withdraw.insufficientUsdt')
   }
   return ''
 })
 
 const canSubmit = computed(() => Boolean(amountInput.value) && !amountError.value)
-
-const recordAssetLabel = (asset?: string) => {
-  const a = String(asset || '').toUpperCase()
-  if (a === 'SDT') return 'AIX-USDT'
-  if (a === 'USDT') return 'USDT'
-  return a || '-'
-}
 
 const withdrawStatusText = (status: string) => {
   switch (status) {
@@ -213,17 +156,6 @@ const formatTime = (value: number) => {
   if (Number.isNaN(date.getTime())) return ''
   const pad = (part: number) => String(part).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-const switchAsset = (next: AssetType) => {
-  if (next === 'SDT' && SDT_WITHDRAW_DISABLED) {
-    showToast({ message: $t('withdraw.sdtWithdrawDisabled'), position: 'middle' })
-    return
-  }
-  if (assetType.value === next) return
-  assetType.value = next
-  amountInput.value = ''
-  syncWithdrawPolling()
 }
 
 const getAmountList = async () => {
@@ -267,18 +199,14 @@ const syncWithdrawPolling = () => {
 }
 
 const handleAllAmount = () => {
-  if (!isPositiveDecimal(currentBalance.value)) {
-    const msg =
-      assetType.value === 'USDT'
-        ? $t('withdraw.insufficientUsdt')
-        : $t('withdraw.insufficientSdt')
+  if (!isPositiveDecimal(usdtBalance.value)) {
     showToast({
-      message: msg,
+      message: $t('withdraw.insufficientUsdt'),
       position: 'middle',
     })
     return
   }
-  amountInput.value = currentBalance.value
+  amountInput.value = usdtBalance.value
 }
 
 const checkAmount = (e: Event) => {
@@ -293,23 +221,12 @@ const checkAmount = (e: Event) => {
 
 const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
-  if (assetType.value === 'SDT' && SDT_WITHDRAW_DISABLED) {
-    showToast({ message: $t('withdraw.sdtWithdrawDisabled'), position: 'middle' })
-    return
-  }
   loading.value = true
   try {
-    let result: Awaited<ReturnType<typeof withdrawSdt>>
-    if (assetType.value === 'USDT') {
-      result = await withdrawUsdt(amountInput.value)
-    } else {
-      result = await withdrawSdt(amountInput.value)
-    }
+    const result = await withdrawUsdt(amountInput.value)
     person.profile = {
       ...person.profile,
-      ...(assetType.value === 'USDT'
-        ? { usdt_withdrawable: result.usdt_withdrawable }
-        : { points: result.points }),
+      usdt_withdrawable: result.usdt_withdrawable,
     }
     showToast({
       message: $t('withdraw.submittedProcessing'),
@@ -323,13 +240,9 @@ const handleWithdrawal = async () => {
     const code = error?.response?.data?.reason || error?.response?.data?.code
     const messageKey: Record<string, string> = {
       INVALID_AMOUNT: 'withdraw.enterAmount',
-      INSUFFICIENT_SDT: 'withdraw.insufficientSdt',
       INSUFFICIENT_USDT: 'withdraw.insufficientUsdt',
       FORBIDDEN: 'withdraw.insufficientUsdt',
       INVALID_ADDRESS: 'withdraw.invalidAddress',
-      AIX_WITHDRAW_FORBIDDEN: 'withdraw.aixExchangeHint',
-      WIN_WITHDRAW_DISABLED: 'withdraw.winWithdrawDisabled',
-      SDT_WITHDRAW_DISABLED: 'withdraw.sdtWithdrawDisabled',
     }
     showToast({
       message: messageKey[code]
@@ -372,52 +285,6 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-/* 资产切换沿用顶栏 wallet 的浅蓝底、蓝字、蓝框。 */
-.asset-tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 18px;
-  padding: 4px;
-  border: 1px solid rgba(0, 82, 255, .18);
-  border-radius: 999px;
-  background: #f2f5ff;
-}
-
-.asset-tab {
-  flex: 1;
-  height: 38px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: #0052ff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    color .18s var(--ease),
-    background-color .18s var(--ease);
-
-  &.disabled,
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-
-  &.active {
-    background: #0052ff;
-    border-color: #0052ff;
-    color: var(--on-accent);
-    font-weight: 600;
-  }
-
-  &:focus-visible {
-    outline: 2px solid #0052ff;
-    outline-offset: 2px;
-  }
-}
-
-/* 原本标题/余额/说明三行全部居中且字号接近，读起来没有主次。
-   改成左对齐 + 余额放大：可提现余额是这一页唯一需要"一眼看到"的数字。 */
 .page-header {
   text-align: left;
   margin-bottom: 16px;
@@ -444,323 +311,207 @@ onUnmounted(() => {
     font-variant-numeric: tabular-nums;
     margin-top: 0;
 
-    /* 单位跟在大数字后面，但明显降一级，避免和数值抢注意力 */
     .page-balance-unit {
       margin-left: 7px;
-      font-family: var(--aix-font);
       font-size: 13px;
       font-weight: 500;
-      letter-spacing: .02em;
-      color: var(--text-2);
+      letter-spacing: 0;
+      color: rgba(0, 82, 255, .72);
+      vertical-align: 4px;
     }
   }
 
   .page-hint {
-    margin: 10px 0 0;
+    margin-top: 10px;
     font-size: 12px;
-    color: var(--text-2);
-    line-height: 1.6;
-  }
-
-  .link-btn {
-    margin-left: 4px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #0052ff;
-    cursor: pointer;
+    line-height: 1.5;
+    color: rgba(0, 82, 255, .72);
   }
 }
 
 .withdraw-form {
-  margin-bottom: 40px;
-  padding: 18px;
+  margin-bottom: 28px;
+}
+
+.form-hint-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.form-hint {
+  font-size: 13px;
+  color: var(--fog);
+  margin: 0;
+}
+
+.all-btn {
+  border: 0;
+  background: transparent;
+  color: #0052ff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 48px;
   border: 1px solid rgba(0, 82, 255, .18);
-  border-radius: var(--r-lg);
-  background: var(--surface-1);
+  border-radius: var(--r-md);
+  background: #fff;
+}
 
-  .form-hint-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
+.form-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--paper);
+}
 
-  .form-hint {
-    margin: 0;
-    font-size: 13px;
-    color: var(--text);
-  }
+.asset-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0052ff;
+  white-space: nowrap;
+}
 
-  .all-btn {
-    min-height: 28px;
-    padding: 0 12px;
-    border: 1px solid rgba(0, 82, 255, .24);
-    border-radius: 14px;
-    background: #f2f5ff;
-    color: #0052ff;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-
-    &:hover,
-    &:focus-visible {
-      outline: none;
-      border-color: #0052ff;
-      background: #0052ff;
-      color: var(--on-accent);
-    }
-  }
-
-  .form-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-  }
-
-  .form-input {
-    flex: 1;
-    min-width: 0;
-    height: 44px;
-    padding: 0 14px;
-    border: 1px solid rgba(0, 82, 255, .24);
-    border-radius: var(--r-md);
-    /* 原为 rgba(0,0,0,.25) 配 color: var(--text)（近黑）——
-       25% 黑底压近黑字，这个提现金额输入框此前几乎读不出来。
-       提现是资金操作，输入内容必须清楚可读。
-       改为浅灰底（--surface-2）+ 近黑字，与全站输入框统一。 */
-    background: #f7f9ff;
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-    caret-color: #0052ff;
-    -webkit-text-fill-color: var(--text);
-
-    &::placeholder {
-      color: var(--text-2);
-      -webkit-text-fill-color: var(--text-2);
-    }
-
-    &:focus {
-      border-color: #0052ff;
-      box-shadow: 0 0 0 3px rgba(0, 82, 255, .10);
-    }
-  }
-
-  .asset-tag {
-    flex-shrink: 0;
-    padding: 7px 10px;
-    border: 1px solid rgba(0, 82, 255, .18);
-    border-radius: 14px;
-    background: #f2f5ff;
-    color: #0052ff;
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .error-text {
-    margin: 8px 0 0;
-    color: var(--down);
-    font-size: 12px;
-  }
-
-  .form-info {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-
-    p {
-      margin: 0;
-      font-size: 12px;
-      color: var(--text-2);
-    }
-  }
+.error-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #e5484d;
 }
 
 .subscribe-btn {
   width: 100%;
-  min-height: 44px;
   margin-top: 18px;
-  padding: 8px 20px;
+  height: 48px;
+  border: 0;
+  border-radius: var(--r-pill);
   background: #0052ff;
-  color: var(--on-accent);
-  border: 1px solid #0052ff;
-  border-radius: 18px;
-  font-size: 14px;
+  color: #fff;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease),
-    border-color var(--t-fast) var(--ease),
-    transform var(--t-fast) var(--ease);
-
-  &:hover:not(:disabled) {
-    border-color: #003ec4;
-    background: #003ec4;
-  }
 
   &:disabled {
-    opacity: 1;
+    opacity: 0.45;
     cursor: not-allowed;
-    border-color: var(--hair);
-    background: var(--surface-3);
-    color: var(--text-2);
   }
+}
 
-  &:active:not(:disabled) { transform: scale(.985); }
+.form-info {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--fog);
 }
 
 .record-section {
-  margin-top: 20px;
+  margin-top: 8px;
+}
 
-  .section-title-wrap {
-    margin: 0 0 12px;
-  }
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.title-bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: #0052ff;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--paper);
 }
 
 .table-card {
-  margin-top: 10px;
-  min-height: 220px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  border: 1px solid rgba(0, 82, 255, .18);
+  border: 1px solid rgba(0, 82, 255, .14);
   border-radius: var(--r-lg);
-  background: var(--surface-1);
-  padding: 0;
+  overflow: hidden;
+  background: #fff;
+}
 
-  .table-header {
-    display: grid;
-    grid-template-columns: 1fr 1fr .9fr 1.1fr;
-    gap: 6px;
-    align-items: center;
-    min-height: 42px;
-    padding: 0 8px;
-    background: #f2f5ff;
-    border-bottom: 1px solid rgba(0, 82, 255, .18);
+.table-header,
+.table-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1.1fr 1.2fr 1.2fr;
+  gap: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+}
 
-    span {
-      min-width: 0;
-      text-align: center;
-      font-size: 10px;
-      color: #0052ff;
-      font-weight: 600;
-      letter-spacing: .04em;
-    }
-  }
+.table-header {
+  background: #f2f5ff;
+  color: rgba(0, 82, 255, .78);
+  font-weight: 500;
+}
 
-  .order-list {
-    .table-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr .9fr 1.1fr;
-      gap: 6px;
-      align-items: center;
-      min-height: 62px;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--hair);
-      transition: background-color var(--t-fast) var(--ease);
+.table-row {
+  border-top: 1px solid rgba(0, 82, 255, .08);
+  color: var(--paper);
+  align-items: start;
+}
 
-      &:hover { background: #f7f9ff; }
+.amount-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 
-      span {
-        min-width: 0;
-        text-align: center;
-        font-size: 12px;
-        color: var(--text);
-      }
-    }
-
-    &:last-of-type .table-row { border-bottom: 0; }
-  }
-
-  .address-cell {
-    font-size: 11px !important;
-    color: var(--text-2) !important;
-    overflow-wrap: anywhere;
-  }
-
-  .amount-cell {
-    font-family: var(--aix-font-display);
+  strong {
     font-variant-numeric: tabular-nums;
-
-    strong,
-    small {
-      display: block;
-    }
-
-    strong {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-    }
-
-    small {
-      margin-top: 3px;
-      font-family: var(--aix-font);
-      font-size: 10px;
-      font-weight: 500;
-      color: var(--text-3);
-      white-space: nowrap;
-    }
   }
 
-  .status-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    color: var(--text-2) !important;
-    font-size: 11px !important;
-
-    &.is-review,
-    &.is-pending,
-    &.is-doing { color: #0052ff !important; }
-
-    &.is-completed { color: var(--up-readable) !important; }
-
-    &.is-rejected,
-    &.is-failed { color: var(--down) !important; }
-
-    .tx-hint {
-      font-size: 10px;
-      color: var(--text-2);
-    }
-  }
-
-  .muted {
-    font-size: 11px;
-    color: var(--text-3);
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 250px;
-
-    p {
-      margin-top: 8px;
-      font-size: 12px;
-      color: var(--text-3);
-    }
-  }
-
-  .state-box {
-    height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  small {
+    color: var(--fog);
   }
 }
 
-@media (max-width: 420px) {
-  .table-card {
-    .table-header,
-    .table-row {
-      min-width: 460px;
-      grid-template-columns: minmax(92px, 1fr) minmax(92px, 1fr) minmax(86px, .9fr) minmax(108px, 1.1fr);
-    }
+.address-cell {
+  word-break: break-all;
+  color: var(--fog);
+}
+
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .tx-hint,
+  .muted {
+    color: var(--fog);
+    font-size: 11px;
   }
+
+  &.is-completed { color: #1a7f37; }
+  &.is-failed,
+  &.is-rejected { color: #e5484d; }
+  &.is-pending,
+  &.is-doing,
+  &.is-review { color: #0052ff; }
+}
+
+.empty-state,
+.state-box {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--fog);
+  font-size: 13px;
 }
 </style>
+
+

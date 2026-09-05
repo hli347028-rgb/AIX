@@ -492,6 +492,64 @@ func writeRechargeCSV(w http.ResponseWriter, rows []rechargeListRow) error {
 	return cw.Error()
 }
 
+func rewardTypeLabel(t string) string {
+	switch normalizeRewardType(t) {
+	case "static_aix":
+		return "静态奖(AIX)"
+	case "dynamic_usdt":
+		return "直推奖(USDT)"
+	case "mgmt":
+		return "管理奖(USDT)"
+	case "exit_accel":
+		return "出局加速"
+	case "transfer_in":
+		return "转入"
+	case "transfer_out":
+		return "转出"
+	case "zero_account":
+		return "零号账户(USDT)"
+	case "community_subsidy":
+		return "社区补贴(USDT)"
+	default:
+		if t == "" {
+			return "-"
+		}
+		return t
+	}
+}
+
+func writeRewardCSV(w http.ResponseWriter, rows []rewardListRow) error {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="reward_export.csv"`)
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"ID", "时间", "类型", "资产", "金额", "地址", "来源地址", "结算日"}); err != nil {
+		return err
+	}
+	for _, r := range rows {
+		settle := ""
+		if r.SettlementDate != nil {
+			settle = *r.SettlementDate
+		}
+		if err := cw.Write([]string{
+			fmt.Sprintf("%d", r.ID),
+			formatLegacyTime(r.CreatedTime),
+			rewardTypeLabel(r.Type),
+			r.Asset,
+			r.Amount.String(),
+			r.Address,
+			r.FromAddress,
+			settle,
+		}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
 func withdrawalWithinTime(w *biz.Withdrawal, start, end *time.Time) bool {
 	if w == nil {
 		return false

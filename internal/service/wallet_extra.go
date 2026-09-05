@@ -23,6 +23,8 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.GET("/v1/wallet/subscribe-orders", wallet.HandleSubscribeOrders)
 	r.POST("/v1/wallet/transfer", wallet.HandleTransfer)
 	r.GET("/v1/wallet/transfer-records/lineal", wallet.HandleLinealTransferRecords)
+	r.POST("/v1/wallet/transfer-exchange", wallet.HandleTransferExchange)
+	r.GET("/v1/wallet/transfer-exchange-records", wallet.HandleExchangeTransferRecords)
 	r.POST("/v1/wallet/withdraw-aix", wallet.HandleWithdrawAIX)
 	r.POST("/v1/wallet/exchange-aix-to-win", wallet.HandleExchangeAixToWin)
 	r.POST("/v1/wallet/withdraw-sdt", wallet.HandleWithdrawSDT)
@@ -34,6 +36,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.GET("/v1/wallet/management-rewards", wallet.HandleManagementRewards)
 	r.GET("/v1/wallet/aix-profile", wallet.HandleAixProfile)
 	r.GET("/v1/wallet/downline-usdt-recharges", wallet.HandleDownlineUSDTRecharges)
+	r.GET("/v1/wallet/downline-win-recharges", wallet.HandleDownlineWINRecharges)
 	r.GET("/v1/wallet/downline-subscribe-orders", wallet.HandleDownlineSubscribeOrders)
 	r.GET("/v1/wallet/points-records", wallet.HandlePointsRecords)
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
@@ -219,6 +222,56 @@ func (s *WalletService) HandleTransfer(ctx khttp.Context) error {
 		"id": t.ID, "from_user_id": t.FromUserID, "to_user_id": t.ToUserID,
 		"asset": t.Asset, "amount": t.Amount, "pay_from": t.PayFrom,
 		"to_credit_reward": t.ToCreditReward, "to_credit_aix": t.ToCreditAix,
+	})
+}
+
+func (s *WalletService) HandleTransferExchange(ctx khttp.Context) error {
+	var req struct {
+		Token  string `json:"token"`
+		Amount string `json:"amount"`
+	}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
+	}
+	rec, left, err := s.uc.TransferToExchange(ctx, tokenFromRequest(ctx, req.Token), req.Amount)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"id":             rec.ID,
+		"asset":          "AIX-USDT",
+		"amount":         rec.Amount,
+		"status":         rec.Status,
+		"partner_txn_id": rec.PartnerTxnID,
+		"points_left":    left,
+	})
+}
+
+func (s *WalletService) HandleExchangeTransferRecords(ctx khttp.Context) error {
+	page, pageSize, err := transferRecordPagination(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{
+			"code": 400, "reason": "INVALID_PAGE", "message": err.Error(),
+		})
+	}
+	records, err := s.uc.ListExchangeTransfers(ctx, tokenFromRequest(ctx, ""))
+	if err != nil {
+		return err
+	}
+	start, end := pageBounds(len(records), page, pageSize)
+	list := make([]map[string]any, 0, end-start)
+	for _, record := range records[start:end] {
+		list = append(list, map[string]any{
+			"id":             record.ID,
+			"asset":          "AIX-USDT",
+			"amount":         record.Amount,
+			"status":         record.Status,
+			"partner_txn_id": record.PartnerTxnID,
+			"created_at":     record.CreatedTime.Unix(),
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"page": page, "page_size": pageSize, "total": len(records), "list": list,
 	})
 }
 
@@ -457,6 +510,7 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"win_a_recharge_enabled": false,
 		"min_usdt_recharge":    s.uc.MinUsdtRecharge(),
 		"min_win_recharge":     s.uc.MinWinRecharge(),
+		"exchange_transfer_min_amount": s.uc.ExchangeTransferMinAmount(),
 	})
 }
 
@@ -493,6 +547,48 @@ func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 		"records": items,
 		"count":   total,
 		"page":    page,
+		"page_size": pageSize,
+	})
+}
+
+// HandleDownlineWINRecharges 当前用户所有下级 WIN 充值记录（链上充值 + 交易所划转）。
+func (s *WalletService) HandleDownlineWINRecharges(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	page, pageSize, err := transferRecordPagination(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
+	}
+	records, total, err := s.uc.ListDownlineWINRecharges(ctx, token, page, pageSize)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		if rec == nil {
+			continue
+		}
+		createdAt := rec.CreatedTime.Unix()
+		if rec.ConfirmedTime != nil {
+			createdAt = rec.ConfirmedTime.Unix()
+		}
+		source := "chain"
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rec.TxHash)), "partner:") {
+			source = "exchange"
+		}
+		items = append(items, map[string]any{
+			"id":         rec.ID,
+			"address":    rec.Address,
+			"amount":     rec.Amount,
+			"asset":      rec.Asset,
+			"status":     rec.Status,
+			"source":     source,
+			"created_at": createdAt,
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"records":   items,
+		"count":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }

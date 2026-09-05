@@ -124,6 +124,7 @@ const local = {
     directInviteData: 'Số tiền đăng ký cấp dưới',
     downlineSubscribeAmount: 'Số tiền đăng ký cấp dưới',
     downlineRechargeUsdt: 'Số tiền nạp USDT cấp dưới',
+    downlineRechargeWin: 'Số tiền nạp WIN cấp dưới',
     directLedgerTabs: 'Chi tiết cấp dưới',
     teamIdoTotal: 'Tổng IDO nhóm',
     personalRedeemed: 'Thành tích đã chuộc cá nhân',
@@ -153,7 +154,7 @@ const local = {
     generation: 'Thế hệ',
     reward: 'Thưởng',
     time: 'Thời gian', directReferralReward: 'Thưởng giới thiệu trực tiếp', managementReward: 'Thưởng quản lý',
-    usdtAmount: 'Số lượng USDT', subscribeAmount: 'Số tiền đăng ký', subscribeType: 'Loại', subscribeTypeRecharge: 'USDT đăng ký', subscribeTypeReward: 'Tái đầu tư', subscribeTypeWin: 'Thanh toán WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Số lượng BRC20', myTeam: 'Đội của tôi', refresh: 'Làm mới', teamTotalMembers: 'Tổng thành viên đội', username: 'Tên người dùng', usernameSetting: 'Cài đặt tên', editUsername: 'Sửa', saveUsername: 'Lưu', cancelUsername: 'Hủy', usernameSaved: 'Đã lưu tên người dùng', usernameRequired: 'Vui lòng nhập tên người dùng', usernameTooLong: 'Tên người dùng tối đa 24 ký tự', notSet: 'Chưa đặt', teamMembers: 'Hồ sơ thành viên đội', noTeamMembers: 'Chưa có thành viên đội', active: 'Hoạt động', directMembers: 'Thành viên trực tiếp', joinedAt: 'Ngày tham gia'
+    usdtAmount: 'Số lượng USDT', winAmount: 'Số lượng WIN', rechargeSource: 'Nguồn nạp', rechargeSourceChain: 'Nạp on-chain', rechargeSourceExchange: 'Chuyển sàn', subscribeAmount: 'Số tiền đăng ký', subscribeType: 'Loại', subscribeTypeRecharge: 'USDT đăng ký', subscribeTypeReward: 'Tái đầu tư', subscribeTypeWin: 'Thanh toán WIN', subscribeTypeWinA: 'WIN-A', brc20Amount: 'Số lượng BRC20', myTeam: 'Đội của tôi', refresh: 'Làm mới', teamTotalMembers: 'Tổng thành viên đội', username: 'Tên người dùng', usernameSetting: 'Cài đặt tên', editUsername: 'Sửa', saveUsername: 'Lưu', cancelUsername: 'Hủy', usernameSaved: 'Đã lưu tên người dùng', usernameRequired: 'Vui lòng nhập tên người dùng', usernameTooLong: 'Tên người dùng tối đa 24 ký tự', notSet: 'Chưa đặt', teamMembers: 'Hồ sơ thành viên đội', noTeamMembers: 'Chưa có thành viên đội', active: 'Hoạt động', directMembers: 'Thành viên trực tiếp', joinedAt: 'Ngày tham gia'
   },
   count: {
     myNodes: 'Node của tôi', myIncome: 'Thu nhập của tôi', matrix: 'Ma trận', level: 'Cấp độ', sharedNodes: 'Node chia sẻ',
@@ -422,7 +423,7 @@ const local = {
     recordsUnavailable: 'Lịch sử chuyển chưa khả dụng', noRecords: 'Chưa có lịch sử chuyển',
     rechargeWallet: 'Ví nạp', rewardWallet: 'Ví thưởng', myRewardWallet: 'Ví thưởng của tôi',
     userRewardWallet: 'Ví thưởng người dùng', selfHint: 'Chuyển số dư nạp sang ví thưởng, không tạo thưởng giới thiệu.',
-    userHint: 'Chỉ hỗ trợ tuyến trên và tuyến dưới. Tiền được chuyển vào ví thưởng của người nhận.', upline: 'Tuyến trên', downline: 'Tuyến dưới',
+    userHint: 'Chỉ cấp trên được chuyển cho cấp dưới trong chuỗi mời. Tiền vào ví thưởng người nhận.', upline: 'Tuyến trên', downline: 'Tuyến dưới',
     fetchRecordsFailed: 'Không thể tải lịch sử chuyển', insufficientBalance: 'Số dư {wallet} không đủ',
     amountMustBePositive: 'Số tiền chuyển phải lớn hơn 0', invalidRecipient: 'Địa chỉ nhận không hợp lệ',
     cannotTransferToSelf: 'Không thể chuyển cho chính mình', success: 'Chuyển khoản thành công', failed: 'Chuyển khoản thất bại'
