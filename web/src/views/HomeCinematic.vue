@@ -117,6 +117,7 @@ import PartnersWall from '@/components/PartnersWall.vue'
 
 const router = useRouter()
 const { t: $t } = useI18n()
+const emit = defineEmits<{ (event: 'render-failed'): void }>()
 const stageRef = ref<HTMLElement | null>(null)
 // Android 钱包 WebView 的 GPU/图片解码能力差异很大。手机端直接进入首个
 // 内容章节，避免开场遮罩或大图解码失败时把可用页面永久盖成黑屏。
@@ -368,8 +369,17 @@ const onVisibilityChange = () => {
 const openPrediction = () => window.open('https://prediction-exchange-lovat.vercel.app', '_blank', 'noopener,noreferrer')
 const openWallet = () => window.open('https://testnet.wallet.eoeo.info/06bx', '_blank', 'noopener,noreferrer')
 
+const watchSceneImage = () => {
+  const src = scenes[activeNode.value]?.image
+  if (!src) return
+  const img = new Image()
+  img.onerror = () => emit('render-failed')
+  img.src = src
+}
+
 onMounted(() => {
   startAnimation()
+  watchSceneImage()
   addEventListener('keydown', onKey)
   document.addEventListener('visibilitychange', onVisibilityChange)
   stageRef.value?.addEventListener('touchstart', onTouchStart, { passive: true })

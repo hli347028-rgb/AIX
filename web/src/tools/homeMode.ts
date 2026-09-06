@@ -1,6 +1,8 @@
 export type HomeMode = 'static' | 'cinematic'
 
 const STORAGE_KEY = 'aix-home-mode'
+const FIRST_SCENE = '/assets/timeline-04-consensus.png'
+const PROBE_MS = 4000
 
 function readQueryParam(name: string): string | null {
   try {
@@ -53,12 +55,11 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-/** Android 系统 Chrome 不含 `; wv)`；钱包内置页几乎都带这个标记。 */
-function isAndroidInAppWebView(ua: string): boolean {
+/** 仅用于“要不要先探测场景图”。不再据此直接退阶。 */
+export function isAndroidInAppWebView(ua = navigator.userAgent || ''): boolean {
   if (!/Android/i.test(ua)) return false
   if (/; wv\)/i.test(ua)) return true
   if (/\bWebView\b/i.test(ua)) return true
-  // 部分 OEM 内置页不带 wv 标记，但仍是 Version/4.0 Chrome WebView。
   if (/Version\/4\.0/i.test(ua) && /Chrome\//i.test(ua)) return true
   return false
 }
@@ -79,21 +80,53 @@ function canUseCanvas2d(): boolean {
   }
 }
 
-function detectHomeMode(): HomeMode {
-  const ua = navigator.userAgent || ''
-  if (prefersReducedMotion()) return 'static'
-  if (!canUseCanvas2d()) return 'static'
-  if (isAndroidInAppWebView(ua)) return 'static'
-
-  const major = chromeMajor(ua)
-  if (major !== null && major > 0 && major < 80) return 'static'
-
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
-  if (typeof memory === 'number' && memory > 0 && memory <= 2 && /Android/i.test(ua)) {
-    return 'static'
+function hasNonEmptyPixels(img: HTMLImageElement): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = 32
+    canvas.height = 32
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return false
+    ctx.drawImage(img, 0, 0, 32, 32)
+    const data = ctx.getImageData(0, 0, 32, 32).data
+    let visible = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 8 && data[i] + data[i + 1] + data[i + 2] > 12) visible += 1
+    }
+    return visible > 20
+  } catch {
+    return false
   }
+}
 
-  return 'cinematic'
+/** 钱包 WebView 先解码一张真实场景图；失败再静态，成功才上电影式。 */
+export function probeCinematicReady(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const finish = (ok: boolean) => {
+      clearTimeout(timer)
+      img.onload = null
+      img.onerror = null
+      resolve(ok)
+    }
+    const timer = window.setTimeout(() => finish(false), PROBE_MS)
+    img.onload = () => {
+      const decode = 'decode' in img ? img.decode() : Promise.resolve()
+      void decode.then(() => finish(hasNonEmptyPixels(img))).catch(() => finish(false))
+    }
+    img.onerror = () => finish(false)
+    img.src = FIRST_SCENE
+  })
+}
+
+function detectHardStatic(): boolean {
+  const ua = navigator.userAgent || ''
+  if (prefersReducedMotion()) return true
+  if (!canUseCanvas2d()) return true
+  const major = chromeMajor(ua)
+  if (major !== null && major > 0 && major < 80) return true
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  return typeof memory === 'number' && memory > 0 && memory <= 2 && /Android/i.test(ua)
 }
 
 function buildStamp(): string {
@@ -104,15 +137,23 @@ function buildStamp(): string {
   }
 }
 
-function logHomeMode(mode: HomeMode, source: 'forced' | 'stored' | 'detected') {
+function logHomeMode(mode: HomeMode, source: string) {
   console.info('[AIX home]', mode, `(${source})`, navigator.userAgent, buildStamp())
 }
 
+export function persistHomeMode(mode: HomeMode) {
+  writeStoredMode(mode)
+  logHomeMode(mode, 'persisted')
+}
+
+export function shouldProbeCinematic(mode: HomeMode): boolean {
+  return mode === 'cinematic' && isAndroidInAppWebView()
+}
+
 /**
- * 能力退阶：无法安全合成电影式场景时走静态首页。
- * 不要用 1024 PNG 做探测——解码本身就会打满钱包 WebView 的 GPU。
- *
- * 调试：`#/?home=static` 强制静态，`#/?home=cinematic` 强制电影式，`#/?home=auto` 清除覆盖。
+ * 默认电影式。安卓钱包不再一律静态。
+ * 硬条件不足、或上次场景探测失败（localStorage）才静态。
+ * `#/?home=static|cinematic|auto` 可覆盖。
  */
 export function resolveHomeMode(): HomeMode {
   const forced = parseForcedMode()
@@ -124,15 +165,17 @@ export function resolveHomeMode(): HomeMode {
     return forced
   } else {
     const stored = readStoredMode()
-    const ua = navigator.userAgent || ''
-    // 钱包 WebView 忽略上次强制的 cinematic，避免黑屏被写进 localStorage 后反复出现。
-    if (stored === 'static' || (stored === 'cinematic' && !isAndroidInAppWebView(ua))) {
+    if (stored === 'static' || stored === 'cinematic') {
+      if (stored === 'cinematic' && detectHardStatic()) {
+        logHomeMode('static', 'hard-static')
+        return 'static'
+      }
       logHomeMode(stored, 'stored')
       return stored
     }
   }
 
-  const mode = detectHomeMode()
+  const mode = detectHardStatic() ? 'static' : 'cinematic'
   logHomeMode(mode, 'detected')
   return mode
 }
