@@ -45,7 +45,8 @@ type UserPO struct {
 	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结：禁登录/资金操作；无静态/动态/社区补贴入账；他人不可向其划转
 	FrozenAt          *time.Time      `gorm:"column:frozen_at"`
 	ExchangeEnabled   bool            `gorm:"column:exchange_enabled;default:true;not null"` // 关闭后禁止 AIX→可提 U 兑换
-	ExchangeBindAddress string         `gorm:"column:exchange_bind_address;size:42;uniqueIndex"` // 向交易所划转绑定地址；空=未绑定，绑定后不可改
+	// 未绑定必须为 NULL（唯一索引允许多个 NULL）；禁止写空串 ''，否则会撞唯一键导致注册失败。
+	ExchangeBindAddress *string        `gorm:"column:exchange_bind_address;size:42;uniqueIndex"`
 	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
 	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime       time.Time       `gorm:"column:updated_time;autoUpdateTime"`

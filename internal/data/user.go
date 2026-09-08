@@ -622,7 +622,10 @@ func (r *userRepo) ResolveExchangeBindAddress(ctx context.Context, userID int64,
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
 			return err
 		}
-		existing := strings.TrimSpace(u.ExchangeBindAddress)
+		existing := ""
+		if u.ExchangeBindAddress != nil {
+			existing = strings.TrimSpace(*u.ExchangeBindAddress)
+		}
 		requested := strings.TrimSpace(requestedAddress)
 		if existing != "" {
 			if requested != "" {
@@ -858,12 +861,14 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		IsFrozen:             po.IsFrozen,
 		FrozenAt:             po.FrozenAt,
 		ExchangeEnabled:      po.ExchangeEnabled,
-		ExchangeBindAddress:  strings.TrimSpace(po.ExchangeBindAddress),
 		InviterID:            po.InviterID,
 		Role:                 po.Role,
 		CreatedTime:          po.CreatedTime,
 		UpdatedTime:          po.UpdatedTime,
 		InviterAddress:       inviterAddress,
+	}
+	if po.ExchangeBindAddress != nil {
+		user.ExchangeBindAddress = strings.TrimSpace(*po.ExchangeBindAddress)
 	}
 	user.SyncCompatFields()
 	return user

@@ -425,6 +425,13 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 			return err
 		}
 	}
+	// 空串会撞唯一索引；统一改回 NULL（未绑定）
+	if err := db.Exec(`
+		UPDATE users SET exchange_bind_address = NULL
+		WHERE exchange_bind_address IS NOT NULL AND exchange_bind_address = ''
+	`).Error; err != nil {
+		return err
+	}
 	// 历史已开启角色但无设置时间：用 updated_time 近似回填（仅补空值）
 	if err := db.Exec(`
 		UPDATE users SET zero_account_set_at = updated_time
