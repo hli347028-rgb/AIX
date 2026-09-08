@@ -24,7 +24,7 @@
         <div class="vignette" />
       </div>
 
-      <div v-if="!resourceLite && activeNode === 0" class="opening" aria-live="polite">
+      <div v-if="activeNode === 0" class="opening" aria-live="polite">
         <div class="opening-space" aria-hidden="true">
           <div class="opening-tunnel" />
           <div class="opening-energy" />
@@ -119,11 +119,10 @@ const router = useRouter()
 const { t: $t } = useI18n()
 const emit = defineEmits<{ (event: 'render-failed'): void }>()
 const stageRef = ref<HTMLElement | null>(null)
-// Android 钱包 WebView 的 GPU/图片解码能力差异很大。手机端直接进入首个
-// 内容章节，避免开场遮罩或大图解码失败时把可用页面永久盖成黑屏。
+// 手机仍只挂当前场景层，减轻显存；开场幕不再跳过——能进电影式就从「进入未来」开始。
 const resourceLite = /Android/i.test(navigator.userAgent) || window.innerWidth <= 540
-const initialNode = resourceLite ? 1 : 0
-const minimumNode = initialNode
+const initialNode = 0
+const minimumNode = 0
 const scenes = [
   { id: 'opening', image: '/assets/timeline-00-time-tunnel-v2.png' },
   { id: 'future', image: '/assets/timeline-04-consensus.png' },
@@ -515,14 +514,31 @@ watch(target, startAnimation)
 }
 .embedded-panel :deep(.market-stats>.stat span){font-size:10px;letter-spacing:.14em}
 .embedded-panel :deep(.market-stats>.stat strong){font-size:18px}
-/* 手机钱包内置 WebView：减少昂贵的合成图层，避免 GPU 进程被回收后白屏。 */
+/* 手机钱包内置 WebView：减少后续章节的昂贵合成；第 0 幕开场保持原样式。 */
 @media(max-width:540px){
   .space-camera{will-change:auto}
-  .speed-lines,.opening-energy{display:none}
+  .speed-lines{display:none}
   .content-surface,.embedded-panel,.partners-panel,.hero-actions button{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
-  .opening-tunnel{filter:none;will-change:auto}
   .partners-panel :deep(.wall-track){animation:none!important}
 }
+
+/* 第 0 幕沿用桌面电影式开场，不被手机压缩规则改写。 */
+.opening-energy{display:block;opacity:.2;inset:-25%;animation:opening-orbit 18s linear infinite}
+.opening-tunnel{
+  inset:-5%;
+  background-image:url('/assets/timeline-00-time-tunnel-v2.png');
+  background-position:center;
+  background-size:cover;
+  filter:saturate(.9) contrast(1.08) brightness(.78);
+  animation:opening-breathe 9s ease-in-out infinite alternate;
+  will-change:transform,filter;
+}
+.opening-copy{align-items:flex-start;width:min(82vw,760px);gap:0;padding:36px;text-align:left}
+.opening-copy>p{margin:0 0 22px;font-size:10px;letter-spacing:.34em;white-space:nowrap}
+.opening-copy h1{width:100%;font-size:clamp(58px,8.2vw,116px);line-height:.94;letter-spacing:-.065em}
+.opening-copy h1 span{font-size:.23em;letter-spacing:.34em}
+.opening-enter{width:238px;height:58px;margin-top:38px}
+.opening-copy>small{margin-top:15px;font-size:8px;letter-spacing:.22em}
 
 /* 桌面开场保留可点击入口；较旧 WebView 不再依赖滑动才能离开遮罩。 */
 .opening { pointer-events: auto; }
