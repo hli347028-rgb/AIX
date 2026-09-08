@@ -49,6 +49,7 @@ type User struct {
 	IsFrozen        bool
 	FrozenAt        *time.Time
 	ExchangeEnabled bool // 默认 true；后台关闭后禁止 AIX 兑换
+	ExchangeBindAddress string // 向交易所划转绑定地址；空表示未绑定
 	InviterID       *int64
 	InviterAddress  string
 	Role            string
@@ -183,6 +184,10 @@ type UserRepo interface {
 	RefreshPerformance(ctx context.Context) error
 	RefreshPerformanceFromUsers(ctx context.Context, userIDs ...int64) error
 	AdminUpdateUser(ctx context.Context, update *AdminUserUpdate) error
+	// SetFrozenForUsers 批量设置冻结状态（含 frozen_at），用于冻结/解冻团队。
+	SetFrozenForUsers(ctx context.Context, userIDs []int64, frozen bool) error
+	// ResolveExchangeBindAddress 解析/绑定向交易所划转地址：已绑定不可改；未绑定则绑定且全局唯一。
+	ResolveExchangeBindAddress(ctx context.Context, userID int64, requestedAddress string) (bound string, err error)
 	UpdateUsername(ctx context.Context, userID int64, username string) error
 	SetRole(ctx context.Context, userID int64, role string) error
 	GetBalances(ctx context.Context, userID int64) (recharge, reward, aix string, err error)

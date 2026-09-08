@@ -401,7 +401,7 @@ func (uc *WalletUsecase) CreateAixWithdraw(ctx context.Context, tokenString, amo
 }
 
 // ExchangeAixToWin AIX → 可提 U（USDT）兑换。
-// 当全网当日已兑换 AIX（含待审）加上本笔后，超过「今日AIX数量 × 审核阈值%」时进入待审核：
+// 当全网当日已完成兑换 AIX 加上本笔后，超过「全网总AIX × 审核阈值%」时进入待审核：
 // 先扣 AIX，审核通过后再入可提 U；拒绝则退回 AIX。
 func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixAmount string) (*ExchangeRecord, string, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
@@ -439,24 +439,33 @@ func (uc *WalletUsecase) ExchangeAixToWin(ctx context.Context, tokenString, aixA
 }
 
 // exchangeNeedsReview 判断本笔兑换是否需进审核。
-// 今日AIX数量 = 今天 0 点结算任务对应结算日（昨日）发放的静态 AIX 总量。
-// 已兑换量只计当日已完成（completed）；待审核不占配额，也不会计入次日阈值。
-// 今日尚无结算产量时不触发审核（避免 0 基数下任意兑换都被拦）。
+// 优先使用当日 0 点锁定的额度（一天只算一次，与结算无关）；尚未锁定时回退为实时全网 aix_balance。
 func (uc *WalletUsecase) exchangeNeedsReview(ctx context.Context, amt decimal.Decimal) (bool, error) {
-	pct, err := decimal.NewFromString(strings.TrimSpace(GetExchangeReviewThresholdPercent()))
-	if err != nil || pct.IsNegative() {
-		pct, _ = decimal.NewFromString(conf.DefaultExchangeReviewThresholdPercent)
-	}
-	todayAixStr, err := uc.walletRepo.SumStaticAixBySettlementDate(ctx, TodaySettlementDate(time.Now()))
-	if err != nil {
+	now := time.Now().In(token.ChinaLocation())
+	today := now.Format("2006-01-02")
+	var limit decimal.Decimal
+	if _, limitStr, found, err := uc.stakingRepo.GetLockedExchangeQuota(ctx, today); err != nil {
 		return false, err
+	} else if found {
+		limit, _ = ParseAmount(limitStr)
+	} else {
+		pct, err := decimal.NewFromString(strings.TrimSpace(GetExchangeReviewThresholdPercent()))
+		if err != nil || pct.IsNegative() {
+			pct, _ = decimal.NewFromString(conf.DefaultExchangeReviewThresholdPercent)
+		}
+		totalAixStr, err := uc.walletRepo.SumTotalAixBalance(ctx)
+		if err != nil {
+			return false, err
+		}
+		totalAix, _ := ParseAmount(totalAixStr)
+		if !totalAix.IsPositive() {
+			return false, nil
+		}
+		limit = totalAix.Mul(pct).Div(decimal.NewFromInt(100))
 	}
-	todayAix, _ := ParseAmount(todayAixStr)
-	if !todayAix.IsPositive() {
+	if !limit.IsPositive() {
 		return false, nil
 	}
-	limit := todayAix.Mul(pct).Div(decimal.NewFromInt(100))
-	now := time.Now().In(token.ChinaLocation())
 	since := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	exchangedStr, err := uc.walletRepo.SumExchangedAixSince(ctx, since)
 	if err != nil {
@@ -826,6 +835,9 @@ func (uc *WalletUsecase) Transfer(ctx context.Context, tokenString, toAddress, a
 	}
 	if toUser == nil {
 		return nil, errors.NotFound("USER_NOT_FOUND", "收款用户不存在")
+	}
+	if toUser.IsFrozen {
+		return nil, errors.BadRequest("ACCOUNT_FROZEN", "收款账户已冻结，无法划转")
 	}
 	if toUser.ID == user.ID {
 		return nil, errors.BadRequest("INVALID_TRANSFER", "不能转给自己")

@@ -53,18 +53,19 @@ func TestEffectiveSubsidyRatePercent(t *testing.T) {
 }
 
 func TestSubsidyDifferentialWalk(t *testing.T) {
+	// chain[0]=recharger；充值人自身档位不占用起点（highest 从 0 起）。
 	chain := []struct {
 		pct  int32
 		subs bool
 	}{
-		{pct: 10, subs: true},
+		{pct: 10, subs: true}, // recharger
 		{0, false},
-		{10, true},
+		{10, true}, // first ancestor with tier: full 10%
 		{0, false},
-		{15, true},
+		{15, true}, // gap 5%
 	}
 	amount := decimal.NewFromInt(1000)
-	highest := EffectiveSubsidyRatePercent(chain[0].subs, chain[0].pct)
+	highest := int32(0)
 	payouts := map[int]decimal.Decimal{}
 	for i := 1; i < len(chain); i++ {
 		node := chain[i]
@@ -77,24 +78,22 @@ func TestSubsidyDifferentialWalk(t *testing.T) {
 			highest = pct
 		}
 	}
-	if !payouts[2].IsZero() {
-		t.Fatalf("c should get 0 on same level as e")
+	if payouts[2].String() != "100" {
+		t.Fatalf("first 10%% ancestor should get 100, got %s", payouts[2])
 	}
 	if payouts[4].String() != "50" {
-		t.Fatalf("a should get 50, got %s", payouts[4])
+		t.Fatalf("15%% ancestor should get 50 gap, got %s", payouts[4])
 	}
 
+	// A(15%) 直推 B(15%)：B 充值时 A 应拿满 15%。
 	chain2 := []struct {
 		pct  int32
 		subs bool
 	}{
-		{pct: 15, subs: true},
-		{0, false},
-		{10, true},
-		{0, false},
-		{15, true},
+		{pct: 15, subs: true}, // B recharger
+		{15, true},            // A
 	}
-	highest = EffectiveSubsidyRatePercent(chain2[0].subs, chain2[0].pct)
+	highest = 0
 	total := decimal.Zero
 	for i := 1; i < len(chain2); i++ {
 		node := chain2[i]
@@ -107,7 +106,36 @@ func TestSubsidyDifferentialWalk(t *testing.T) {
 			highest = pct
 		}
 	}
-	if !total.IsZero() {
-		t.Fatalf("expected 0 payout when recharger is 15%%, got %s", total)
+	if total.String() != "150" {
+		t.Fatalf("direct upline same 15%% should get 150, got %s", total)
+	}
+
+	// C 充值，中间 B(15%)，再上 A(15%)：A 仍被中间同档阻断。
+	chain3 := []struct {
+		pct  int32
+		subs bool
+	}{
+		{pct: 0, subs: false}, // C
+		{15, true},            // B
+		{15, true},            // A
+	}
+	highest = 0
+	payouts3 := map[int]decimal.Decimal{}
+	for i := 1; i < len(chain3); i++ {
+		node := chain3[i]
+		pct := EffectiveSubsidyRatePercent(node.subs, node.pct)
+		gap := SubsidyGapRate(pct, highest)
+		if gap.IsPositive() {
+			payouts3[i] = amount.Mul(gap)
+		}
+		if pct > highest {
+			highest = pct
+		}
+	}
+	if payouts3[1].String() != "150" {
+		t.Fatalf("middle 15%% should get 150, got %s", payouts3[1])
+	}
+	if !payouts3[2].IsZero() {
+		t.Fatalf("top same-tier after middle block should get 0, got %s", payouts3[2])
 	}
 }

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"backend/internal/biz"
@@ -211,19 +212,76 @@ func (r *stakingRepo) CreateSettlementBatch(ctx context.Context, batch *biz.Sett
 	return nil
 }
 
-func (r *stakingRepo) FinishSettlementBatch(ctx context.Context, id int64, status string, staticCount int32, staticAmount string, mgmtCount int32, mgmtAmount string, errMsg string) error {
+func (r *stakingRepo) FinishSettlementBatch(ctx context.Context, id int64, status string, staticCount int32, staticAmount string, mgmtCount int32, mgmtAmount string, errMsg string, exchangeQuotaBase, exchangeQuotaLimit string) error {
 	sa, _ := decimal.NewFromString(staticAmount)
 	ma, _ := decimal.NewFromString(mgmtAmount)
+	qb, _ := decimal.NewFromString(exchangeQuotaBase)
+	ql, _ := decimal.NewFromString(exchangeQuotaLimit)
 	now := time.Now()
 	return r.data.db.WithContext(ctx).Model(&SettlementBatchPO{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status":        status,
-		"static_count":  staticCount,
-		"static_amount": sa,
-		"mgmt_count":    mgmtCount,
-		"mgmt_amount":   ma,
-		"finished_time": now,
-		"error_msg":     errMsg,
+		"status":               status,
+		"static_count":         staticCount,
+		"static_amount":        sa,
+		"mgmt_count":           mgmtCount,
+		"mgmt_amount":          ma,
+		"exchange_quota_base":  qb,
+		"exchange_quota_limit": ql,
+		"finished_time":        now,
+		"error_msg":            errMsg,
 	}).Error
+}
+
+// GetLockedExchangeQuota 取某自然日已锁定的兑换额度。
+func (r *stakingRepo) GetLockedExchangeQuota(ctx context.Context, date string) (base, limit string, found bool, err error) {
+	var po DailyExchangeQuotaPO
+	err = r.data.db.WithContext(ctx).Where("quota_date = ?", date).First(&po).Error
+	if err == gorm.ErrRecordNotFound {
+		// 兼容：旧数据写在 settlement_batches 上
+		var batch SettlementBatchPO
+		berr := r.data.db.WithContext(ctx).
+			Where("settlement_date = ? AND status = ? AND exchange_quota_limit > 0", date, biz.SettlementStatusSuccess).
+			Order("id asc").First(&batch).Error
+		if berr == gorm.ErrRecordNotFound {
+			return "", "", false, nil
+		}
+		if berr != nil {
+			return "", "", false, berr
+		}
+		return batch.ExchangeQuotaBase.String(), batch.ExchangeQuotaLimit.String(), true, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	return po.QuotaBase.String(), po.QuotaLimit.String(), true, nil
+}
+
+// EnsureDailyExchangeQuota 写入当日额度；若已存在则忽略（一天只算一次）。
+func (r *stakingRepo) EnsureDailyExchangeQuota(ctx context.Context, date, base, limit string) error {
+	if strings.TrimSpace(date) == "" {
+		return nil
+	}
+	var cnt int64
+	if err := r.data.db.WithContext(ctx).Model(&DailyExchangeQuotaPO{}).Where("quota_date = ?", date).Count(&cnt).Error; err != nil {
+		return err
+	}
+	if cnt > 0 {
+		return nil
+	}
+	b, _ := decimal.NewFromString(base)
+	l, _ := decimal.NewFromString(limit)
+	po := &DailyExchangeQuotaPO{
+		QuotaDate:  date,
+		QuotaBase:  b,
+		QuotaLimit: l,
+	}
+	if err := r.data.db.WithContext(ctx).Create(po).Error; err != nil {
+		// 并发下唯一键冲突视为已锁定
+		if strings.Contains(err.Error(), "Duplicate") || strings.Contains(err.Error(), "1062") {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *stakingRepo) ListSettlementBatches(ctx context.Context, offset, limit int) ([]*biz.SettlementBatch, int64, error) {
@@ -240,25 +298,32 @@ func (r *stakingRepo) ListSettlementBatches(ctx context.Context, offset, limit i
 	}
 	out := make([]*biz.SettlementBatch, 0, len(list))
 	for _, po := range list {
-		b := &biz.SettlementBatch{
-			ID:             po.ID,
-			SettlementDate: po.SettlementDate,
-			AixPrice:       biz.FormatAixPriceDecimal(po.AixPrice),
-			Status:         po.Status,
-			StaticCount:    po.StaticCount,
-			StaticAmount:   po.StaticAmount.String(),
-			MgmtCount:      po.MgmtCount,
-			MgmtAmount:     po.MgmtAmount.String(),
-			ErrorMsg:       po.ErrorMsg,
-			CreatedTime:    po.CreatedTime,
-		}
-		if po.StartedTime != nil {
-			b.StartedAt = *po.StartedTime
-		}
-		b.FinishedAt = po.FinishedTime
+		b := settlementBatchFromPO(&po)
 		out = append(out, b)
 	}
 	return out, total, nil
+}
+
+func settlementBatchFromPO(po *SettlementBatchPO) *biz.SettlementBatch {
+	b := &biz.SettlementBatch{
+		ID:                 po.ID,
+		SettlementDate:     po.SettlementDate,
+		AixPrice:           biz.FormatAixPriceDecimal(po.AixPrice),
+		Status:             po.Status,
+		StaticCount:        po.StaticCount,
+		StaticAmount:       po.StaticAmount.String(),
+		MgmtCount:          po.MgmtCount,
+		MgmtAmount:         po.MgmtAmount.String(),
+		ExchangeQuotaBase:  po.ExchangeQuotaBase.String(),
+		ExchangeQuotaLimit: po.ExchangeQuotaLimit.String(),
+		ErrorMsg:           po.ErrorMsg,
+		CreatedTime:        po.CreatedTime,
+	}
+	if po.StartedTime != nil {
+		b.StartedAt = *po.StartedTime
+	}
+	b.FinishedAt = po.FinishedTime
+	return b
 }
 
 func (r *stakingRepo) SumStaticByDate(ctx context.Context, date string) (string, error) {
@@ -335,17 +400,7 @@ func (r *stakingRepo) GetLatestSettlementBatch(ctx context.Context, date string)
 	if err != nil {
 		return nil, err
 	}
-	b := &biz.SettlementBatch{
-		ID: po.ID, SettlementDate: po.SettlementDate, AixPrice: biz.FormatAixPriceDecimal(po.AixPrice),
-		Status: po.Status, StaticCount: po.StaticCount, StaticAmount: po.StaticAmount.String(),
-		MgmtCount: po.MgmtCount, MgmtAmount: po.MgmtAmount.String(), ErrorMsg: po.ErrorMsg,
-		CreatedTime: po.CreatedTime,
-	}
-	if po.StartedTime != nil {
-		b.StartedAt = *po.StartedTime
-	}
-	b.FinishedAt = po.FinishedTime
-	return b, nil
+	return settlementBatchFromPO(&po), nil
 }
 
 func (r *stakingRepo) SumReleaseByUserDate(ctx context.Context, userID int64, date string) (string, error) {

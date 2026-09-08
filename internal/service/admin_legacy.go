@@ -345,6 +345,7 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 			"userId":              u.ID,
 			"id":                  u.ID,
 			"address":             u.Address,
+			"exchange_bind_address": u.ExchangeBindAddress,
 			"username":            u.Username,
 			"usdt_recharge":       u.UsdtRecharge,
 			"usdt_reward":         u.UsdtReward,
@@ -976,15 +977,17 @@ func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
 			status = "completed"
 		}
 		item := map[string]interface{}{
-			"id":             b.ID,
-			"settlementDate": b.SettlementDate,
-			"status":         status,
-			"releaseTotal":   b.ReleaseTotal,
-			"aixPrice":       biz.FormatAixPrice(b.AixPrice),
-			"staticAmount":   b.StaticAmount,
-			"mgmtAmount":     b.MgmtAmount,
-			"startedAt":      "",
-			"finishedAt":     "",
+			"id":                 b.ID,
+			"settlementDate":     b.SettlementDate,
+			"status":             status,
+			"releaseTotal":       b.ReleaseTotal,
+			"aixPrice":           biz.FormatAixPrice(b.AixPrice),
+			"staticAmount":       b.StaticAmount,
+			"mgmtAmount":         b.MgmtAmount,
+			"exchangeQuotaBase":  b.ExchangeQuotaBase,
+			"exchangeQuotaLimit": b.ExchangeQuotaLimit,
+			"startedAt":          "",
+			"finishedAt":         "",
 		}
 		if !b.StartedAt.IsZero() {
 			item["startedAt"] = b.StartedAt.In(jwtpkg.ChinaLocation()).Format("2006-01-02 15:04:05")
@@ -1100,6 +1103,32 @@ func (s *AdminLegacyService) HandleSetFrozen(ctx khttp.Context) error {
 		return err
 	}
 	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
+func (s *AdminLegacyService) HandleSetFrozenTeam(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	userID, _ := strconv.ParseInt(firstNonEmpty(
+		ctx.Request().Form.Get("user_id"),
+		ctx.Request().Form.Get("userId"),
+	), 10, 64)
+	enabled := strings.TrimSpace(ctx.Request().Form.Get("enabled")) == "1" ||
+		strings.EqualFold(strings.TrimSpace(ctx.Request().Form.Get("enabled")), "true")
+	if userID <= 0 {
+		return errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	affected, err := s.admin.SetFrozenTeam(ctx, s.token(ctx), userID, enabled)
+	if err != nil {
+		return err
+	}
+	return ctx.Result(200, map[string]interface{}{
+		"status":   "ok",
+		"affected": affected,
+	})
 }
 
 func (s *AdminLegacyService) HandleSetCommunitySubsidy(ctx khttp.Context) error {
@@ -2428,7 +2457,7 @@ func applyLegacyConfigUpdate(snapshot *conf.SystemConfigSnapshot, walletCfg *con
 	case 41:
 		pct, err := strconv.ParseFloat(value, 64)
 		if err != nil || pct < 0 {
-			return errors.BadRequest("INVALID_VALUE", "AIX兑换审核阈值须为 ≥0 的数字（百分数，如 40 表示 40%；100 表示兑完今日AIX后才审）")
+			return errors.BadRequest("INVALID_VALUE", "AIX兑换审核阈值须为 ≥0 的数字（百分数，如 40 表示 40%；相对全网总AIX）")
 		}
 		snapshot.ExchangeReviewThresholdPercent = strconv.FormatFloat(pct, 'f', -1, 64)
 	case 42:

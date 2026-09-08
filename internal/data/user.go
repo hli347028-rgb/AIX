@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"backend/internal/biz"
+	"backend/internal/pkg/eth"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -590,12 +591,85 @@ func (r *userRepo) AdminUpdateUser(ctx context.Context, update *biz.AdminUserUpd
 	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id = ?", update.UserID).Updates(updates).Error
 }
 
+func (r *userRepo) SetFrozenForUsers(ctx context.Context, userIDs []int64, frozen bool) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	updates := map[string]interface{}{"is_frozen": frozen}
+	if frozen {
+		updates["frozen_at"] = time.Now()
+	} else {
+		updates["frozen_at"] = nil
+	}
+	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id IN ?", userIDs).Updates(updates).Error
+}
+
 func (r *userRepo) SetRole(ctx context.Context, userID int64, role string) error {
 	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id = ?", userID).Update("role", role).Error
 }
 
 func (r *userRepo) UpdateUsername(ctx context.Context, userID int64, username string) error {
 	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id = ?", userID).Update("username", username).Error
+}
+
+// ResolveExchangeBindAddress 绑定或校验向交易所划转地址。
+// 已绑定：返回原地址；若传入不同地址则报错。
+// 未绑定：要求传入地址，校验全局未被占用后写入。
+func (r *userRepo) ResolveExchangeBindAddress(ctx context.Context, userID int64, requestedAddress string) (string, error) {
+	var bound string
+	err := r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var u UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&u, userID).Error; err != nil {
+			return err
+		}
+		existing := strings.TrimSpace(u.ExchangeBindAddress)
+		requested := strings.TrimSpace(requestedAddress)
+		if existing != "" {
+			if requested != "" {
+				reqNorm, err := eth.NormalizeAddress(requested)
+				if err != nil {
+					return fmt.Errorf("invalid exchange bind address")
+				}
+				existNorm, _ := eth.NormalizeAddress(existing)
+				if !strings.EqualFold(reqNorm, existNorm) {
+					return fmt.Errorf("exchange bind address already set")
+				}
+				bound = existNorm
+				return nil
+			}
+			existNorm, err := eth.NormalizeAddress(existing)
+			if err != nil {
+				bound = strings.ToLower(existing)
+				return nil
+			}
+			bound = existNorm
+			return nil
+		}
+		if requested == "" {
+			return fmt.Errorf("exchange bind address required")
+		}
+		norm, err := eth.NormalizeAddress(requested)
+		if err != nil {
+			return fmt.Errorf("invalid exchange bind address")
+		}
+		var other UserPO
+		err = tx.Select("id").Where("exchange_bind_address = ? AND id <> ?", norm, userID).Limit(1).Take(&other).Error
+		if err == nil {
+			return fmt.Errorf("exchange bind address taken")
+		}
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+		if err := tx.Model(&u).Update("exchange_bind_address", norm).Error; err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+				return fmt.Errorf("exchange bind address taken")
+			}
+			return err
+		}
+		bound = norm
+		return nil
+	})
+	return bound, err
 }
 
 func (r *userRepo) GetBalances(ctx context.Context, userID int64) (string, string, string, error) {
@@ -784,6 +858,7 @@ func (r *userRepo) toBizWithInviter(po *UserPO, inviterAddress string) *biz.User
 		IsFrozen:             po.IsFrozen,
 		FrozenAt:             po.FrozenAt,
 		ExchangeEnabled:      po.ExchangeEnabled,
+		ExchangeBindAddress:  strings.TrimSpace(po.ExchangeBindAddress),
 		InviterID:            po.InviterID,
 		Role:                 po.Role,
 		CreatedTime:          po.CreatedTime,

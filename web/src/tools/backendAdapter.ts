@@ -373,6 +373,16 @@ async function fetchUserInfo() {
       ),
       exchange_enabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
       exchangeEnabled: aixProfile.exchange_enabled !== false && aixProfile.exchangeEnabled !== false,
+      exchange_bind_address: firstText(
+        aixProfile.exchange_bind_address,
+        aixProfile.exchangeBindAddress,
+        '',
+      ),
+      exchangeBindAddress: firstText(
+        aixProfile.exchange_bind_address,
+        aixProfile.exchangeBindAddress,
+        '',
+      ),
       points: String(aixProfile.points ?? pickField(aixProfile, 'points') ?? '0'),
       points_all: String(aixProfile.points_all ?? pickField(aixProfile, 'points_all', 'pointsAll') ?? '0'),
       // 代数奖励合计（1代+≥2代，累计）

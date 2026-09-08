@@ -17,7 +17,8 @@ import (
 type exchangeTransferAdminRow struct {
 	ID           int64
 	UserID       int64
-	Address      string
+	Address      string // 本笔划转到交易所的地址
+	UserAddress  string // 用户登录钱包地址
 	Asset        string
 	Amount       decimal.Decimal
 	Status       string
@@ -29,9 +30,11 @@ type exchangeTransferAdminRow struct {
 }
 
 func (s *AdminLegacyService) exchangeTransferListDB(ctx context.Context, q url.Values) *gorm.DB {
-	db := s.data.DB().WithContext(ctx).Table("exchange_transfers et")
+	db := s.data.DB().WithContext(ctx).Table("exchange_transfers et").
+		Joins("LEFT JOIN users u ON u.id = et.user_id")
 	if address := strings.TrimSpace(q.Get("address")); address != "" {
-		db = db.Where("et.address LIKE ?", "%"+address+"%")
+		like := "%" + address + "%"
+		db = db.Where("(et.address LIKE ? OR u.address LIKE ?)", like, like)
 	}
 	status := strings.TrimSpace(q.Get("status"))
 	if lower := strings.ToLower(status); lower == "undefined" || lower == "null" {
@@ -97,7 +100,7 @@ func (s *AdminLegacyService) HandleExchangeTransferList(ctx khttp.Context) error
 
 	var rows []exchangeTransferAdminRow
 	if err := s.exchangeTransferListDB(ctx, q).
-		Select(`et.id, et.user_id, et.address, et.asset, et.amount, et.status, et.nonce,
+		Select(`et.id, et.user_id, et.address, COALESCE(u.address,'') as user_address, et.asset, et.amount, et.status, et.nonce,
 			et.partner_txn_id, et.partner_code, et.remark, et.created_time`).
 		Order("et.id desc").Limit(pageSize).Offset(offset).
 		Scan(&rows).Error; err != nil {
@@ -111,17 +114,19 @@ func (s *AdminLegacyService) HandleExchangeTransferList(ctx khttp.Context) error
 			asset = "AIX-USDT"
 		}
 		list = append(list, map[string]interface{}{
-			"id":           r.ID,
-			"userId":       r.UserID,
-			"address":      r.Address,
-			"asset":        asset,
-			"amount":       r.Amount.String(),
-			"status":       r.Status,
-			"requestNo":    r.Nonce,
-			"partnerTxnId": r.PartnerTxnID,
-			"partnerCode":  r.PartnerCode,
-			"remark":       r.Remark,
-			"createdAt":    formatLegacyTime(r.CreatedTime),
+			"id":              r.ID,
+			"userId":          r.UserID,
+			"address":         r.UserAddress, // 兼容旧字段：用户钱包地址
+			"userAddress":     r.UserAddress,
+			"transferAddress": r.Address, // 划转到交易所的地址
+			"asset":           asset,
+			"amount":          r.Amount.String(),
+			"status":          r.Status,
+			"requestNo":       r.Nonce,
+			"partnerTxnId":    r.PartnerTxnID,
+			"partnerCode":     r.PartnerCode,
+			"remark":          r.Remark,
+			"createdAt":       formatLegacyTime(r.CreatedTime),
 		})
 	}
 

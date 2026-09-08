@@ -32,7 +32,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
 		&ExchangeRecordPO{}, &AnnouncementPO{}, &FeedbackPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
-		&ExchangeTransferPO{},
+		&ExchangeTransferPO{}, &DailyExchangeQuotaPO{},
 	); err != nil {
 		return nil, nil, err
 	}
@@ -40,6 +40,9 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		return nil, nil, err
 	}
 	if err := ensureSettlementBatchMultiPerDay(db); err != nil {
+		return nil, nil, err
+	}
+	if err := ensureSettlementBatchExchangeQuotaColumns(db); err != nil {
 		return nil, nil, err
 	}
 	if err := migrateOverflowReward(db); err != nil {
@@ -121,6 +124,40 @@ func ensureSettlementBatchMultiPerDay(db *gorm.DB) error {
 	}
 	if normalIndexCount == 0 {
 		return db.Exec("CREATE INDEX idx_settlement_batches_settlement_date ON settlement_batches (settlement_date)").Error
+	}
+	return nil
+}
+
+func ensureSettlementBatchExchangeQuotaColumns(db *gorm.DB) error {
+	columns := []struct {
+		name string
+		ddl  string
+	}{
+		{
+			name: "exchange_quota_base",
+			ddl:  "ALTER TABLE settlement_batches ADD COLUMN exchange_quota_base decimal(36,18) NOT NULL DEFAULT 0",
+		},
+		{
+			name: "exchange_quota_limit",
+			ddl:  "ALTER TABLE settlement_batches ADD COLUMN exchange_quota_limit decimal(36,18) NOT NULL DEFAULT 0",
+		},
+	}
+	for _, col := range columns {
+		var cnt int64
+		if err := db.Raw(`
+			SELECT COUNT(1)
+			FROM information_schema.columns
+			WHERE table_schema = DATABASE()
+			  AND table_name = 'settlement_batches'
+			  AND column_name = ?
+		`, col.name).Scan(&cnt).Error; err != nil {
+			return err
+		}
+		if cnt == 0 {
+			if err := db.Exec(col.ddl).Error; err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -348,6 +385,10 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 			name: "transfer_reinvest_blocked",
 			ddl:  "ALTER TABLE users ADD COLUMN transfer_reinvest_blocked decimal(36,18) NOT NULL DEFAULT 0",
 		},
+		{
+			name: "exchange_bind_address",
+			ddl:  "ALTER TABLE users ADD COLUMN exchange_bind_address varchar(42) NULL DEFAULT NULL",
+		},
 	}
 	for _, col := range columns {
 		var cnt int64
@@ -364,6 +405,24 @@ func ensureUserAdminColumns(db *gorm.DB) error {
 			if err := db.Exec(col.ddl).Error; err != nil {
 				return err
 			}
+		}
+	}
+	// 划转绑定地址全局唯一（允许多个 NULL）
+	var idxCnt int64
+	if err := db.Raw(`
+		SELECT COUNT(1)
+		FROM information_schema.statistics
+		WHERE table_schema = DATABASE()
+		  AND table_name = 'users'
+		  AND index_name = 'idx_users_exchange_bind_address'
+	`).Scan(&idxCnt).Error; err != nil {
+		return err
+	}
+	if idxCnt == 0 {
+		if err := db.Exec(`
+			CREATE UNIQUE INDEX idx_users_exchange_bind_address ON users (exchange_bind_address)
+		`).Error; err != nil {
+			return err
 		}
 	}
 	// 历史已开启角色但无设置时间：用 updated_time 近似回填（仅补空值）

@@ -462,6 +462,8 @@ type WalletRepo interface {
 	CompleteExchangeTransfer(ctx context.Context, id int64, partnerTxnID, partnerCode string) error
 	// FailAndRefundExchangeTransfer 划转失败并退回 points。
 	FailAndRefundExchangeTransfer(ctx context.Context, id int64, partnerCode, remark string) error
+	// ResolveStuckExchangeTransfers 收尾卡住的 pending（有对方单号→成功，否则超时后退款）。
+	ResolveStuckExchangeTransfers(ctx context.Context, userID int64, olderThan time.Duration) (completed, refunded int, err error)
 	ListExchangeTransfersByUser(ctx context.Context, userID int64) ([]*ExchangeTransfer, error)
 
 	CreateRewardLog(ctx context.Context, log *RewardLog) error
@@ -483,6 +485,8 @@ type WalletRepo interface {
 	RejectExchangeReview(ctx context.Context, id int64, remark string) error
 	// SumStaticAixBySettlementDate 某结算日静态发放的 AIX 枚数合计（reward_logs.amount）。
 	SumStaticAixBySettlementDate(ctx context.Context, settlementDate string) (string, error)
+	// SumTotalAixBalance 全网用户 aix_balance 合计（与管理端「总AIX数量」同口径）。
+	SumTotalAixBalance(ctx context.Context) (string, error)
 	// SumExchangedAixSince 自 since 起已占用当日配额的兑换 AIX 量。
 	// 只计 completed：待审核不占配额，因此也不会带到次日阈值。
 	SumExchangedAixSince(ctx context.Context, since time.Time) (string, error)

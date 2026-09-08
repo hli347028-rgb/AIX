@@ -5,22 +5,11 @@
                 type="info"
                 show-icon
                 style="margin-bottom: 16px"
-                message="每日结算当前只发放静态奖（金本位发 AIX）。管理奖在下级认购时即时产生：等级由小区业绩决定（不要求大区达标），大区与小区认购均可按级差发放，可在「订单奖励」中按类型筛选查看。"
+                message="每日结算仅由系统在中国时区 0 点自动执行，后台无法手动触发。同一时刻会按当时全网总 AIX 锁定「今日兑换额度」（一天只算一次，与是否结算成功无关）。列表仅供查看。"
             />
             <a-row :gutter="10" class="inputGroup" style="margin-bottom: 16px">
-                <a-col :xs="24" :md="8" :lg="6" :xl="5">
-                    <a-date-picker
-                        v-model="settleDate"
-                        format="YYYY-MM-DD"
-                        style="width: 100%"
-                        placeholder="结算日期"
-                    />
-                </a-col>
                 <a-col :xs="24" :md="10" :lg="8" :xl="6">
-                    <a-button-group>
-                        <a-button type="primary" :loading="triggering" @click="triggerSettle">执行结算</a-button>
-                        <a-button :loading="loading" @click="getListTwo">刷新列表</a-button>
-                    </a-button-group>
+                    <a-button :loading="loading" @click="getListTwo">刷新列表</a-button>
                 </a-col>
             </a-row>
             <a-table
@@ -37,7 +26,6 @@
 </template>
 
 <script type="text/jsx">
-import moment from 'moment'
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
 
@@ -46,8 +34,6 @@ export default {
     mixins: [listMixin],
     data() {
         return {
-            settleDate: undefined,
-            triggering: false,
             columns: [
                 {
                     title: 'ID',
@@ -74,7 +60,6 @@ export default {
                     customRender: (v) => {
                         const n = Number(v)
                         if (!Number.isFinite(n) || n <= 0) return v || '-'
-                        // 优先保留后端已格式化的 15 位字符串
                         const text = String(v ?? '')
                         if (/^\d+(\.\d+)?$/.test(text)) {
                             const [i, f = ''] = text.split('.')
@@ -86,6 +71,19 @@ export default {
                 {
                     title: '静态合计',
                     dataIndex: 'staticAmount',
+                },
+                {
+                    title: '当日兑换额度',
+                    dataIndex: 'exchangeQuotaLimit',
+                    customRender: (v, row) => {
+                        const limit = v != null && v !== '' ? String(v) : ''
+                        if (!limit || Number(limit) === 0) return '—'
+                        const base = row && row.exchangeQuotaBase != null ? String(row.exchangeQuotaBase) : ''
+                        if (base && Number(base) !== 0) {
+                            return `${limit}（基数 ${base}）`
+                        }
+                        return limit
+                    },
                 },
                 {
                     title: '管理奖合计',
@@ -104,27 +102,10 @@ export default {
                     title: '结束时间',
                     dataIndex: 'finishedAt',
                 },
-                {
-                    title: '操作',
-                    key: 'action',
-                    fixed: 'right',
-                    width: 120,
-                    customRender: (v) => {
-                        const disabled = v.status === 'running'
-                        return <a-button type="primary" disabled={disabled} onClick={() => this.rerun(v.settlementDate)}>再结算</a-button>
-                    },
-                },
             ],
         }
     },
     methods: {
-        dateStr() {
-            if (!this.settleDate) return ''
-            if (moment.isMoment(this.settleDate)) {
-                return this.settleDate.format('YYYY-MM-DD')
-            }
-            return String(this.settleDate)
-        },
         getList() {
             this.loading = true
             Gai.settlement_list({
@@ -135,39 +116,10 @@ export default {
                     return { ...value, key }
                 })
                 this.total = parseInt(res.total || res.count || 0)
-                if (!this.settleDate && res.defaultSettleDate) {
-                    this.settleDate = moment(res.defaultSettleDate, 'YYYY-MM-DD')
-                }
                 this.loading = false
             }).catch(() => {
                 this.loading = false
             })
-        },
-        triggerSettle() {
-            const date = this.dateStr()
-            if (!date) {
-                this.$message.warning('请选择结算日期')
-                return
-            }
-            this.$confirm({
-                title: '执行每日结算',
-                content: `确定对 ${date} 执行每日结算吗？将发放静态 AIX（管理奖在认购时已即时产生，不在本结算中发放）。`,
-                centered: true,
-                onOk: () => {
-                    this.triggering = true
-                    return Gai.settlement_trigger({
-                        settlement_date: date,
-                    }).then(() => {
-                        this.getList()
-                    }).finally(() => {
-                        this.triggering = false
-                    })
-                },
-            })
-        },
-        rerun(date) {
-            this.settleDate = date ? moment(date, 'YYYY-MM-DD') : undefined
-            this.triggerSettle()
         },
     },
 }

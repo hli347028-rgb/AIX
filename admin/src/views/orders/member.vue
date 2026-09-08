@@ -37,6 +37,11 @@ export default {
                     dataIndex: 'address',
                 },
                 {
+                    title: '交易所划转地址',
+                    dataIndex: 'exchange_bind_address',
+                    customRender: (v) => v || '—',
+                },
+                {
                     title: '用户名',
                     dataIndex: 'username',
                     customRender: (v) => v || '—',
@@ -229,6 +234,10 @@ export default {
                                             <a-menu-item onClick={() => this.set_frozen(v.userId || v.id, v.is_frozen)}>
                                                 {v.is_frozen ? '解冻账户' : '冻结账户'}
                                             </a-menu-item>
+
+                                            <a-menu-item onClick={() => this.set_frozen_team(v.userId || v.id, v.is_frozen)}>
+                                                {v.is_frozen ? '解冻团队' : '冻结团队'}
+                                            </a-menu-item>
                                         </a-menu>
                                     </a-dropdown>
                                 </a-button-group>
@@ -336,7 +345,7 @@ export default {
                 content: (
                     <div>
                         <div style="margin-bottom:8px;color:#888;font-size:12px;">
-                            下级 USDT 充值按级差发放；下级档位会阻断上级同档或更低档收益。
+                            下级 USDT 充值按级差发放；充值人自身档位不阻断直推上级，中间下级同档或更高会阻断更上级。
                         </div>
                         <a-select style="width:240px" defaultValue={rate} onChange={(val) => { rate = val }}>
                             <a-select-option value="0">关闭</a-select-option>
@@ -360,12 +369,33 @@ export default {
             this.$confirm({
                 title: willFreeze ? '冻结账户' : '解冻账户',
                 content: willFreeze
-                    ? '冻结后该账户将无法登录、充值、报单和提现，确认冻结？'
+                    ? '冻结后：无法登录/充值/报单/提现；无静态与动态收益；收不到社区补贴；他人无法向该账户划转。确认冻结？'
                     : '解冻后该账户恢复正常使用，确认解冻？',
                 centered: true,
                 onOk: () => {
                     return Gai.set_frozen({ user_id, enabled: willFreeze ? '1' : '0' }).then(() => {
                         this.$message.success(willFreeze ? '账户已冻结' : '账户已解冻')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_frozen_team(user_id, current) {
+            const willFreeze = !current
+            this.$confirm({
+                title: willFreeze ? '冻结团队' : '解冻团队',
+                content: willFreeze
+                    ? '将冻结该账户及其全部下级。冻结后：无法登录/充值/报单/提现；无静态与动态收益；收不到社区补贴；他人无法向其划转。确认？'
+                    : '将解冻该账户及其全部下级，恢复正常使用。确认解冻团队？',
+                centered: true,
+                onOk: () => {
+                    return Gai.set_frozen_team({ user_id, enabled: willFreeze ? '1' : '0' }).then((res) => {
+                        const n = (res && res.affected) != null ? res.affected : ''
+                        this.$message.success(
+                            willFreeze
+                                ? (n !== '' ? `团队已冻结（${n} 个账户）` : '团队已冻结')
+                                : (n !== '' ? `团队已解冻（${n} 个账户）` : '团队已解冻')
+                        )
                         this.getList()
                     })
                 }

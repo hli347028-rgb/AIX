@@ -42,9 +42,10 @@ type UserPO struct {
 	ZeroAccountRewardTotal decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`
 	CommunitySubsidyTotal  decimal.Decimal `gorm:"column:community_subsidy_total;type:decimal(36,18);default:0;not null"`
 	Status            int32           `gorm:"default:1;not null"`
-	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结后禁止登录/充值/报单/提现
+	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结：禁登录/资金操作；无静态/动态/社区补贴入账；他人不可向其划转
 	FrozenAt          *time.Time      `gorm:"column:frozen_at"`
 	ExchangeEnabled   bool            `gorm:"column:exchange_enabled;default:true;not null"` // 关闭后禁止 AIX→可提 U 兑换
+	ExchangeBindAddress string         `gorm:"column:exchange_bind_address;size:42;uniqueIndex"` // 向交易所划转绑定地址；空=未绑定，绑定后不可改
 	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
 	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime       time.Time       `gorm:"column:updated_time;autoUpdateTime"`
@@ -231,6 +232,9 @@ type SettlementBatchPO struct {
 	StaticAmount   decimal.Decimal `gorm:"column:static_amount;type:decimal(36,18);default:0;not null"`
 	MgmtCount      int32           `gorm:"column:mgmt_count;default:0;not null"`
 	MgmtAmount     decimal.Decimal `gorm:"column:mgmt_amount;type:decimal(36,18);default:0;not null"`
+	// 当日兑换额度快照：静态结算成功后按全网 aix_balance 计算一次，当天兑换审核沿用此值
+	ExchangeQuotaBase  decimal.Decimal `gorm:"column:exchange_quota_base;type:decimal(36,18);default:0;not null"`
+	ExchangeQuotaLimit decimal.Decimal `gorm:"column:exchange_quota_limit;type:decimal(36,18);default:0;not null"`
 	StartedTime    *time.Time      `gorm:"column:started_time"`
 	FinishedTime   *time.Time      `gorm:"column:finished_time"`
 	ErrorMsg       string          `gorm:"column:error_msg;size:512"`
@@ -238,6 +242,17 @@ type SettlementBatchPO struct {
 }
 
 func (SettlementBatchPO) TableName() string { return "settlement_batches" }
+
+// DailyExchangeQuotaPO 每日兑换审核额度快照（中国时区自然日 0 点锁定一次，与结算无关）。
+type DailyExchangeQuotaPO struct {
+	ID             int64           `gorm:"primaryKey;autoIncrement"`
+	QuotaDate      string          `gorm:"column:quota_date;type:date;uniqueIndex;not null"`
+	QuotaBase      decimal.Decimal `gorm:"column:quota_base;type:decimal(36,18);default:0;not null"`
+	QuotaLimit     decimal.Decimal `gorm:"column:quota_limit;type:decimal(36,18);default:0;not null"`
+	CreatedTime    time.Time       `gorm:"column:created_time;autoCreateTime"`
+}
+
+func (DailyExchangeQuotaPO) TableName() string { return "daily_exchange_quotas" }
 
 type SettingPO struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement"`

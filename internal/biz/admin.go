@@ -168,6 +168,34 @@ func (uc *AdminUsecase) UpdateUser(ctx context.Context, tokenString string, upda
 	return &AdminUserDetail{User: user, InviteeCount: count}, nil
 }
 
+// SetFrozenTeam 冻结/解冻该账户及其全部下级。
+func (uc *AdminUsecase) SetFrozenTeam(ctx context.Context, tokenString string, rootUserID int64, frozen bool) (affected int, err error) {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return 0, err
+	}
+	if rootUserID <= 0 {
+		return 0, errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	root, err := uc.userRepo.FindByID(ctx, rootUserID)
+	if err != nil {
+		return 0, err
+	}
+	if root == nil {
+		return 0, errors.NotFound("USER_NOT_FOUND", "用户不存在")
+	}
+	under, err := uc.userRepo.ListUserIDsUnder(ctx, rootUserID)
+	if err != nil {
+		return 0, err
+	}
+	ids := make([]int64, 0, 1+len(under))
+	ids = append(ids, rootUserID)
+	ids = append(ids, under...)
+	if err := uc.userRepo.SetFrozenForUsers(ctx, ids, frozen); err != nil {
+		return 0, err
+	}
+	return len(ids), nil
+}
+
 // SetUserInviter 后台修改用户上级（按钱包地址），并刷新团队业绩。
 func (uc *AdminUsecase) SetUserInviter(ctx context.Context, tokenString string, userID int64, inviterAddress string) error {
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
@@ -481,14 +509,7 @@ func (uc *AdminUsecase) TriggerSettlement(ctx context.Context, tokenString, sett
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return err
 	}
-	if settlementDate == "" {
-		settlementDate = TodaySettlementDate(token.NowChina())
-	}
-	// 日结遍历全网活跃订单，通常超过 HTTP server.timeout（当前 5s）。
-	// 鉴权仍用请求 ctx；真正跑结算改用独立超时，避免被请求 deadline 掐断。
-	runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Minute)
-	defer cancel()
-	return uc.settlement.ForceDailySettlement(runCtx, settlementDate)
+	return errors.Forbidden("SETTLEMENT_SYSTEM_ONLY", "每日结算仅由系统在中国时区 0 点自动执行，后台无法手动触发")
 }
 
 func (uc *AdminUsecase) AdminCreditBalance(ctx context.Context, tokenString, address, amount string) (string, string, error) {
@@ -592,6 +613,27 @@ func (uc *AdminUsecase) ListSettlementBatches(ctx context.Context, tokenString s
 		releaseTotal, err := uc.settlement.SumReleaseForBatch(ctx, b)
 		if err != nil {
 			return nil, 0, err
+		}
+		// 兑换额度按「自然日」锁定；日结批次的 settlement_date 通常是昨日，
+		// 列表优先用开始时间的中国时区日期，再回退结算日 / 批次字段。
+		quotaDates := make([]string, 0, 2)
+		if !b.StartedAt.IsZero() {
+			quotaDates = append(quotaDates, b.StartedAt.In(token.ChinaLocation()).Format("2006-01-02"))
+		}
+		if d := strings.TrimSpace(b.SettlementDate); d != "" {
+			// settlement_date 可能带时间后缀
+			if len(d) >= 10 {
+				d = d[:10]
+			}
+			quotaDates = append(quotaDates, d)
+		}
+		for _, qd := range quotaDates {
+			base, limitStr, found, qerr := uc.settlement.GetLockedExchangeQuota(ctx, qd)
+			if qerr == nil && found {
+				b.ExchangeQuotaBase = base
+				b.ExchangeQuotaLimit = limitStr
+				break
+			}
 		}
 		out = append(out, &AdminSettlementBatch{SettlementBatch: b, ReleaseTotal: releaseTotal})
 	}

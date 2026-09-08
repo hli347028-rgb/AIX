@@ -3,12 +3,11 @@
         <a-card :title="`向交易所划转（共 ${total} 条）`">
             <a-row :gutter="10" class="inputGroup">
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
-                    <a-input v-model="searchData.address" placeholder="用户地址" allowClear @keyup.enter="getListTwo" />
+                    <a-input v-model="searchData.address" placeholder="用户/划转地址" allowClear @keyup.enter="getListTwo" />
                 </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select allowClear v-model="searchData.status" style="width:100%" placeholder="状态"
                         @change="getListTwo">
-                        <a-select-option value="pending">处理中</a-select-option>
                         <a-select-option value="completed">成功</a-select-option>
                         <a-select-option value="failed">失败</a-select-option>
                     </a-select>
@@ -54,9 +53,9 @@ import listMixin from '../mixin/listMixin'
 import moment from 'moment'
 
 const statusText = {
-    pending: '处理中',
     completed: '成功',
     failed: '失败',
+    pending: '失败(已退回)',
 }
 
 export default {
@@ -72,7 +71,13 @@ export default {
                 },
                 {
                     title: '用户地址',
-                    dataIndex: 'address',
+                    dataIndex: 'userAddress',
+                    customRender: (v, row) => v || (row && row.address) || '—',
+                },
+                {
+                    title: '划转地址',
+                    dataIndex: 'transferAddress',
+                    customRender: (v) => v || '—',
                 },
                 {
                     title: '资产',
@@ -88,7 +93,7 @@ export default {
                     dataIndex: 'status',
                     customRender: (v) => {
                         const label = statusText[v] || v || '-'
-                        const color = v === 'completed' ? 'green' : (v === 'failed' ? 'red' : 'blue')
+                        const color = v === 'completed' ? 'green' : 'red'
                         return <a-tag color={color}>{label}</a-tag>
                     },
                 },

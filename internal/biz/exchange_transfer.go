@@ -20,17 +20,40 @@ import (
 )
 
 // TransferToExchange 向交易所划转 AIX-USDT（扣 points，调用 WinBit aixInbound）。
-func (uc *WalletUsecase) TransferToExchange(ctx context.Context, tokenString, amount string) (*ExchangeTransfer, string, error) {
-	return uc.transferToExchangeImpl(ctx, tokenString, amount)
+// address 为交易所绑定收款地址：未绑定时必填并写入绑定；已绑定则固定使用绑定地址。
+func (uc *WalletUsecase) TransferToExchange(ctx context.Context, tokenString, amount, address string) (*ExchangeTransfer, string, error) {
+	return uc.transferToExchangeImpl(ctx, tokenString, amount, address)
 }
 
-func (uc *WalletUsecase) transferToExchangeImpl(ctx context.Context, tokenString, amount string) (*ExchangeTransfer, string, error) {
+func (uc *WalletUsecase) transferToExchangeImpl(ctx context.Context, tokenString, amount, address string) (*ExchangeTransfer, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
 		return nil, "", err
 	}
 	if uc.walletCfg == nil || !uc.walletCfg.ExchangeTransferConfigured() {
 		return nil, "", errors.BadRequest("EXCHANGE_TRANSFER_DISABLED", "向交易所划转暂未开通")
+	}
+
+	// 先收尾该用户卡住的 pending，避免重复占款。
+	if _, _, err := uc.walletRepo.ResolveStuckExchangeTransfers(ctx, user.ID, 2*time.Minute); err != nil {
+		uc.log.Warnf("resolve stuck exchange transfers before transfer user=%d: %v", user.ID, err)
+	}
+
+	bindAddr, err := uc.userRepo.ResolveExchangeBindAddress(ctx, user.ID, address)
+	if err != nil {
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "required"):
+			return nil, "", errors.BadRequest("EXCHANGE_BIND_REQUIRED", "请填写交易所划转地址（绑定后不可更改）")
+		case strings.Contains(msg, "already set"):
+			return nil, "", errors.BadRequest("EXCHANGE_BIND_LOCKED", "交易所划转地址已绑定，不可更改")
+		case strings.Contains(msg, "taken"):
+			return nil, "", errors.BadRequest("EXCHANGE_BIND_TAKEN", "该交易所地址已被其他用户绑定")
+		case strings.Contains(msg, "invalid"):
+			return nil, "", errors.BadRequest("INVALID_ADDRESS", "交易所划转地址无效")
+		default:
+			return nil, "", err
+		}
 	}
 
 	amt, err := ParseAmount(amount)
@@ -49,7 +72,7 @@ func (uc *WalletUsecase) transferToExchangeImpl(ctx context.Context, tokenString
 	if err != nil {
 		return nil, "", err
 	}
-	rec, left, err := uc.walletRepo.CreateExchangeTransfer(ctx, user.ID, user.Address, amt.String(), requestNo)
+	rec, left, err := uc.walletRepo.CreateExchangeTransfer(ctx, user.ID, bindAddr, amt.String(), requestNo)
 	if err != nil {
 		if strings.Contains(err.Error(), "insufficient") {
 			return nil, "", errors.BadRequest("INSUFFICIENT_BALANCE", "AIX-USDT 余额不足")
@@ -57,7 +80,7 @@ func (uc *WalletUsecase) transferToExchangeImpl(ctx context.Context, tokenString
 		return nil, "", err
 	}
 
-	partnerTxnID, partnerCode, callErr := uc.callExchangeTransferAPI(ctx, user.Address, amt.String(), requestNo)
+	partnerTxnID, partnerCode, callErr := uc.callExchangeTransferAPI(ctx, bindAddr, amt.String(), requestNo)
 	if callErr != nil {
 		_ = uc.walletRepo.FailAndRefundExchangeTransfer(ctx, rec.ID, partnerCode, callErr.Error())
 		userMsg := "向交易所划转失败，余额已退回"
@@ -68,6 +91,9 @@ func (uc *WalletUsecase) transferToExchangeImpl(ctx context.Context, tokenString
 	}
 	if err := uc.walletRepo.CompleteExchangeTransfer(ctx, rec.ID, partnerTxnID, partnerCode); err != nil {
 		uc.log.Errorf("complete exchange transfer %d: %v", rec.ID, err)
+		if attachErr := uc.walletRepo.CompleteExchangeTransfer(ctx, rec.ID, partnerTxnID, partnerCode); attachErr != nil {
+			uc.log.Errorf("retry complete exchange transfer %d: %v", rec.ID, attachErr)
+		}
 	}
 	rec.Status = "completed"
 	rec.PartnerTxnID = partnerTxnID
@@ -79,6 +105,9 @@ func (uc *WalletUsecase) ListExchangeTransfers(ctx context.Context, tokenString 
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
 		return nil, err
+	}
+	if _, _, err := uc.walletRepo.ResolveStuckExchangeTransfers(ctx, user.ID, 2*time.Minute); err != nil {
+		uc.log.Warnf("resolve stuck exchange transfers before list user=%d: %v", user.ID, err)
 	}
 	return uc.walletRepo.ListExchangeTransfersByUser(ctx, user.ID)
 }

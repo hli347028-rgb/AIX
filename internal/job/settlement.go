@@ -10,7 +10,8 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
-// SettlementJob 每日中国时间 0 点结算
+// SettlementJob 仅在中国时间每日 0 点触发：先锁定当日兑换额度，再跑系统日结。
+// 启动/部署不会触发结算；管理端也无法手动触发。
 type SettlementJob struct {
 	uc     *biz.SettlementUsecase
 	log    *log.Helper
@@ -27,7 +28,7 @@ func NewSettlementJob(uc *biz.SettlementUsecase, logger log.Logger) *SettlementJ
 
 func (j *SettlementJob) Start() {
 	go j.run()
-	j.log.Info("settlement job started, runs daily at China midnight")
+	j.log.Info("settlement job started: China midnight only (no boot run)")
 }
 
 func (j *SettlementJob) Stop() {
@@ -35,11 +36,9 @@ func (j *SettlementJob) Stop() {
 }
 
 func (j *SettlementJob) run() {
-	j.runOnce()
-
 	for {
 		delay := durationUntilNextChinaMidnight(time.Now())
-		j.log.Infof("next settlement in %s", delay.Round(time.Second))
+		j.log.Infof("next system settlement/quota lock in %s", delay.Round(time.Second))
 		select {
 		case <-time.After(delay):
 			j.runOnce()
@@ -51,7 +50,19 @@ func (j *SettlementJob) run() {
 
 func (j *SettlementJob) runOnce() {
 	ctx := context.Background()
-	settlementDate := biz.TodaySettlementDate(time.Now())
+	now := time.Now()
+	quotaDate := now.In(token.ChinaLocation()).Format("2006-01-02")
+	settlementDate := biz.TodaySettlementDate(now)
+
+	// 1) 自然日兑换额度：与结算无关，一天只锁一次
+	j.log.Infof("locking daily exchange quota for %s", quotaDate)
+	if err := j.uc.EnsureDailyExchangeQuota(ctx, quotaDate); err != nil {
+		j.log.Errorf("exchange quota lock %s failed: %v", quotaDate, err)
+	} else {
+		j.log.Infof("exchange quota lock %s ok", quotaDate)
+	}
+
+	// 2) 系统日结（结算日为「昨日」）
 	j.log.Infof("running daily settlement for %s", settlementDate)
 	if err := j.uc.RunDailySettlement(ctx, settlementDate); err != nil {
 		j.log.Errorf("settlement %s failed: %v", settlementDate, err)
@@ -59,7 +70,6 @@ func (j *SettlementJob) runOnce() {
 	}
 	j.log.Infof("settlement %s completed", settlementDate)
 
-	// 补发历史漏掉的社区基础奖（有社区等级但 eco_rewards 为空的日期）
 	if err := j.uc.BackfillMissingEcoRewards(ctx); err != nil {
 		j.log.Errorf("eco backfill failed: %v", err)
 	}

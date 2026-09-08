@@ -49,6 +49,7 @@ var adminActionLabels = map[string]string{
 	"/api/admin_dhb/set_zero_account":      "设置零号账户",
 	"/api/admin_dhb/set_community_subsidy": "设置社区补贴",
 	"/api/admin_dhb/set_frozen":            "冻结/解冻账户",
+	"/api/admin_dhb/set_frozen_team":       "冻结/解冻团队",
 	"/api/admin_dhb/set_exchange_enabled":  "开关用户兑换功能",
 	"/api/admin_dhb/set_inviter":           "设置上级",
 	"/api/admin_dhb/change_address":        "修改用户地址",

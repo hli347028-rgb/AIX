@@ -662,7 +662,8 @@ func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, so
 		rate := decimal.NewFromFloat(biz.MgmtRateForLevel(ancestor.MgmtLevel))
 		gap := rate.Sub(highestLowerRate)
 
-		if gap.IsPositive() {
+		// 冻结账户丢弃管理奖；级差仍占用，继续向上结算其他人
+		if !ancestor.IsFrozen && gap.IsPositive() {
 			total := sourceOrder.Principal.Mul(gap).Round(8)
 			if total.IsPositive() {
 				var existing MgmtRewardPO
@@ -704,6 +705,15 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 	if reward.ReleasedAmount.GreaterThanOrEqual(reward.TotalAmount) {
 		return nil
 	}
+	var user UserPO
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
+		return err
+	}
+	// 冻结账户丢弃管理奖释放
+	if user.IsFrozen {
+		reward.ReleasedAmount = reward.TotalAmount
+		return tx.Model(reward).Update("released_amount", reward.ReleasedAmount).Error
+	}
 	var logCount int64
 	if err := tx.Model(&RewardLogPO{}).
 		Where("user_id = ? AND order_id = ? AND type IN ?", userID, reward.SourceOrderID,
@@ -720,10 +730,6 @@ func (r *walletRepo) tryReleaseMgmtAgainstExitCap(tx *gorm.DB, userID int64, rew
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("user_id = ? AND status = ?", userID, biz.OrderStatusActive).
 		Order("id asc").Find(&orders).Error; err != nil {
-		return err
-	}
-	var user UserPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
 		return err
 	}
 
@@ -864,6 +870,10 @@ func (r *walletRepo) drainOverflowPool(tx *gorm.DB, userID int64, kind string) e
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, userID).Error; err != nil {
 		return err
 	}
+	// 冻结期间不释放溢出（丢弃当期释放机会；解冻后下次认购再释放）
+	if user.IsFrozen {
+		return nil
+	}
 	want := user.OverflowDirect
 	rewardType := biz.RewardTypeDirectPoolRelease
 	if kind == overflowKindMgmt {
@@ -949,6 +959,14 @@ func (r *walletRepo) payDirectReward(tx *gorm.DB, inviterID, fromUserID, orderID
 	if !want.IsPositive() {
 		return nil
 	}
+	var inviter UserPO
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&inviter, inviterID).Error; err != nil {
+		return err
+	}
+	// 冻结账户丢弃直推奖（不入账、不进溢出）
+	if inviter.IsFrozen {
+		return nil
+	}
 	var orders []OrderPO
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("user_id = ? AND status = ?", inviterID, biz.OrderStatusActive).
@@ -961,11 +979,6 @@ func (r *walletRepo) payDirectReward(tx *gorm.DB, inviterID, fromUserID, orderID
 		if rem.IsPositive() {
 			remainCap = remainCap.Add(rem)
 		}
-	}
-
-	var inviter UserPO
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&inviter, inviterID).Error; err != nil {
-		return err
 	}
 
 	fromID := fromUserID
@@ -1430,6 +1443,16 @@ func (r *walletRepo) SumStaticAixBySettlementDate(ctx context.Context, settlemen
 	err := r.data.db.WithContext(ctx).Model(&RewardLogPO{}).
 		Where("type = ? AND settlement_date = ?", biz.RewardTypeStaticAix, settlementDate).
 		Select("COALESCE(SUM(amount),0)").Scan(&total).Error
+	if err != nil {
+		return "0", err
+	}
+	return total.String(), nil
+}
+
+func (r *walletRepo) SumTotalAixBalance(ctx context.Context) (string, error) {
+	var total decimal.Decimal
+	err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Select("COALESCE(SUM(aix_balance),0)").Scan(&total).Error
 	if err != nil {
 		return "0", err
 	}
@@ -2256,23 +2279,22 @@ func (r *walletRepo) AdminUpdateOrder(ctx context.Context, update *biz.AdminOrde
 
 // payUSDTRechargeRoleRewards 下级 USDT 充值时，按社区补贴级差向上发放（5%/10%/15%）。
 // 仅 USDT 充值触发；WIN / WIN-A 充值不发放。
-// 充值者自身档位作为起点：若下级已设 15%，则其上方所有人拿不到该笔补贴。
-// 平级不发：上级档位 ≤ 下级已占用档位时不发；更高档位发差额。
+// 充值者自身档位不占用级差起点（直推上级可拿满自身档位）；路径上中间节点的档位仍阻断同档/更低档上级。
+// 平级不发：上级档位 ≤ 路径上已占用最高档时不发；更高档位发差额。
 func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.Decimal) error {
 	if !amount.GreaterThan(decimal.Zero) {
 		return nil
 	}
 	var recharger UserPO
-	if err := tx.Select("id", "inviter_id", "is_community_subsidy", "community_subsidy_rate").
-		First(&recharger, fromUserID).Error; err != nil {
+	if err := tx.Select("id", "inviter_id").First(&recharger, fromUserID).Error; err != nil {
 		return err
 	}
 	if recharger.InviterID == nil {
 		return nil
 	}
 
-	rechargerPct := biz.EffectiveSubsidyRatePercent(recharger.IsCommunitySubsidy, recharger.CommunitySubsidyRate)
-	highestLowerPct := rechargerPct
+	// 从 0 起算：充值人自己的社区补贴档位不阻断上级。
+	highestLowerPct := int32(0)
 
 	currentID := *recharger.InviterID
 	seen := map[int64]bool{fromUserID: true}
@@ -2285,12 +2307,21 @@ func payUSDTRechargeRoleRewards(tx *gorm.DB, fromUserID int64, amount decimal.De
 		var ancestor UserPO
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Select("id", "inviter_id", "is_community_subsidy", "community_subsidy_rate",
-				"usdt_withdrawable", "community_subsidy_total").
+				"usdt_withdrawable", "community_subsidy_total", "is_frozen").
 			First(&ancestor, currentID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				break
 			}
 			return err
+		}
+
+		// 冻结上级不发补贴，且不占用级差，继续向上寻找
+		if ancestor.IsFrozen {
+			if ancestor.InviterID == nil {
+				break
+			}
+			currentID = *ancestor.InviterID
+			continue
 		}
 
 		ancestorPct := biz.EffectiveSubsidyRatePercent(ancestor.IsCommunitySubsidy, ancestor.CommunitySubsidyRate)

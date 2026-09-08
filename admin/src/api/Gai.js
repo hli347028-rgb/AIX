@@ -350,6 +350,13 @@ export default {
             data: parameter
         })
     },
+    set_frozen_team: (parameter) => {
+        return axios({
+            url: `${api8006}/set_frozen_team`,
+            method: 'post',
+            data: parameter
+        })
+    },
     set_exchange_enabled: (parameter) => {
         return axios({
             url: `${api8006}/set_exchange_enabled`,

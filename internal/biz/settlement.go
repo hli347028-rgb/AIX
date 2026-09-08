@@ -3,8 +3,10 @@ package biz
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"backend/internal/conf"
 	"backend/internal/pkg/token"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -82,17 +84,43 @@ func (uc *SettlementUsecase) runDailySettlement(ctx context.Context, settlementD
 
 	staticCount, staticAmt, err := uc.processStatic(ctx, settlementDate, batch.ID, priceDec, force)
 	if err != nil {
-		_ = uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusFailed, 0, "0", 0, "0", err.Error())
+		_ = uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusFailed, 0, "0", 0, "0", err.Error(), "0", "0")
 		return err
 	}
 	if err := uc.refreshMgmtLevels(ctx); err != nil {
-		_ = uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusFailed, staticCount, staticAmt.String(), 0, "0", err.Error())
+		_ = uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusFailed, staticCount, staticAmt.String(), 0, "0", err.Error(), "0", "0")
 		return err
 	}
 	// Management rewards are generated once when a downline subscribes. Daily
 	// settlement now handles static rewards only; flat-level rewards are gone.
 	mgmtCount, mgmtAmt := int32(0), decimal.Zero
-	return uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusSuccess, staticCount, staticAmt.String(), mgmtCount, mgmtAmt.String(), "")
+	return uc.stakingRepo.FinishSettlementBatch(ctx, batch.ID, SettlementStatusSuccess, staticCount, staticAmt.String(), mgmtCount, mgmtAmt.String(), "", "0", "0")
+}
+
+// EnsureDailyExchangeQuota 按当前全网总 AIX 锁定某自然日兑换额度（已存在则跳过）。
+func (uc *SettlementUsecase) EnsureDailyExchangeQuota(ctx context.Context, quotaDate string) error {
+	if strings.TrimSpace(quotaDate) == "" {
+		quotaDate = chinaDate(token.NowChina())
+	}
+	if _, _, found, err := uc.stakingRepo.GetLockedExchangeQuota(ctx, quotaDate); err != nil {
+		return err
+	} else if found {
+		return nil
+	}
+	totalAixStr, err := uc.walletRepo.SumTotalAixBalance(ctx)
+	if err != nil {
+		return err
+	}
+	totalAix, _ := ParseAmount(totalAixStr)
+	pct, err := decimal.NewFromString(strings.TrimSpace(GetExchangeReviewThresholdPercent()))
+	if err != nil || pct.IsNegative() {
+		pct, _ = decimal.NewFromString(conf.DefaultExchangeReviewThresholdPercent)
+	}
+	limitDec := decimal.Zero
+	if totalAix.IsPositive() {
+		limitDec = totalAix.Mul(pct).Div(decimal.NewFromInt(100))
+	}
+	return uc.stakingRepo.EnsureDailyExchangeQuota(ctx, quotaDate, totalAix.String(), limitDec.String())
 }
 
 func (uc *SettlementUsecase) processStatic(ctx context.Context, date string, batchID int64, aixPrice decimal.Decimal, allowRepeat bool) (int32, decimal.Decimal, error) {
@@ -108,6 +136,14 @@ func (uc *SettlementUsecase) processStatic(ctx context.Context, date string, bat
 	totalAix := decimal.Zero
 
 	for _, order := range orders {
+		user, err := uc.userRepo.FindByID(ctx, order.UserID)
+		if err != nil {
+			return 0, decimal.Zero, err
+		}
+		// 冻结账户不做静态发放（丢弃当日静态）
+		if user != nil && user.IsFrozen {
+			continue
+		}
 		if !allowRepeat {
 			exists, err := uc.stakingRepo.HasStaticReward(ctx, order.ID, date)
 			if err != nil {
@@ -286,6 +322,10 @@ func (uc *SettlementUsecase) applyExitCapReward(ctx context.Context, userID int6
 
 func (uc *SettlementUsecase) ListBatches(ctx context.Context, offset, limit int) ([]*SettlementBatch, int64, error) {
 	return uc.stakingRepo.ListSettlementBatches(ctx, offset, limit)
+}
+
+func (uc *SettlementUsecase) GetLockedExchangeQuota(ctx context.Context, date string) (base, limit string, found bool, err error) {
+	return uc.stakingRepo.GetLockedExchangeQuota(ctx, date)
 }
 
 func (uc *SettlementUsecase) SumReleaseByDate(ctx context.Context, date string) (string, error) {

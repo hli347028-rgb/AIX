@@ -42,7 +42,7 @@ type SystemConfigSnapshot struct {
 	PartnerMaxAmount  string `json:"partner_max_amount"`  // 单笔上限
 	PartnerDailyLimit string `json:"partner_daily_limit"` // 单日累计上限
 
-	// AIX 兑换审核：全网当日已兑换 AIX 超过「今日AIX数量 × 阈值%」后，后续兑换进待审核
+	// AIX 兑换审核：全网当日已兑换 AIX 超过「全网总AIX × 阈值%」后，后续兑换进待审核
 	ExchangeReviewThresholdPercent string `json:"exchange_review_threshold_percent"`
 
 	// 用户端「向交易所划转」AIX-USDT 单笔最低额（管理端可配）
@@ -85,7 +85,7 @@ const (
 	DefaultPartnerMaxAmount  = "100000"
 	DefaultPartnerDailyLimit = "1000000"
 
-	// 兑换审核阈值（%）：当日已兑换 AIX 超过「今日AIX × 该百分比」后，后续兑换需审核。默认 100=不提前触发。
+	// 兑换审核阈值（%）：当日已兑换 AIX 超过「全网总AIX × 该百分比」后，后续兑换需审核。默认 100。
 	DefaultExchangeReviewThresholdPercent = "100"
 
 	// 向交易所划转 AIX-USDT 单笔最低额

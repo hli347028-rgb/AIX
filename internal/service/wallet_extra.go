@@ -227,13 +227,14 @@ func (s *WalletService) HandleTransfer(ctx khttp.Context) error {
 
 func (s *WalletService) HandleTransferExchange(ctx khttp.Context) error {
 	var req struct {
-		Token  string `json:"token"`
-		Amount string `json:"amount"`
+		Token   string `json:"token"`
+		Amount  string `json:"amount"`
+		Address string `json:"address"`
 	}
 	if err := json.NewDecoder(ctx.Request().Body).Decode(&req); err != nil && err != io.EOF {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid json"})
 	}
-	rec, left, err := s.uc.TransferToExchange(ctx, tokenFromRequest(ctx, req.Token), req.Amount)
+	rec, left, err := s.uc.TransferToExchange(ctx, tokenFromRequest(ctx, req.Token), req.Amount, req.Address)
 	if err != nil {
 		return err
 	}
@@ -241,6 +242,7 @@ func (s *WalletService) HandleTransferExchange(ctx khttp.Context) error {
 		"id":             rec.ID,
 		"asset":          "AIX-USDT",
 		"amount":         rec.Amount,
+		"address":        rec.Address,
 		"status":         rec.Status,
 		"partner_txn_id": rec.PartnerTxnID,
 		"points_left":    left,
@@ -265,6 +267,7 @@ func (s *WalletService) HandleExchangeTransferRecords(ctx khttp.Context) error {
 			"id":             record.ID,
 			"asset":          "AIX-USDT",
 			"amount":         record.Amount,
+			"address":        record.Address,
 			"status":         record.Status,
 			"partner_txn_id": record.PartnerTxnID,
 			"created_at":     record.CreatedTime.Unix(),
@@ -505,6 +508,12 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"aix_to_win_rate":      aixToWinRate,
 		"exchange_fee_rate":    biz.GetExchangeFeeRate(),
 		"exchange_enabled":     user == nil || user.ExchangeEnabled,
+		"exchange_bind_address": func() string {
+			if user == nil {
+				return ""
+			}
+			return user.ExchangeBindAddress
+		}(),
 		"aix_contract":         "", // TODO
 		"win_contract":           s.uc.WinContract(),
 		"win_a_recharge_enabled": false,

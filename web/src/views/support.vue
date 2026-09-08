@@ -64,7 +64,7 @@ import userPerson from '@/pinia/person'
 const router = useRouter()
 const { t: $t } = useI18n()
 const person = userPerson()
-const chatIdParts = ['10424', '10289', '11387', '10082']
+const chatIdParts = ['10424', '10289', '11387']
 
 const content = ref('')
 const submitting = ref(false)

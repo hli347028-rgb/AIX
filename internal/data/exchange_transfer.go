@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"backend/internal/biz"
 
@@ -60,11 +61,36 @@ func (r *walletRepo) CreateExchangeTransfer(ctx context.Context, userID int64, a
 }
 
 func (r *walletRepo) CompleteExchangeTransfer(ctx context.Context, id int64, partnerTxnID, partnerCode string) error {
-	return r.data.db.WithContext(ctx).Model(&ExchangeTransferPO{}).Where("id = ? AND status = ?", id, "pending").Updates(map[string]any{
+	partnerTxnID = strings.TrimSpace(partnerTxnID)
+	partnerCode = strings.TrimSpace(partnerCode)
+	updates := map[string]any{
 		"status":         "completed",
+		"partner_txn_id": partnerTxnID,
+		"partner_code":   partnerCode,
+		"remark":         "exchange transfer completed",
+	}
+	res := r.data.db.WithContext(ctx).Model(&ExchangeTransferPO{}).
+		Where("id = ? AND status = ?", id, "pending").Updates(updates)
+	if res.Error != nil {
+		// 写状态失败时仍尽量留下对方单号，避免后续被误退款。
+		_ = r.attachExchangeTransferPartner(ctx, id, partnerTxnID, partnerCode)
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		_ = r.data.db.WithContext(ctx).Model(&ExchangeTransferPO{}).Where("id = ?", id).Updates(map[string]any{
+			"partner_txn_id": partnerTxnID,
+			"partner_code":   partnerCode,
+		}).Error
+	}
+	return nil
+}
+
+// attachExchangeTransferPartner 在仍为 pending 时写入对方单号，避免「对方已成功但本地未完结」时被误退款。
+func (r *walletRepo) attachExchangeTransferPartner(ctx context.Context, id int64, partnerTxnID, partnerCode string) error {
+	return r.data.db.WithContext(ctx).Model(&ExchangeTransferPO{}).
+		Where("id = ? AND status = ?", id, "pending").Updates(map[string]any{
 		"partner_txn_id": strings.TrimSpace(partnerTxnID),
 		"partner_code":   strings.TrimSpace(partnerCode),
-		"remark":         "exchange transfer completed",
 	}).Error
 }
 
@@ -96,9 +122,46 @@ func (r *walletRepo) FailAndRefundExchangeTransfer(ctx context.Context, id int64
 	})
 }
 
+// ResolveStuckExchangeTransfers 收尾卡住的 pending：
+// - 已有对方单号 → 标为成功（对方已入账，不可退款）
+// - 否则且超过 olderThan → 失败并退回 points
+// userID>0 时仅处理该用户；olderThan<=0 时处理全部无对方单号的 pending。
+func (r *walletRepo) ResolveStuckExchangeTransfers(ctx context.Context, userID int64, olderThan time.Duration) (completed, refunded int, err error) {
+	db := r.data.db.WithContext(ctx).Model(&ExchangeTransferPO{}).Where("status = ?", "pending")
+	if userID > 0 {
+		db = db.Where("user_id = ?", userID)
+	}
+	if olderThan > 0 {
+		db = db.Where("created_time <= ?", time.Now().Add(-olderThan))
+	}
+	var list []ExchangeTransferPO
+	if err = db.Order("id asc").Find(&list).Error; err != nil {
+		return 0, 0, err
+	}
+	for i := range list {
+		po := &list[i]
+		if strings.TrimSpace(po.PartnerTxnID) != "" {
+			if e := r.CompleteExchangeTransfer(ctx, po.ID, po.PartnerTxnID, po.PartnerCode); e != nil {
+				return completed, refunded, e
+			}
+			completed++
+			continue
+		}
+		remark := "stuck pending auto-failed; points refunded"
+		if e := r.FailAndRefundExchangeTransfer(ctx, po.ID, po.PartnerCode, remark); e != nil {
+			return completed, refunded, e
+		}
+		refunded++
+	}
+	return completed, refunded, nil
+}
+
 func (r *walletRepo) ListExchangeTransfersByUser(ctx context.Context, userID int64) ([]*biz.ExchangeTransfer, error) {
 	var list []ExchangeTransferPO
-	if err := r.data.db.WithContext(ctx).Where("user_id = ?", userID).Order("id desc").Find(&list).Error; err != nil {
+	// 用户侧只展示成功/失败，不展示处理中。
+	if err := r.data.db.WithContext(ctx).
+		Where("user_id = ? AND status IN ?", userID, []string{"completed", "failed"}).
+		Order("id desc").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*biz.ExchangeTransfer, 0, len(list))

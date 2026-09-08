@@ -51,6 +51,25 @@
           </div>
         </template>
 
+        <template v-else>
+          <label class="field-label" for="exchange-bind-address">{{ $t('transfer.exchangeBindAddress') }}</label>
+          <div class="input-shell" :class="{ locked: !!boundExchangeAddress }">
+            <van-icon name="contact-o" aria-hidden="true" />
+            <input
+              id="exchange-bind-address"
+              v-model.trim="exchangeAddress"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              :readonly="!!boundExchangeAddress"
+              :placeholder="$t('transfer.exchangeBindPlaceholder')"
+            />
+          </div>
+          <p class="min-hint">
+            {{ boundExchangeAddress ? $t('transfer.exchangeBindLockedHint') : $t('transfer.exchangeBindHint') }}
+          </p>
+        </template>
+
         <div class="amount-heading">
           <label class="field-label" for="transfer-amount">{{ $t('transfer.amount') }}</label>
           <button type="button" class="all-btn" @click="fillAll">{{ $t('transfer.all') }}</button>
@@ -173,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Pagination, showFailToast, showSuccessToast, showToast } from 'vant'
@@ -207,6 +226,7 @@ interface ExchangeTransferRecord {
   id: number
   asset: string
   amount: string
+  address?: string
   status: string
   partner_txn_id?: string
   created_at: number
@@ -223,6 +243,7 @@ const person = userPerson()
 
 const transferMode = ref<TransferMode>('user')
 const recipient = ref('')
+const exchangeAddress = ref('')
 const amount = ref('')
 const loading = ref(false)
 const records = ref<TransferRecord[]>([])
@@ -246,6 +267,14 @@ const exchangeMinAmount = computed(() => {
   const raw = String((person.profile as any)?.exchange_transfer_min_amount || '').trim()
   return raw || DEFAULT_EXCHANGE_MIN
 })
+const boundExchangeAddress = computed(() => {
+  const raw = String(
+    (person.profile as any)?.exchange_bind_address
+    || (person.profile as any)?.exchangeBindAddress
+    || '',
+  ).trim()
+  return raw
+})
 const sourceBalance = computed(() => (transferMode.value === 'exchange' ? pointsBalance.value : rewardBalance.value))
 const currencyLabel = computed(() => (transferMode.value === 'exchange' ? 'AIX-USDT' : 'USDT'))
 const balanceLabel = computed(() =>
@@ -257,6 +286,10 @@ const sourceWalletName = computed(() =>
 const transferHint = computed(() =>
   transferMode.value === 'exchange' ? $t('transfer.exchangeHint') : $t('transfer.userHint'),
 )
+
+watch(boundExchangeAddress, (addr) => {
+  if (addr) exchangeAddress.value = addr
+}, { immediate: true })
 
 const isPositiveAmount = (value: string) => /^\d+(?:\.\d+)?$/.test(value) && /[1-9]/.test(value)
 
@@ -281,7 +314,7 @@ const compareDecimalStrings = (left: string, right: string) => {
 const canSubmit = computed(() => {
   if (!isPositiveAmount(amount.value)) return false
   if (transferMode.value === 'user') return recipient.value.length > 0
-  return true
+  return (boundExchangeAddress.value || exchangeAddress.value).length > 0
 })
 
 const switchMode = (next: TransferMode) => {
@@ -289,6 +322,11 @@ const switchMode = (next: TransferMode) => {
   transferMode.value = next
   amount.value = ''
   recipient.value = ''
+  if (boundExchangeAddress.value) {
+    exchangeAddress.value = boundExchangeAddress.value
+  } else if (next !== 'exchange') {
+    exchangeAddress.value = ''
+  }
   reloadRecords(1)
 }
 
@@ -329,8 +367,7 @@ const exchangeStatusText = (status: string) => {
   switch (String(status || '').toLowerCase()) {
     case 'completed': return $t('transfer.statusCompleted')
     case 'failed': return $t('transfer.statusFailed')
-    case 'pending': return $t('transfer.statusPending')
-    default: return status || '-'
+    default: return $t('transfer.statusFailed')
   }
 }
 
@@ -455,9 +492,17 @@ const submitTransfer = async () => {
       showFailToast($t('transfer.exchangeMinHint', { min: exchangeMinAmount.value }))
       return
     }
+    const addr = (boundExchangeAddress.value || exchangeAddress.value || '').trim()
+    if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+      showFailToast($t('transfer.invalidExchangeAddress'))
+      return
+    }
     loading.value = true
     try {
-      await request.post('/v1/wallet/transfer-exchange', { amount: amount.value })
+      await request.post('/v1/wallet/transfer-exchange', {
+        amount: amount.value,
+        address: boundExchangeAddress.value ? undefined : addr,
+      })
       amount.value = ''
       await Promise.all([
         person.getUser?.(),
@@ -732,6 +777,16 @@ onMounted(async () => {
   &:focus-within {
     border-color: #0052ff;
     box-shadow: 0 0 0 3px rgba(0, 82, 255, .10);
+  }
+
+  &.locked {
+    background: #eef1f6;
+    border-color: rgba(15, 23, 42, .12);
+
+    input {
+      color: var(--text-2);
+      cursor: default;
+    }
   }
 
   .van-icon {

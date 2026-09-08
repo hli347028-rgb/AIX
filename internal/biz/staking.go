@@ -190,6 +190,9 @@ type SettlementBatch struct {
 	StaticAmount   string
 	MgmtCount      int32
 	MgmtAmount     string
+	// ExchangeQuotaBase 结算成功时锁定的全网 AIX 基数；ExchangeQuotaLimit 当日兑换审核额度
+	ExchangeQuotaBase  string
+	ExchangeQuotaLimit string
 	StartedAt      time.Time
 	FinishedAt     *time.Time
 	ErrorMsg       string
@@ -244,7 +247,11 @@ type StakingRepo interface {
 
 	HasCompletedSettlement(ctx context.Context, date string) (bool, error)
 	CreateSettlementBatch(ctx context.Context, batch *SettlementBatch) error
-	FinishSettlementBatch(ctx context.Context, id int64, status string, staticCount int32, staticAmount string, mgmtCount int32, mgmtAmount string, errMsg string) error
+	FinishSettlementBatch(ctx context.Context, id int64, status string, staticCount int32, staticAmount string, mgmtCount int32, mgmtAmount string, errMsg string, exchangeQuotaBase, exchangeQuotaLimit string) error
+	// GetLockedExchangeQuota 取某自然日已锁定的兑换额度（一天只算一次，与结算无关）。
+	GetLockedExchangeQuota(ctx context.Context, date string) (base, limit string, found bool, err error)
+	// EnsureDailyExchangeQuota 若该日尚未锁定则按当前全网 aix_balance 写入额度。
+	EnsureDailyExchangeQuota(ctx context.Context, date, base, limit string) error
 	ListSettlementBatches(ctx context.Context, offset, limit int) ([]*SettlementBatch, int64, error)
 	SumStaticByDate(ctx context.Context, date string) (string, error)
 
