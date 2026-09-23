@@ -364,6 +364,13 @@ export default {
             data: parameter
         })
     },
+    set_exchange_enabled_team: (parameter) => {
+        return axios({
+            url: `${api8006}/set_exchange_enabled_team`,
+            method: 'post',
+            data: parameter
+        })
+    },
     set_inviter: (parameter) => {
         return axios({
             url: `${api8006}/set_inviter`,

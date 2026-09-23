@@ -29,6 +29,13 @@ export default {
             data: parameter
         })
     },
+    moveArticle: (parameter) => {
+        return axios({
+            url: `${api}/announcement_move`,
+            method: 'post',
+            data: parameter
+        })
+    },
     getArticleDetails: (parameter) => {
         return axios({
             url: `${api}/announcement_detail`,

@@ -13,6 +13,13 @@
                         </a-select-option>
                     </a-select>
                 </a-col>
+                <a-col :xs="12" :md="6" :lg="6" :xl="4">
+                    <a-select allowClear v-model="searchData.asset" style="width:100%" placeholder="划转币种"
+                        @change="getListTwo">
+                        <a-select-option value="WIN">WIN</a-select-option>
+                        <a-select-option value="WIN-A">WIN-A</a-select-option>
+                    </a-select>
+                </a-col>
                 <a-col :xs="24" :md="12" :lg="10" :xl="8">
                     <a-range-picker
                         v-model="searchData.dateRange"
@@ -30,7 +37,7 @@
             </a-row>
             <div class="stats-bar" v-if="stats">
                 <span>筛选笔数：<b>{{ stats.totalCount || 0 }}</b></span>
-                <span>划转总额：<b>{{ stats.amountTotal || 0 }}</b> WIN</span>
+                <span>划转总额：<b>{{ stats.amountTotal || 0 }}</b></span>
             </div>
             <a-table
                 rowKey="id"
@@ -72,7 +79,16 @@ export default {
                     dataIndex: 'address',
                 },
                 {
-                    title: '金额(WIN)',
+                    title: '划转币种',
+                    dataIndex: 'asset',
+                    customRender: (v, row) => {
+                        const asset = v || 'WIN'
+                        const code = row && row.coinType != null ? row.coinType : ''
+                        return code !== '' && code != null ? `${asset} (${code})` : asset
+                    },
+                },
+                {
+                    title: '金额',
                     dataIndex: 'amount',
                 },
                 {
@@ -87,6 +103,7 @@ export default {
             searchData: {
                 address: '',
                 partner_id: undefined,
+                asset: undefined,
                 dateRange: [],
             },
             pageSize: 50,
@@ -113,6 +130,8 @@ export default {
             if (address) params.address = address
             const partnerId = this.searchData.partner_id
             if (partnerId) params.partner_id = partnerId
+            const asset = this.searchData.asset
+            if (asset) params.asset = asset
             if (this.searchData.dateRange && this.searchData.dateRange.length === 2) {
                 params.startTime = moment(this.searchData.dateRange[0]).format('YYYY-MM-DD HH:mm:ss')
                 params.endTime = moment(this.searchData.dateRange[1]).format('YYYY-MM-DD HH:mm:ss')

@@ -64,6 +64,7 @@ type ChainRechargeJob struct {
 	usdtCycling  atomic.Bool
 	winCycling   atomic.Bool
 	winACycling  atomic.Bool
+	sdtCycling   atomic.Bool
 }
 
 func NewChainRechargeJob(
@@ -90,8 +91,8 @@ func (j *ChainRechargeJob) Start() {
 	if interval <= 0 {
 		interval = time.Minute
 	}
-	j.log.Infof("depositOnly timers started: usdt=%s win=%s rpc=%s interval=%s",
-		j.cfg.GetDepositContract(), j.cfg.GetWinDepositContract(), j.cfg.GetRPCURL(), interval)
+	j.log.Infof("depositOnly timers started: usdt=%s win=%s sdt=%s rpc=%s interval=%s",
+		j.cfg.GetDepositContract(), j.cfg.GetWinDepositContract(), j.cfg.GetSdtDepositContract(), j.cfg.GetRPCURL(), interval)
 
 	go func() {
 		j.runOnce(context.Background())
@@ -123,6 +124,11 @@ func (j *ChainRechargeJob) runOnce(ctx context.Context) {
 	} else if res != nil && res.Scanned > 0 {
 		j.log.Infof("WIN depositOnly: credited=%d skipped=%d scanned=%d", res.Credited, res.Skipped, res.Scanned)
 	}
+	if res, err := j.DepositOnlySdt(ctx); err != nil {
+		j.log.Errorf("SDT depositOnly failed: %v", err)
+	} else if res != nil && res.Scanned > 0 {
+		j.log.Infof("SDT depositOnly: credited=%d skipped=%d scanned=%d", res.Credited, res.Skipped, res.Scanned)
+	}
 }
 
 // DepositOnly syncs the USDT BuySomething ledger on EOEO → usdt_recharge.
@@ -149,6 +155,20 @@ func (j *ChainRechargeJob) DepositOnlyWin(ctx context.Context) (*DepositOnlyResu
 // DepositOnlyWinA WIN-A 充值已关闭。
 func (j *ChainRechargeJob) DepositOnlyWinA(ctx context.Context) (*DepositOnlyResult, error) {
 	return &DepositOnlyResult{Asset: "WIN-A"}, nil
+}
+
+// DepositOnlySdt syncs the AIX-USDT BuySomething ledger on EOEO → points.
+func (j *ChainRechargeJob) DepositOnlySdt(ctx context.Context) (*DepositOnlyResult, error) {
+	return j.syncDepositLedger(ctx, "SDT", j.cfg.GetSdtDepositContract(), j.cfg.GetRPCURL(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
+		credited, _, err := j.walletRepo.AutoCreditSdtRecharge(ctx, recordHash, fromAddress, contractAddress, amount)
+		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "user not found") {
+				return false, nil
+			}
+			return false, err
+		}
+		return credited, nil
+	})
 }
 
 func (j *ChainRechargeJob) depositCycleParams() (queries int, gap time.Duration) {
@@ -235,6 +255,39 @@ func (j *ChainRechargeJob) TriggerDepositOnlyWinACycle() *CycleTriggerResult {
 		Asset:  "WIN-A",
 		Reason: "win-a recharge disabled",
 	}
+}
+
+// TriggerDepositOnlySdtCycle starts a background AIX-USDT deposit cycle.
+func (j *ChainRechargeJob) TriggerDepositOnlySdtCycle() *CycleTriggerResult {
+	queries, gap := j.depositCycleParams()
+	res := &CycleTriggerResult{
+		Asset: "SDT", Queries: queries, IntervalSeconds: int64(gap / time.Second),
+	}
+	if !j.sdtCycling.CompareAndSwap(false, true) {
+		res.Accepted = false
+		res.Reason = "cycle already running"
+		return res
+	}
+	res.Accepted = true
+	go func() {
+		defer j.sdtCycling.Store(false)
+		j.log.Infof("SDT depositOnly cycle started: queries=%d interval=%s", queries, gap)
+		for i := 0; i < queries; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			if _, err := j.DepositOnlySdt(ctx); err != nil {
+				j.log.Errorf("SDT depositOnly cycle #%d/%d failed: %v", i+1, queries, err)
+			} else {
+				j.log.Infof("SDT depositOnly cycle #%d/%d ok", i+1, queries)
+			}
+			cancel()
+			if i >= queries-1 {
+				break
+			}
+			time.Sleep(gap)
+		}
+		j.log.Info("SDT depositOnly cycle finished")
+	}()
+	return res
 }
 
 func (j *ChainRechargeJob) syncDepositLedger(ctx context.Context, asset, contractRaw, rpcURL string, credit creditFn) (*DepositOnlyResult, error) {

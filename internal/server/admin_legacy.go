@@ -51,6 +51,7 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.POST(p+"/set_frozen", legacy.HandleSetFrozen)
 	r.POST(p+"/set_frozen_team", legacy.HandleSetFrozenTeam)
 	r.POST(p+"/set_exchange_enabled", legacy.HandleSetExchangeEnabled)
+	r.POST(p+"/set_exchange_enabled_team", legacy.HandleSetExchangeEnabledTeam)
 	r.POST(p+"/set_inviter", legacy.HandleSetInviter)
 	r.POST(p+"/change_address", legacy.HandleChangeAddress)
 	r.POST(p+"/update_goods", legacy.HandleUpdateGoods)
@@ -65,6 +66,7 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.POST(p+"/announcement_detail", legacy.HandleAnnouncementDetail)
 	r.POST(p+"/announcement_save", legacy.HandleAnnouncementSave)
 	r.POST(p+"/announcement_delete", legacy.HandleAnnouncementDelete)
+	r.POST(p+"/announcement_move", legacy.HandleAnnouncementMove)
 
 	// 用户端公告（无需登录）
 	r.GET("/v1/announcements", legacy.HandlePublicAnnouncementList)

@@ -53,7 +53,8 @@ export default defineConfig(({ mode }) => {
     build: {
         outDir: "dist",
         assetsDir: "static",
-        assetsInlineLimit: 150000,
+        // 默认 4KB；过大的 inline 会把图片打进 JS，撑大首包
+        assetsInlineLimit: 4096,
         // 钱包内置浏览器的内核通常落后于系统 Chrome。ES2018 是当前依赖
         // （包括 PLaOC 的 async iterator）可以稳定构建的最低目标。
         target: 'es2018'

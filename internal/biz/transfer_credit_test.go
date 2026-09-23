@@ -86,6 +86,7 @@ func signedRequest(amount string) *TransferCreditRequest {
 		PartnerID: "AIX10001",
 		Timestamp: time.Now().UnixMilli(),
 		Nonce:     fmt.Sprintf("n%011d", time.Now().UnixNano()%1e11),
+		CoinType:  DefaultPartnerCoinType, // 缺省 WIN；未置 CoinTypeInBody → 不参与签名
 	}
 	req.Sign = partnersign.Sign(testSecret, req.SignedFields())
 	return req
@@ -127,6 +128,53 @@ func TestCreditHappyPath(t *testing.T) {
 	// 幂等键必须由 partner_id + nonce 构成，否则重放无法被 tx_hash 唯一索引拦住
 	if want := PartnerIdempotencyKey(req.PartnerID, req.Nonce); wallet.lastInput.IdempotencyKey != want {
 		t.Fatalf("idempotency key = %s, want %s", wallet.lastInput.IdempotencyKey, want)
+	}
+	if wallet.lastInput.Asset != TokenWIN {
+		t.Fatalf("default asset = %s, want %s", wallet.lastInput.Asset, TokenWIN)
+	}
+}
+
+func TestCreditCoinTypeWIN(t *testing.T) {
+	wallet := &stubWalletRepo{}
+	uc, _ := newTestUsecase(t, wallet, &stubNonceRepo{})
+	req := signedRequest("10")
+	req.CoinType = PartnerCoinTypeWIN
+	req.CoinTypeInBody = true
+	req.Sign = partnersign.Sign(testSecret, req.SignedFields())
+
+	partner, err := uc.LookupPartner(req.PartnerID)
+	if err != nil {
+		t.Fatalf("lookup: %v", err)
+	}
+	if err := uc.VerifyRequest(req, partner); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if err := uc.OccupyNonce(context.Background(), req); err != nil {
+		t.Fatalf("nonce: %v", err)
+	}
+	if _, err := uc.Credit(context.Background(), req, partner); err != nil {
+		t.Fatalf("credit: %v", err)
+	}
+	if wallet.lastInput.Asset != TokenWIN {
+		t.Fatalf("asset = %s, want %s", wallet.lastInput.Asset, TokenWIN)
+	}
+}
+
+func TestCreditUnsupportedCoinType(t *testing.T) {
+	wallet := &stubWalletRepo{}
+	uc, _ := newTestUsecase(t, wallet, &stubNonceRepo{})
+	req := signedRequest("10")
+	req.CoinType = PartnerCoinTypeUnsupported
+	req.CoinTypeInBody = true
+	req.Sign = partnersign.Sign(testSecret, req.SignedFields())
+
+	partner, _ := uc.LookupPartner(req.PartnerID)
+	_ = uc.VerifyRequest(req, partner)
+	_ = uc.OccupyNonce(context.Background(), req)
+	_, err := uc.Credit(context.Background(), req, partner)
+	assertCode(t, err, TransferCodeUnsupportedCoin)
+	if wallet.creditCalls != 0 {
+		t.Fatalf("should not credit unsupported coin")
 	}
 }
 

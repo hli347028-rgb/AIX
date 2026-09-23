@@ -197,40 +197,49 @@ func (r *userRepo) ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64,
 	return r.listUserIDsUnder(ctx, rootID)
 }
 
-// listUserIDsUnder 收集 rootID 之下的全部后代。
-// 推荐链最深可达 90 余层，按层查询会产生同样数量的串行往返并耗尽请求的
-// context deadline，因此这里一次性取回 id→inviter 关系再在内存中展开。
+// listUserIDsUnder 收集 rootID 之下的全部后代（不含本人）。
+// 优先用 MySQL 递归 CTE（单次往返）；失败时退回按层 BFS。
+// 禁止再全表拉 id→inviter：用户量大时会拖垮团队页 / profile。
 func (r *userRepo) listUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error) {
-	type edge struct {
-		ID        int64
-		InviterID *int64
+	if rootID <= 0 {
+		return nil, nil
 	}
-	var edges []edge
-	if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
-		Select("id", "inviter_id").
-		Where("inviter_id IS NOT NULL").
-		Order("id asc").
-		Find(&edges).Error; err != nil {
-		return nil, err
+	var ids []int64
+	err := r.data.db.WithContext(ctx).Raw(`
+		WITH RECURSIVE under AS (
+			SELECT id FROM users WHERE inviter_id = ?
+			UNION ALL
+			SELECT u.id FROM users u INNER JOIN under ON u.inviter_id = under.id
+		)
+		SELECT id FROM under
+	`, rootID).Scan(&ids).Error
+	if err == nil {
+		return ids, nil
 	}
-	children := make(map[int64][]int64, len(edges))
-	for _, e := range edges {
-		children[*e.InviterID] = append(children[*e.InviterID], e.ID)
-	}
+	return r.listUserIDsUnderBFS(ctx, rootID)
+}
+
+func (r *userRepo) listUserIDsUnderBFS(ctx context.Context, rootID int64) ([]int64, error) {
 	var all []int64
-	visited := map[int64]struct{}{rootID: {}}
-	queue := []int64{rootID}
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		for _, child := range children[cur] {
-			if _, seen := visited[child]; seen {
+	frontier := []int64{rootID}
+	seen := map[int64]struct{}{rootID: {}}
+	for len(frontier) > 0 {
+		var kids []int64
+		if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+			Where("inviter_id IN ?", frontier).
+			Pluck("id", &kids).Error; err != nil {
+			return nil, err
+		}
+		next := make([]int64, 0, len(kids))
+		for _, id := range kids {
+			if _, ok := seen[id]; ok {
 				continue
 			}
-			visited[child] = struct{}{}
-			all = append(all, child)
-			queue = append(queue, child)
+			seen[id] = struct{}{}
+			all = append(all, id)
+			next = append(next, id)
 		}
+		frontier = next
 	}
 	return all, nil
 }
@@ -272,6 +281,76 @@ func (r *userRepo) ListAllUsers(ctx context.Context) ([]*biz.User, error) {
 			addr = inviterAddr[*list[i].InviterID]
 		}
 		out = append(out, r.toBizWithInviter(&list[i], addr))
+	}
+	return out, nil
+}
+
+func (r *userRepo) ListUsersPaged(ctx context.Context, addressFilter string, offset, limit int) ([]*biz.User, int64, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	addressFilter = strings.TrimSpace(addressFilter)
+	build := func() *gorm.DB {
+		q := r.data.db.WithContext(ctx).Model(&UserPO{})
+		if addressFilter != "" {
+			q = q.Where("LOWER(address) LIKE ?", "%"+strings.ToLower(addressFilter)+"%")
+		}
+		return q
+	}
+	var total int64
+	if err := build().Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var list []UserPO
+	if err := build().Order("id desc").Offset(offset).Limit(limit).Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+	inviterIDs := make([]int64, 0, len(list))
+	for i := range list {
+		if list[i].InviterID != nil {
+			inviterIDs = append(inviterIDs, *list[i].InviterID)
+		}
+	}
+	inviterAddr := r.batchUserAddresses(ctx, inviterIDs)
+	out := make([]*biz.User, 0, len(list))
+	for i := range list {
+		addr := ""
+		if list[i].InviterID != nil {
+			addr = inviterAddr[*list[i].InviterID]
+		}
+		out = append(out, r.toBizWithInviter(&list[i], addr))
+	}
+	return out, total, nil
+}
+
+func (r *userRepo) CountDirectInviteesByUserIDs(ctx context.Context, userIDs []int64) (map[int64]int, error) {
+	out := make(map[int64]int, len(userIDs))
+	for _, id := range userIDs {
+		out[id] = 0
+	}
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		InviterID int64
+		Cnt       int
+	}
+	var rows []row
+	if err := r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Select("inviter_id AS inviter_id, COUNT(*) AS cnt").
+		Where("inviter_id IN ?", userIDs).
+		Group("inviter_id").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range rows {
+		out[item.InviterID] = item.Cnt
 	}
 	return out, nil
 }
@@ -602,6 +681,15 @@ func (r *userRepo) SetFrozenForUsers(ctx context.Context, userIDs []int64, froze
 		updates["frozen_at"] = nil
 	}
 	return r.data.db.WithContext(ctx).Model(&UserPO{}).Where("id IN ?", userIDs).Updates(updates).Error
+}
+
+func (r *userRepo) SetExchangeEnabledForUsers(ctx context.Context, userIDs []int64, enabled bool) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
+	return r.data.db.WithContext(ctx).Model(&UserPO{}).
+		Where("id IN ?", userIDs).
+		Update("exchange_enabled", enabled).Error
 }
 
 func (r *userRepo) SetRole(ctx context.Context, userID int64, role string) error {

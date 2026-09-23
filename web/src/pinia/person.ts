@@ -12,6 +12,7 @@ setToastDefaultOptions({
 
 let timeSwitch: any = null//定时获取用户信息
 let initializationPromise: Promise<void> | null = null
+let hydratePromise: Promise<void> | null = null
 let listenedProvider: any = null
 let accountsChangedHandler: ((accounts: string[]) => void) | null = null
 let chainChangedHandler: (() => void) | null = null
@@ -21,6 +22,19 @@ let walletEventVersion = 0
 
 const INVITE_CANCELLED = 'INVITE_CANCELLED'
 const WALLET_DISCONNECTED = 'WALLET_DISCONNECTED'
+
+/** 轻量 aix-profile 会带 area_funding 分项全 0；勿覆盖社区页已加载的明细 */
+function areaFundingHasDetail(af: any): boolean {
+  if (!af || typeof af !== 'object') return false
+  const sides = [af.large, af.small]
+  return sides.some((side) => {
+    if (!side || typeof side !== 'object') return false
+    return ['usdt', 'win', 'exchangeWin', 'exchange_win', 'reward'].some((k) => {
+      const n = Number(side[k])
+      return Number.isFinite(n) && n > 0
+    })
+  })
+}
 
 function clearAuthStorage() {
   localStorage.removeItem('token')
@@ -85,6 +99,8 @@ function removeInviteFromAddressBar() {
 export default defineStore('person', {
   state: () => ({
     loadAccount: false,
+    profileReady: false,
+    hydrating: false,
     isLogin: false,
     userinfo: {
       status: 'ok',
@@ -201,11 +217,15 @@ export default defineStore('person', {
       this.isLogin = false
       this.authError = ''
       this.loadAccount = false
+      this.profileReady = false
+      this.hydrating = false
       initializationPromise = this.initializeAuth().catch((error: any) => {
         const message = error?.response?.data?.message || error?.message || String(error || '')
         this.authError = this.mapAuthError(message, error)
         this.authStage = 'error'
         this.loadAccount = false
+        this.profileReady = false
+        this.hydrating = false
         this.isLogin = false
         throw error
       }).finally(() => {
@@ -423,17 +443,103 @@ export default defineStore('person', {
       this.authStage = 'idle'
       return this.init()
     },
-    /* 获取用户信息 */
-    async getUser() {
-      const getData = async () => {
-        let res: any = await request.get('app_server/user_info')
-        this.userinfo = { ...this.userinfo, ...res }
+    /* 获取用户信息；lite=登录黑屏最小集，full=进页后补齐 */
+    async getUser(mode: 'lite' | 'full' = 'full') {
+      const getData = async (nextMode: 'lite' | 'full' = mode) => {
+        const res: any = await request.get('app_server/user_info', {
+          params: nextMode === 'lite' ? { lite: 1 } : undefined,
+          silent: true,
+        } as any)
+        const { _lite, ...payload } = res || {}
+        const prev = this.userinfo as Record<string, any>
+        // 无 include 的 profile 分项恒为 0，轮询 full 时保留社区页已写入的明细
+        if (
+          areaFundingHasDetail(prev?.areaFunding || prev?.area_funding)
+          && !areaFundingHasDetail(payload?.areaFunding || payload?.area_funding)
+        ) {
+          delete payload.areaFunding
+          delete payload.area_funding
+        }
+        this.userinfo = { ...this.userinfo, ...payload }
+        this.applyLiteBalancesFromUserinfo()
       }
       clearUserTimer()
-      await getData()
+      await getData(mode)
+      // 定时刷新用完整资料，避免社区/业绩长期停留在 lite 默认值
       timeSwitch = setInterval(() => {
-        void getData().catch((error) => console.error('[getUser:poll]', error))
+        void getData('full').catch((error) => console.error('[getUser:poll]', error))
       }, 30000)
+    },
+    applyLiteBalancesFromUserinfo() {
+      const info = this.userinfo as Record<string, any>
+      this.profile = {
+        ...this.profile,
+        address: info.inviteUrl || info.address || this.address || this.profile.address,
+        usdt_recharge: String(info.usdt ?? info.balanceUsdt ?? this.profile.usdt_recharge ?? '0'),
+        usdt_reward: String(info.reward ?? this.profile.usdt_reward ?? '0'),
+        aix_balance: String(info.aix ?? this.profile.aix_balance ?? '0'),
+        win_recharge_balance: String(
+          info.win_recharge_balance
+          ?? info.win_recharge
+          ?? info.winRechargeBalance
+          ?? this.profile.win_recharge_balance
+          ?? '0',
+        ),
+        win_balance: String(
+          info.win_balance
+          ?? info.win
+          ?? info.winBalance
+          ?? this.profile.win_balance
+          ?? '0',
+        ),
+        usdt_withdrawable: String(info.usdtWithdrawable ?? this.profile.usdt_withdrawable ?? '0'),
+        static_usdt_total: String(info.staticIncomeTotal ?? info.location ?? this.profile.static_usdt_total ?? '0'),
+        pending_amount: String(info.pendingAmount ?? info.amountLast ?? this.profile.pending_amount ?? '0'),
+        unexited_amount: String(info.unexitedAmount ?? this.profile.unexited_amount ?? '0'),
+        total_nodes: Number(info.totalNodes ?? this.profile.total_nodes ?? 0),
+        next_release_at: Number(info.nextReleaseAt ?? this.profile.next_release_at ?? 0),
+        server_time: Number(info.time ?? this.profile.server_time ?? 0),
+        points: String(info.points ?? this.profile.points ?? '0'),
+        points_all: String(info.points_all ?? this.profile.points_all ?? '0'),
+        overflow_reward: String(info.overflow_reward ?? info.overflowReward ?? this.profile.overflow_reward ?? '0'),
+        exchange_enabled: info.exchange_enabled !== false && info.exchangeEnabled !== false,
+        exchange_bind_address: String(info.exchange_bind_address ?? info.exchangeBindAddress ?? this.profile.exchange_bind_address ?? ''),
+        exchangeBindAddress: String(info.exchangeBindAddress ?? info.exchange_bind_address ?? this.profile.exchangeBindAddress ?? ''),
+      }
+    },
+    async hydrateAccount() {
+      if (hydratePromise) return hydratePromise
+      this.hydrating = true
+      hydratePromise = (async () => {
+        try {
+          // full 已含 aix-profile，不再二次 refreshProfile
+          await this.getUser('full')
+          if (this.isLogin) {
+            this.loadAccount = true
+            this.profileReady = true
+          }
+        } catch (error: any) {
+          const message = error?.response?.data?.message || error?.message || ''
+          const reason = error?.response?.data?.reason || ''
+          if (
+            reason === 'ACCOUNT_FROZEN'
+            || /账户已被冻结|ACCOUNT_FROZEN|登录过期|未登录|unauthorized|token|请先登录/i.test(String(message))
+          ) {
+            this.outLogin(true)
+            return
+          }
+          // 非鉴权失败：用已有 lite 数据放行，避免一直卡死资金操作
+          console.error('[hydrateAccount]', error)
+          if (this.isLogin) {
+            this.loadAccount = true
+            this.profileReady = true
+          }
+        } finally {
+          this.hydrating = false
+          hydratePromise = null
+        }
+      })()
+      return hydratePromise
     },
     async refreshProfile() {
       try {
@@ -482,31 +588,29 @@ export default defineStore('person', {
         }
       }
     },
-    /* 登录成功 */
+    /* 登录成功：先轻量进页，再后台补齐资料 */
     async loginSuccess(token?: string) {
       if (token) {
         localStorage.setItem('token', token)
         localStorage.setItem('account', ETH.account)
       }
-      await this.getUser()
-      try {
-        await this.refreshProfile()
-      } catch (error) {
-        // AIX profile 是增强数据，失败时保留 getUser 的基础数据并继续登录。
-        console.error('[loginSuccess:refreshProfile]', error)
-      }
-      this.isLogin = true
-      this.loadAccount = true
-      this.authError = ''
       this.authStage = 'verifying'
+      await this.getUser('lite')
+      this.isLogin = true
+      // lite 已有余额，先放行资金页；full 在后台补齐
+      this.loadAccount = true
+      this.profileReady = true
+      this.authError = ''
       removeInviteFromAddressBar()
       this.urlCode = ''
+      void this.hydrateAccount()
     },
     clearAuthentication(clearAddress = false, clearUserData = false) {
       const currentAddress = this.address
       const initializing = this.isInitializing
       clearAuthStorage()
       clearUserTimer()
+      hydratePromise = null
       if (clearUserData) {
         // 切换账户时必须清除上一账户的余额和团队数据，避免短暂串号展示。
         this.$reset()
@@ -515,6 +619,8 @@ export default defineStore('person', {
       }
       this.isLogin = false
       this.loadAccount = false
+      this.profileReady = false
+      this.hydrating = false
       this.sign = ''
       if (clearAddress) this.address = ''
     },

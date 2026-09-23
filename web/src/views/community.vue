@@ -74,9 +74,58 @@
         <div class="metric-group">
           <h4>{{ $t('community.performanceBreakdown') }}</h4>
           <div class="aix-metrics">
-            <div><span class="k">{{ $t('community.teamTotalPerformance') }}</span><span class="v">{{ formatNum(userinfo.total) }}</span></div>
-            <div><span class="k">{{ $t('community.regionalPerformance') }}</span><span class="v">{{ formatNum(userinfo.max) }}</span></div>
-            <div><span class="k">{{ $t('community.smallAreaPerformance') }}</span><span class="v">{{ formatNum(userinfo.min) }}</span></div>
+            <div class="metric-full">
+              <span class="k">{{ $t('community.teamTotalPerformance') }}</span>
+              <span class="v">{{ formatNum(perfTotals.team) }} <em class="unit">USDT</em></span>
+            </div>
+            <div class="metric-block">
+              <div class="metric-main">
+                <span class="k">{{ $t('community.regionalPerformance') }}</span>
+                <span class="metric-main-right">
+                  <span class="v">{{ formatNum(perfTotals.large) }} <em class="unit">USDT</em></span>
+                  <button
+                    type="button"
+                    class="area-expand-btn"
+                    :class="{ open: areaFundingOpen.large }"
+                    :aria-expanded="areaFundingOpen.large"
+                    :aria-label="$t('community.areaFundingToggle')"
+                    @click="areaFundingOpen.large = !areaFundingOpen.large"
+                  >
+                    <span class="area-expand-chevron" aria-hidden="true" />
+                  </button>
+                </span>
+              </div>
+              <div v-show="areaFundingOpen.large" class="metric-sub">
+                <div><span class="k">{{ $t('community.areaUsdtIn') }}</span><span class="v">{{ formatNum(areaFunding.large.usdt) }} <em class="unit">USDT</em></span></div>
+                <div><span class="k">{{ $t('community.areaWinIn') }}</span><span class="v">{{ formatWinQty(areaFunding.large.win) }} <em class="unit">WIN</em></span></div>
+                <div><span class="k">{{ $t('community.areaExchangeWin') }}</span><span class="v">{{ formatWinQty(areaFunding.large.exchangeWin) }} <em class="unit">WIN</em></span></div>
+                <div><span class="k">{{ $t('community.areaRewardIn') }}</span><span class="v">{{ formatNum(areaFunding.large.reward) }} <em class="unit">USDT</em></span></div>
+              </div>
+            </div>
+            <div class="metric-block">
+              <div class="metric-main">
+                <span class="k">{{ $t('community.smallAreaPerformance') }}</span>
+                <span class="metric-main-right">
+                  <span class="v">{{ formatNum(perfTotals.small) }} <em class="unit">USDT</em></span>
+                  <button
+                    type="button"
+                    class="area-expand-btn"
+                    :class="{ open: areaFundingOpen.small }"
+                    :aria-expanded="areaFundingOpen.small"
+                    :aria-label="$t('community.areaFundingToggle')"
+                    @click="areaFundingOpen.small = !areaFundingOpen.small"
+                  >
+                    <span class="area-expand-chevron" aria-hidden="true" />
+                  </button>
+                </span>
+              </div>
+              <div v-show="areaFundingOpen.small" class="metric-sub">
+                <div><span class="k">{{ $t('community.areaUsdtIn') }}</span><span class="v">{{ formatNum(areaFunding.small.usdt) }} <em class="unit">USDT</em></span></div>
+                <div><span class="k">{{ $t('community.areaWinIn') }}</span><span class="v">{{ formatWinQty(areaFunding.small.win) }} <em class="unit">WIN</em></span></div>
+                <div><span class="k">{{ $t('community.areaExchangeWin') }}</span><span class="v">{{ formatWinQty(areaFunding.small.exchangeWin) }} <em class="unit">WIN</em></span></div>
+                <div><span class="k">{{ $t('community.areaRewardIn') }}</span><span class="v">{{ formatNum(areaFunding.small.reward) }} <em class="unit">USDT</em></span></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -164,7 +213,10 @@
             :class="{ active: directLedgerTab === 'subscribe' }"
             :aria-selected="directLedgerTab === 'subscribe'"
             @click="switchDirectLedgerTab('subscribe')"
-          >{{ $t('community.downlineSubscribeAmount') }}</button>
+          >
+            <span class="tab-label">{{ $t('community.downlineSubscribeAmount') }}</span>
+            <span class="tab-total">{{ formatLedgerTotal(downlineSubscribeTotal) }}</span>
+          </button>
           <button
             type="button"
             role="tab"
@@ -172,7 +224,10 @@
             :class="{ active: directLedgerTab === 'recharge' }"
             :aria-selected="directLedgerTab === 'recharge'"
             @click="switchDirectLedgerTab('recharge')"
-          >{{ $t('community.downlineRechargeUsdt') }}</button>
+          >
+            <span class="tab-label">{{ $t('community.downlineRechargeUsdt') }}</span>
+            <span class="tab-total">{{ formatLedgerTotal(downlineRechargeTotal, 4) }}</span>
+          </button>
           <button
             type="button"
             role="tab"
@@ -180,7 +235,21 @@
             :class="{ active: directLedgerTab === 'rechargeWin' }"
             :aria-selected="directLedgerTab === 'rechargeWin'"
             @click="switchDirectLedgerTab('rechargeWin')"
-          >{{ $t('community.downlineRechargeWin') }}</button>
+          >
+            <span class="tab-label">{{ $t('community.downlineRechargeWin') }}</span>
+            <span class="tab-total">{{ formatLedgerTotal(downlineWinRechargeTotal, 4) }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="direct-ledger-tab"
+            :class="{ active: directLedgerTab === 'exchangeWin' }"
+            :aria-selected="directLedgerTab === 'exchangeWin'"
+            @click="switchDirectLedgerTab('exchangeWin')"
+          >
+            <span class="tab-label">{{ $t('community.downlineExchangeWin') }}</span>
+            <span class="tab-total">{{ formatLedgerTotal(downlineExchangeWinTotal, 4) }}</span>
+          </button>
         </div>
       </div>
 
@@ -252,6 +321,28 @@
         <p v-else class="empty-state">{{ $t('common.noData') }}</p>
       </div>
 
+      <div v-show="directLedgerTab === 'exchangeWin'" class="ledger is-three-col" role="tabpanel">
+        <div class="ledger-head">
+          <span>{{ $t('community.walletAddress') }}</span>
+          <span class="num">{{ $t('community.winAmount') }}</span>
+          <span class="time">{{ $t('community.time') }}</span>
+        </div>
+        <template v-if="downlineExchangeWinList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineExchangeWinList" :key="item.id || index">
+            <span class="aix-mono">{{ formatAddr(item.address) }}</span>
+            <span class="num">{{ formatRechargeAmount(item.amount) }}</span>
+            <span class="time">{{ item.createdAt }}</span>
+          </div>
+          <Pagination
+            v-model="downlineExchangeWinPage"
+            :page-count="downlineExchangeWinPageCount"
+            mode="simple"
+            @change="getDownlineExchangeWin"
+          />
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
+      </div>
+
 
       <div class="safe-bottom"></div>
     </div>
@@ -262,12 +353,13 @@
 import Header from '@/components/Header.vue'
 import TeamTreeNode from '@/components/TeamTreeNode.vue'
 import userPerson from '@/pinia/person'
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { showToast } from 'vant'
 import copy from 'copy-to-clipboard'
 import request from '@/tools/request'
 import { Pagination } from 'vant'
 import { useI18n } from 'vue-i18n'
+import { getAixProfile } from '@/api/aix'
 
 const person = userPerson()
 const { t: $t } = useI18n()
@@ -323,8 +415,7 @@ const saveUsername = async () => {
     const saved = String(res?.username || username).trim()
     if (person.profile) person.profile = { ...person.profile, username: saved }
     if (person.userinfo) person.userinfo = { ...person.userinfo, username: saved }
-    await Promise.allSettled([person.refreshProfile?.(), person.getUser?.()])
-    await loadTeamMembers()
+    await Promise.allSettled([person.refreshProfile?.(), loadTeamMembers()])
     editingUsername = false
     usernameDraft = ''
     showToast($t('community.usernameSaved'))
@@ -349,6 +440,37 @@ const overflowReward = computed(() => {
   return u.overflowReward ?? u.overflow_reward ?? p.overflow_reward ?? p.overflowReward ?? p.pending_mgmt_reward ?? 0
 })
 const incomeTotal = computed(() => userinfo.value?.all ?? 0)
+const areaFunding = computed(() => {
+  const raw = userinfo.value?.areaFunding || userinfo.value?.area_funding || {}
+  const empty = { usdt: '0', win: '0', exchangeWin: '0', reward: '0', totalUsdt: '0' }
+  return {
+    large: { ...empty, ...(raw.large || {}) },
+    small: { ...empty, ...(raw.small || {}) },
+    teamTotalUsdt: String(raw.teamTotalUsdt ?? raw.team_total_usdt ?? '0'),
+  }
+})
+const perfTotals = computed(() => {
+  const pickPositive = (primary: any, fallback: any) => {
+    const p = Number(primary)
+    if (Number.isFinite(p) && p > 0) return String(primary)
+    const f = Number(fallback)
+    if (Number.isFinite(f) && f > 0) return String(fallback)
+    if (primary != null && primary !== '') return String(primary)
+    if (fallback != null && fallback !== '') return String(fallback)
+    return '0'
+  }
+  const large = pickPositive(areaFunding.value.large.totalUsdt, userinfo.value?.max)
+  const small = pickPositive(areaFunding.value.small.totalUsdt, userinfo.value?.min)
+  return {
+    large,
+    small,
+    team: pickPositive(
+      areaFunding.value.teamTotalUsdt,
+      userinfo.value?.total ?? String(Number(large || 0) + Number(small || 0)),
+    ),
+  }
+})
+const areaFundingOpen = $ref({ large: false, small: false })
 const communitySubsidyTiers = [5, 10, 15]
 const communitySubsidyRate = computed(() => {
   const u = userinfo.value || {}
@@ -393,13 +515,20 @@ const levelLabel = computed(() => {
 let downlineOrderList = $ref<any[]>([])
 let downlinePage = $ref(1)
 let downlinePageCount = $ref(1)
+let downlineSubscribeTotal = $ref('0')
 let downlineRechargeList = $ref<any[]>([])
 let downlineRechargePage = $ref(1)
 let downlineRechargePageCount = $ref(1)
+let downlineRechargeTotal = $ref('0')
 let downlineWinRechargeList = $ref<any[]>([])
 let downlineWinRechargePage = $ref(1)
 let downlineWinRechargePageCount = $ref(1)
-let directLedgerTab = $ref<'subscribe' | 'recharge' | 'rechargeWin'>('subscribe')
+let downlineWinRechargeTotal = $ref('0')
+let downlineExchangeWinList = $ref<any[]>([])
+let downlineExchangeWinPage = $ref(1)
+let downlineExchangeWinPageCount = $ref(1)
+let downlineExchangeWinTotal = $ref('0')
+let directLedgerTab = $ref<'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin'>('subscribe')
 
 const formatAddress = (value: string) => {
   if (!value) return ''
@@ -414,6 +543,11 @@ const formatAddr = (value: string) => formatAddress(value) || '-'
 const formatNum = (value: any) => Number(value || 0).toFixed(2)
 const formatCount = (value: any) => Math.max(0, Number(value || 0)).toLocaleString()
 
+const formatWinQty = (value: any) => {
+  const amount = Number(value || 0)
+  return Number.isFinite(amount) ? amount.toFixed(4) : '0.0000'
+}
+
 const formatOrderAmount = (item: any) => {
   const amount = Number(item?.amount || 0)
   return Number.isFinite(amount) ? amount.toFixed(2) : '0.00'
@@ -422,6 +556,12 @@ const formatOrderAmount = (item: any) => {
 const formatRechargeAmount = (value: any) => {
   const amount = Number(value || 0)
   return Number.isFinite(amount) ? amount.toFixed(4) : '0.0000'
+}
+
+const formatLedgerTotal = (value: any, digits = 2) => {
+  const amount = Number(value || 0)
+  if (!Number.isFinite(amount)) return (0).toFixed(digits)
+  return amount.toFixed(digits)
 }
 
 const formatSubscribeType = (fundSource: string) => {
@@ -496,6 +636,7 @@ const getDownlineOrders = async (pageNum: number = 1) => {
   })
   downlinePageCount = Math.ceil((res.count || 0) / 10) || 1
   downlineOrderList = res.list || []
+  downlineSubscribeTotal = String(res.total_amount ?? res.totalAmount ?? '0')
 }
 
 const getDownlineRecharges = async (pageNum: number = 1) => {
@@ -504,24 +645,90 @@ const getDownlineRecharges = async (pageNum: number = 1) => {
   })
   downlineRechargePageCount = Math.ceil((res.count || 0) / 10) || 1
   downlineRechargeList = res.list || []
+  downlineRechargeTotal = String(res.total_amount ?? res.totalAmount ?? '0')
 }
 
 const getDownlineWinRecharges = async (pageNum: number = 1) => {
   const res: any = await request.get('app_server/downline_win_recharges', {
-    params: { page: pageNum },
+    params: { page: pageNum, source: 'chain' },
   })
   downlineWinRechargePageCount = Math.ceil((res.count || 0) / 10) || 1
   downlineWinRechargeList = res.list || []
+  downlineWinRechargeTotal = String(res.total_amount ?? res.totalAmount ?? '0')
 }
 
-const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin') => {
+const getDownlineExchangeWin = async (pageNum: number = 1) => {
+  const res: any = await request.get('app_server/downline_win_recharges', {
+    params: { page: pageNum, source: 'exchange' },
+  })
+  downlineExchangeWinPageCount = Math.ceil((res.count || 0) / 10) || 1
+  downlineExchangeWinList = res.list || []
+  downlineExchangeWinTotal = String(res.total_amount ?? res.totalAmount ?? '0')
+}
+
+const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin') => {
   if (directLedgerTab === tab) return
   directLedgerTab = tab
+  if (tab === 'subscribe' && downlineOrderList.length === 0) {
+    void getDownlineOrders(downlinePage)
+  }
   if (tab === 'recharge' && downlineRechargeList.length === 0) {
     void getDownlineRecharges(downlineRechargePage)
   }
   if (tab === 'rechargeWin' && downlineWinRechargeList.length === 0) {
     void getDownlineWinRecharges(downlineWinRechargePage)
+  }
+  if (tab === 'exchangeWin' && downlineExchangeWinList.length === 0) {
+    void getDownlineExchangeWin(downlineExchangeWinPage)
+  }
+}
+
+const applyTeamProfile = (res: Record<string, any>) => {
+  if (!res) return
+  person.profile = { ...person.profile, ...res }
+  const area = res.area_funding || res.areaFunding
+  const updates: Record<string, any> = {
+    teamActiveSubscribe: res.team_active_subscribe_principal ?? res.teamActiveSubscribePrincipal,
+    max: res.large_area_perf ?? res.largeAreaPerf,
+    min: res.small_area_perf ?? res.smallAreaPerf,
+    total: res.team_perf ?? res.teamPerf,
+    team: res.mgmt_reward_total ?? res.mgmtRewardTotal,
+    recommend: res.direct_reward_total ?? res.directRewardTotal,
+    overflowReward: res.overflow_reward ?? res.overflowReward,
+    overflow_reward: res.overflow_reward ?? res.overflowReward,
+    location: res.static_usdt_total ?? res.staticUsdtTotal,
+  }
+  if (area) {
+    const pick = (side: any) => ({
+      usdt: String(side?.usdt ?? '0'),
+      win: String(side?.win ?? '0'),
+      exchangeWin: String(side?.exchange_win ?? side?.exchangeWin ?? '0'),
+      reward: String(side?.reward ?? '0'),
+      totalUsdt: String(side?.total_usdt ?? side?.totalUsdt ?? '0'),
+    })
+    updates.areaFunding = {
+      large: pick(area.large || {}),
+      small: pick(area.small || {}),
+      teamTotalUsdt: String(area.team_total_usdt ?? area.teamTotalUsdt ?? '0'),
+    }
+  }
+  person.userinfo = { ...person.userinfo, ...updates }
+}
+
+let teamProfileLoading = false
+let areaFundingDetailLoaded = false
+const loadTeamHeavyProfile = async (force = false) => {
+  if (teamProfileLoading) return
+  if (!force && areaFundingDetailLoaded) return
+  teamProfileLoading = true
+  try {
+    const res: any = await getAixProfile({ include: 'area_funding,team_active' })
+    applyTeamProfile(res || {})
+    areaFundingDetailLoaded = true
+  } catch (error) {
+    console.error('[community:teamProfile]', error)
+  } finally {
+    teamProfileLoading = false
   }
 }
 
@@ -529,12 +736,12 @@ const refreshTeamPage = async () => {
   if (refreshLocked) return
   refreshLocked = true
   try {
-    await Promise.allSettled([person.getUser?.(), person.refreshProfile?.()])
+    // 先出成员树；重字段按需；流水只拉当前 Tab
+    areaFundingDetailLoaded = false
     await Promise.allSettled([
-      getDownlineOrders(downlinePage),
-      getDownlineRecharges(downlineRechargePage),
-      getDownlineWinRecharges(downlineWinRechargePage),
       loadTeamMembers(),
+      loadTeamHeavyProfile(true),
+      getDownlineOrders(downlinePage),
     ])
   } finally {
     refreshCooldownTimer = setTimeout(() => {
@@ -543,6 +750,15 @@ const refreshTeamPage = async () => {
     }, REFRESH_COOLDOWN_MS)
   }
 }
+
+watch(
+  () => [areaFundingOpen.large, areaFundingOpen.small] as const,
+  ([largeOpen, smallOpen]) => {
+    if (largeOpen || smallOpen) {
+      void loadTeamHeavyProfile()
+    }
+  },
+)
 
 onMounted(() => {
   refreshTeamPage()
@@ -687,6 +903,144 @@ onBeforeUnmount(() => {
 .metric-group .aix-metrics > :last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
+
+.metric-group .metric-full {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-group .metric-full .k,
+.metric-group .metric-main .k,
+.metric-group .metric-sub .k {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.metric-group .metric-full .v,
+.metric-group .metric-main .v,
+.metric-group .metric-sub .v {
+  display: inline;
+}
+
+.metric-group .metric-full .v,
+.metric-group .metric-main .v {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.metric-group .metric-full .unit,
+.metric-group .metric-main .unit {
+  margin-left: 2px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  opacity: 0.9;
+}
+
+.metric-group .metric-block {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric-group .metric-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.metric-group .metric-main-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.area-expand-btn {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--hair-2, rgba(255, 255, 255, 0.14));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2, #c8cdd3);
+  cursor: pointer;
+  transition: background var(--t-fast, 0.15s) var(--ease, ease),
+    border-color var(--t-fast, 0.15s) var(--ease, ease),
+    transform var(--t-fast, 0.15s) var(--ease, ease);
+}
+
+.area-expand-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.area-expand-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.area-expand-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 0.18s ease;
+}
+
+.area-expand-btn.open .area-expand-chevron {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.metric-group .metric-sub {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  margin-left: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.metric-group .metric-sub > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.metric-group .metric-sub .k {
+  font-size: 11px;
+  opacity: 0.75;
+  flex: 1 1 auto;
+}
+
+.metric-group .metric-sub .v {
+  font-size: 13px;
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.metric-group .metric-sub .unit {
+  margin-left: 2px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  opacity: 0.9;
+}
+
 .metric-group .metric-total {
   background: var(--accent-dim);
 }
@@ -780,30 +1134,51 @@ onBeforeUnmount(() => {
 
 .direct-ledger-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-top: 2px;
   width: 100%;
 }
 
 .direct-ledger-tab {
-  min-height: 30px;
+  min-height: 44px;
   min-width: 0;
   width: 100%;
-  padding: 0 6px;
+  padding: 6px 4px;
   border: 1px solid var(--hair-2);
-  border-radius: 999px;
+  border-radius: 12px;
   background: transparent;
   color: var(--text-3);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   cursor: pointer;
   transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+
+.direct-ledger-tab .tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-ledger-tab .tab-total {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0.92;
 }
 
 .direct-ledger-tab.active {
@@ -828,6 +1203,11 @@ onBeforeUnmount(() => {
 .ledger.is-three-col .ledger-head,
 .ledger.is-three-col .ledger-row {
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.95fr) minmax(0, 1fr);
+}
+
+.ledger.is-four-col .ledger-head,
+.ledger.is-four-col .ledger-row {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.85fr) minmax(0, 0.85fr) minmax(0, 0.95fr);
 }
 
 .ledger-head {

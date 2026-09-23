@@ -261,6 +261,8 @@ func (s *AdminLegacyService) rechargeListDB(ctx context.Context, q url.Values) *
 		db = db.Where("UPPER(r.asset) = ? AND r.tx_hash NOT LIKE ?", biz.TokenWIN, "admin-%")
 	case "win_a", "win-a", "win-a充值", "wina", "win_a_recharge":
 		db = db.Where("UPPER(r.asset) = ? AND r.tx_hash NOT LIKE ?", biz.TokenWINA, "admin-%")
+	case "sdt", "aix-usdt", "aix_usdt", "aix-usdt充值", "sdt充值", "sdt_recharge":
+		db = db.Where("UPPER(r.asset) = ? AND r.tx_hash NOT LIKE ?", biz.TokenSDT, "admin-%")
 	case "usdt", "usdt充值", "usdt_recharge":
 		db = db.Where("(UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL) AND r.tx_hash NOT LIKE ?", biz.TokenUSDT, "admin-%")
 	}
@@ -280,6 +282,7 @@ func (s *AdminLegacyService) rechargeStats(ctx context.Context, q url.Values) (m
 		UsdtTotal   decimal.Decimal
 		WinTotal    decimal.Decimal
 		WinATotal   decimal.Decimal
+		SdtTotal    decimal.Decimal
 		AdminTotal  decimal.Decimal
 	}
 	var row statRow
@@ -288,8 +291,9 @@ func (s *AdminLegacyService) rechargeStats(ctx context.Context, q url.Values) (m
 			COALESCE(SUM(CASE WHEN r.tx_hash LIKE 'admin-%' THEN r.amount ELSE 0 END),0) as admin_total,
 			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as win_total,
 			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as win_a_total,
+			COALESCE(SUM(CASE WHEN UPPER(r.asset) = ? AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as sdt_total,
 			COALESCE(SUM(CASE WHEN (UPPER(r.asset) = ? OR r.asset = '' OR r.asset IS NULL) AND r.tx_hash NOT LIKE 'admin-%' AND r.tx_hash NOT LIKE 'partner:%' THEN r.amount ELSE 0 END),0) as usdt_total`,
-			biz.TokenWIN, biz.TokenWINA, biz.TokenUSDT).
+			biz.TokenWIN, biz.TokenWINA, biz.TokenSDT, biz.TokenUSDT).
 		Scan(&row).Error
 	if err != nil {
 		return nil, err
@@ -299,6 +303,7 @@ func (s *AdminLegacyService) rechargeStats(ctx context.Context, q url.Values) (m
 		"usdtTotal":  row.UsdtTotal.String(),
 		"winTotal":   row.WinTotal.String(),
 		"winATotal":  row.WinATotal.String(),
+		"sdtTotal":   row.SdtTotal.String(),
 		"adminTotal": row.AdminTotal.String(),
 	}, nil
 }

@@ -144,6 +144,12 @@ function isActiveOrder(o: any): boolean {
   return status === 'active' || status === '1'
 }
 
+/** 后端订单终态：exited（主）/ completed（历史）/ 2（legacy 数字） */
+function isExitedStatus(status: unknown): boolean {
+  const s = String(status ?? '').toLowerCase()
+  return s === 'exited' || s === 'completed' || s === '2'
+}
+
 function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
   let exitTotal = 0
   let releasedTotal = 0
@@ -163,7 +169,7 @@ function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
       unexitedTotal += Math.max(0, exitTarget - released)
     }
     dailyReleaseTotal += calcOrderDailyRelease(o, withdrawReset)
-    if (o.status === 'completed' || o.status === '2') exitCount += 1
+    if (isExitedStatus(o.status)) exitCount += 1
   }
   return {
     exitTotal,
@@ -175,47 +181,50 @@ function sumOrderReleaseStats(orderList: any[], withdrawReset = false) {
   }
 }
 
-async function fetchUserInfo() {
+async function fetchUserInfo(options: { lite?: boolean } = {}) {
   if (!getToken()) {
     throw new Error('请先登录')
   }
+  const lite = Boolean(options.lite)
   try {
-    // 核心接口：失败才整体失败；releases 仅用于静态收益，失败不阻断
-    const [profileRes, balanceRes, ordersRes] = await Promise.all([
+    // 登录黑屏只等轻量接口；团队/流水等进页后再拉。
+    const [profileRes, balanceRes] = await Promise.all([
       authGet('/v1/auth/profile'),
       authGet('/v1/wallet/balance'),
-      authGet('/v1/wallet/subscribe-orders'),
     ])
     let aixProfile: any = {}
-    try {
-      const aixProfileRes = await authGet('/v1/wallet/aix-profile')
-      aixProfile = unwrapEntity(apiBody(aixProfileRes))
-    } catch {
-      aixProfile = {}
-    }
+    let orderList: any[] = []
     let releaseList: any[] = []
     let referralList: any[] = []
-    // 后端暂未提供生态奖励流水；累计值使用 profile.eco_reward_total。
     const ecoList: any[] = []
     let referralLoaded = false
-    try {
-      const releasesRes = await authGet('/v1/wallet/releases')
-      releaseList = apiBody(releasesRes).records || []
-    } catch {
-      releaseList = []
+
+    if (!lite) {
+      const [ordersRes, aixProfileSettled, releasesSettled, referralsSettled] = await Promise.allSettled([
+        authGet('/v1/wallet/subscribe-orders'),
+        authGet('/v1/wallet/aix-profile'),
+        authGet('/v1/wallet/releases'),
+        authGet('/v1/wallet/referral-rewards'),
+      ])
+      if (ordersRes.status === 'fulfilled') {
+        orderList = apiBody(ordersRes.value).orders || []
+      }
+      if (aixProfileSettled.status === 'fulfilled') {
+        aixProfile = unwrapEntity(apiBody(aixProfileSettled.value))
+      }
+      if (releasesSettled.status === 'fulfilled') {
+        releaseList = apiBody(releasesSettled.value).records || []
+      }
+      if (referralsSettled.status === 'fulfilled') {
+        referralList = apiBody(referralsSettled.value).rewards || []
+        referralLoaded = true
+      }
     }
-    try {
-      const referralsRes = await authGet('/v1/wallet/referral-rewards')
-      referralList = apiBody(referralsRes).rewards || []
-      referralLoaded = true
-    } catch {
-      referralList = []
-    }
+
     const p = unwrapEntity(apiBody(profileRes))
     const b = unwrapEntity(apiBody(balanceRes))
     // AIX 模式不提供传统商城商品；保留空数组兼容上游页面字段。
     const goods: any[] = []
-    const orderList = apiBody(ordersRes).orders || []
     const orderStats = sumOrderReleaseStats(orderList)
 
     const activeOrders = orderList.filter(isActiveOrder)
@@ -296,6 +305,7 @@ async function fetchUserInfo() {
 
     return {
       status: 'ok',
+      _lite: lite,
       level: p.community_level || '0',
       communityLevel: (() => {
         const lv = String(p.community_level || '').trim().toUpperCase()
@@ -306,10 +316,26 @@ async function fetchUserInfo() {
       })(),
       locationNum: String(inviteeCount),
       communityStake: p.community_stake || '0',
-      // 总业绩=伞下；小区=community_stake；大区=总-小区；等级仅看小区业绩
-      total: p.team_stake || '0',
-      max: String(Math.max(0, numOrZero(p.team_stake) - numOrZero(p.community_stake))),
-      min: p.community_stake || '0',
+      // 总业绩=伞下；优先用 aix-profile 的 team/large/small；否则回退 profile
+      total: firstText(aixProfile.team_perf, aixProfile.teamPerf, p.team_stake, '0'),
+      max: firstText(aixProfile.large_area_perf, aixProfile.largeAreaPerf, String(Math.max(0, numOrZero(p.team_stake) - numOrZero(p.community_stake))), '0'),
+      min: firstText(aixProfile.small_area_perf, aixProfile.smallAreaPerf, p.community_stake, '0'),
+      areaFunding: (() => {
+        const raw = aixProfile.area_funding || aixProfile.areaFunding || {}
+        const pick = (side: any) => ({
+          usdt: String(side?.usdt ?? '0'),
+          win: String(side?.win ?? '0'),
+          exchangeWin: String(side?.exchange_win ?? side?.exchangeWin ?? '0'),
+          reward: String(side?.reward ?? '0'),
+          totalUsdt: String(side?.total_usdt ?? side?.totalUsdt ?? '0'),
+        })
+        const mapped = {
+          large: pick(raw.large || {}),
+          small: pick(raw.small || {}),
+          teamTotalUsdt: String(raw.team_total_usdt ?? raw.teamTotalUsdt ?? '0'),
+        }
+        return mapped
+      })(),
       inviteUserAddress: p.inviter_address || '',
       inviteUrl: p.address || '',
       recommendNum: inviteeCount,
@@ -401,6 +427,22 @@ async function fetchUserInfo() {
       reward: firstText(aixProfile.usdt_reward, aixProfile.usdtReward, b.released_balance, '0'),
       aix: firstText(aixProfile.aix_balance, aixProfile.aixBalance, b.claimed_amount, '0'),
       win: firstText(aixProfile.win_balance, aixProfile.winBalance, '0'),
+      // lite 未拉 aix-profile，勿写死 0，否则会冲掉已有 WIN 充值余额
+      ...(lite
+        ? {}
+        : {
+            win_recharge: firstText(
+              aixProfile.win_recharge_balance,
+              aixProfile.winRechargeBalance,
+              '0',
+            ),
+            win_recharge_balance: firstText(
+              aixProfile.win_recharge_balance,
+              aixProfile.winRechargeBalance,
+              '0',
+            ),
+            win_balance: firstText(aixProfile.win_balance, aixProfile.winBalance, '0'),
+          }),
       usdtWithdrawable: firstText(aixProfile.usdt_withdrawable, aixProfile.usdtWithdrawable, '0'),
       amountUsdt: firstText(aixProfile.usdt_recharge, aixProfile.usdtRecharge, b.balance, '0'),
       balanceUsdt: firstText(aixProfile.usdt_recharge, aixProfile.usdtRecharge, b.balance, '0'),
@@ -431,6 +473,7 @@ async function fetchUserInfo() {
     throw err
   }
 }
+
 
 function mapWithdrawals(list: any[]) {
   return list.map((item) => {
@@ -464,12 +507,19 @@ function mapRecharges(list: any[]) {
   return (list || []).map((item, index) => {
     const createdRaw = item.created_at ?? item.createdAt
     const createdAt = formatUnixTime(createdRaw)
+    const txHash = String(item.tx_hash ?? item.txHash ?? '')
+    const sourceRaw = String(item.source || '').toLowerCase()
+    const source =
+      sourceRaw === 'exchange' || txHash.toLowerCase().startsWith('partner:')
+        ? 'exchange'
+        : 'chain'
     return {
       id: item.id ?? index,
       amount: trimAmountText(item.amount),
       status: String(item.status || 'pending').toLowerCase(),
-      tx_hash: item.tx_hash ?? item.txHash ?? '',
+      tx_hash: txHash,
       asset: String(item.asset || '').toUpperCase(),
+      source,
       createdAt,
       created_at: createdAt,
     }
@@ -514,8 +564,8 @@ function mapOrders(list: any[]) {
       released_amount: String(releasedRaw),
       exit_target: String(exitTargetRaw ?? exitTarget),
       exit_multiplier: item.exit_multiplier,
-      // 状态：1=收益中 2=已出局；倍率位前端复用 status，同步给出倍数文案字段
-      status: String(item.status || '').toLowerCase() === 'completed' ? '2' : '1',
+      // 状态：1=收益中 2=已出局（后端主值为 exited，兼兼容 completed / 数字 2）
+      status: isExitedStatus(item.status) ? '2' : '1',
       rate: String(item.exit_multiplier || mul),
       release_day: item.release_day,
       created_at: createdAt,
@@ -860,7 +910,13 @@ export async function adaptRequest(
       }
     }
     case 'app_server/user_info':
-      return fetchUserInfo()
+      return fetchUserInfo({
+        lite:
+          mergedParams?.lite === true
+          || mergedParams?.lite === '1'
+          || mergedParams?.lite === 1
+          || String(mergedParams?.mode || '').toLowerCase() === 'lite',
+      })
     case 'app_server/subscribe_tiers':
       return {
         min_subscribe_amount: 100,
@@ -1025,29 +1081,36 @@ export async function adaptRequest(
       })
       return {
         count: Number(body.count || 0),
+        total_amount: String(body.total_amount ?? body.totalAmount ?? '0'),
         list: records,
         page: Number(body.page || page),
       }
     }
     case 'app_server/downline_win_recharges': {
       const page = Math.max(1, Number(mergedParams.page) || 1)
-      const res = await authGet('/v1/wallet/downline-win-recharges', { page, page_size: 10 })
+      const source = String(mergedParams.source || '').toLowerCase()
+      const query: Record<string, any> = { page, page_size: 10 }
+      if (source === 'chain' || source === 'exchange') {
+        query.source = source
+      }
+      const res = await authGet('/v1/wallet/downline-win-recharges', query)
       const body = apiBody(res)
       const records = (body.records || []).map((item: any) => {
         const createdAt = formatUnixTime(item.created_at ?? item.createdAt)
-        const source = String(item.source || '').toLowerCase() === 'exchange' ? 'exchange' : 'chain'
+        const itemSource = String(item.source || '').toLowerCase() === 'exchange' ? 'exchange' : 'chain'
         return {
           id: item.id,
           address: item.address || '',
           amount: trimAmountText(item.amount),
           asset: 'WIN',
-          source,
+          source: itemSource,
           type: 'WIN',
           createdAt,
         }
       })
       return {
         count: Number(body.count || 0),
+        total_amount: String(body.total_amount ?? body.totalAmount ?? '0'),
         list: records,
         page: Number(body.page || page),
       }
@@ -1067,6 +1130,7 @@ export async function adaptRequest(
       }))
       return {
         count: Number(body.count || 0),
+        total_amount: String(body.total_amount ?? body.totalAmount ?? '0'),
         list: records,
         page: Number(body.page || page),
       }
@@ -1086,10 +1150,15 @@ export async function adaptRequest(
       const payFrom = data?.pay_from === 'reward' || data?.payFrom === 'reward'
         ? 'reward'
         : (data?.pay_from === 'win' || data?.payFrom === 'win' ? 'win' : 'recharge')
-      const res = await authPost('/v1/wallet/subscribe-aix', {
+      const payload: Record<string, any> = {
         amount,
         pay_from: payFrom,
-      })
+      }
+      const winAmount = String(data?.win_amount || data?.winAmount || '').trim()
+      if (payFrom === 'win' && winAmount) {
+        payload.win_amount = winAmount
+      }
+      const res = await authPost('/v1/wallet/subscribe-aix', payload)
       return { status: 'ok', ...res.data }
     }
     case 'app_server/deposit_win': {
@@ -1108,6 +1177,13 @@ export async function adaptRequest(
     }
     case 'app_server/deposit_win_list': {
       const res = await authGet('/v1/wallet/recharges-win')
+      const body = apiBody(res)
+      const list = mapRecharges(body.recharges || body.data?.recharges || [])
+      const pageData = paginateList(list, mergedParams.page)
+      return { status: 'ok', ...pageData }
+    }
+    case 'app_server/deposit_sdt_list': {
+      const res = await authGet('/v1/wallet/recharges-sdt')
       const body = apiBody(res)
       const list = mapRecharges(body.recharges || body.data?.recharges || [])
       const pageData = paginateList(list, mergedParams.page)

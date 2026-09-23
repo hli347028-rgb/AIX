@@ -13,7 +13,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// CreditPartnerWin 在单个事务内完成「查用户 → 加 win_recharge_balance → 落流水」。
+// CreditPartnerWin 在单个事务内完成「查用户 → 加 WIN 充值余额 → 落流水」。
+//
+// 业务约定：交易所划转无论 coin_type 是 WIN 还是 WIN-A，余额一律进入 win_recharge_balance；
+// Asset 字段仅用于管理端币种区分（流水仍记 WIN / WIN-A）。
 //
 // 对接文档 §2.1/§2.2 的两条硬约束在这里落地：
 //   - 三步同事务，不会出现「加了款没记录」或「有记录没加款」
@@ -27,6 +30,13 @@ func (r *walletRepo) CreditPartnerWin(ctx context.Context, in biz.PartnerCreditI
 	}
 	if idempotencyKey == "" || address == "" {
 		return nil, fmt.Errorf("invalid partner credit input")
+	}
+	asset := strings.ToUpper(strings.TrimSpace(in.Asset))
+	if asset == "" {
+		asset = biz.TokenWIN
+	}
+	if asset != biz.TokenWIN && asset != biz.TokenWINA {
+		return nil, fmt.Errorf("unsupported partner credit asset")
 	}
 
 	result := &biz.PartnerCreditResult{}
@@ -45,6 +55,7 @@ func (r *walletRepo) CreditPartnerWin(ctx context.Context, in biz.PartnerCreditI
 			}
 			var user UserPO
 			if err := tx.First(&user, existing.UserID).Error; err == nil {
+				// 划转余额统一在 WIN 充值钱包
 				result.NewBalance = user.WinRechargeBalance.String()
 			}
 			return nil
@@ -71,7 +82,7 @@ func (r *walletRepo) CreditPartnerWin(ctx context.Context, in biz.PartnerCreditI
 		now := time.Now()
 		recharge := &RechargePO{
 			UserID:        user.ID,
-			Asset:         biz.TokenWIN,
+			Asset:         asset, // 管理端区分币种；余额一律加 WIN
 			Amount:        amount,
 			TxHash:        idempotencyKey,
 			FromAddress:   address,
@@ -109,6 +120,7 @@ func (r *walletRepo) CreditPartnerWin(ctx context.Context, in biz.PartnerCreditI
 
 // SumPartnerCreditedSince 统计某合作方自 since 起已成功加款的总额。
 // 按 tx_hash 前缀匹配，可以走 tx_hash 唯一索引。
+// WIN / WIN-A 共用单日限额，故合计所有 partner 划转金额、不按 asset 过滤。
 func (r *walletRepo) SumPartnerCreditedSince(ctx context.Context, partnerID string, since time.Time) (string, error) {
 	partnerID = strings.TrimSpace(partnerID)
 	if partnerID == "" {
@@ -120,7 +132,7 @@ func (r *walletRepo) SumPartnerCreditedSince(ctx context.Context, partnerID stri
 		Where("tx_hash LIKE ?", biz.PartnerIdempotencyPrefix(partnerID)+"%").
 		Where("status = ?", biz.RechargeStatusConfirmed).
 		Where("created_time >= ?", since).
-		Select("COALESCE(SUM(amount), 0)").
+		Select("COALESCE(SUM(amount),0)").
 		Scan(&total).Error
 	if err != nil {
 		return "0", err

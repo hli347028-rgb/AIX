@@ -9,7 +9,7 @@
         @click.stop.prevent="openSidebar"
         @touchend.stop.prevent="openSidebar"
       >
-        <img src="/assets/aix-orbit-logo.jpeg" alt="AIX" />
+        <img src="/assets/aix-orbit-logo.webp" alt="AIX" />
         <span class="brand-menu" aria-hidden="true">
           <svg viewBox="0 0 18 18" fill="none">
             <rect x="3" y="3" width="4" height="4" rx="1" />
@@ -60,7 +60,7 @@
     </div>
     <Sidebar :visible="showSidebar" @close="showSidebar = false" />
     <AnnouncementDetailModal
-      :announcement="selectedAnnouncement"
+      :items="forcedModalItems"
       :forced="isForcedAnnouncement"
       @close="closeAnnouncement"
       @acknowledge="acknowledgeAnnouncement"
@@ -71,14 +71,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import userPerson from '@/pinia/person'
 import Sidebar from '@/components/Sidebar.vue'
 import AnnouncementDetailModal from '@/components/AnnouncementDetailModal.vue'
-import { getAnnouncementDetail, listAnnouncements, type AnnouncementItem, type AnnouncementPriority } from '@/api/aix'
+import { listAnnouncements, type AnnouncementItem, type AnnouncementPriority } from '@/api/aix'
 import { userLanguageOptions } from '@/i18n/languages'
 import { restartCurrentApp } from '@/tools/plaocRuntime'
 
 const person = userPerson()
+const router = useRouter()
 const acknowledgedKeys = ref<Set<string>>(new Set())
 const noticeStorageKey = (notice: AnnouncementItem) => {
   const baseKey = `aix-announcement-read:${notice.id || notice.title || 'latest'}`
@@ -101,16 +103,16 @@ const showLangDrawer = ref(false)
 const showSidebar = ref(false)
 const isWalletSwitching = ref(false)
 const announcements = ref<AnnouncementItem[]>([])
-const selectedAnnouncement = ref<AnnouncementItem | null>(null)
+const unreadQueue = ref<AnnouncementItem[]>([])
 const isForcedAnnouncement = ref(false)
 const address = computed(() => person.address)
-const noticePriority = computed<AnnouncementPriority>(() => {
-  const unreadAnnouncements = announcements.value.filter(item => !isAcknowledged(item))
-  if (unreadAnnouncements.some(item => item.priority === 'important')) return 'important'
-  if (unreadAnnouncements.some(item => item.priority === 'new')) return 'new'
-  return 'normal'
-})
-const noticeAriaLabel = computed(() => $t(`announcement.${noticePriority.value === 'important' ? 'viewImportant' : noticePriority.value === 'new' ? 'viewLatest' : 'view'}`))
+const hasUnread = computed(() => announcements.value.some((item) => !isAcknowledged(item)))
+const noticePriority = computed<AnnouncementPriority>(() => (hasUnread.value ? 'new' : 'normal'))
+const noticeAriaLabel = computed(() =>
+  $t(`announcement.${noticePriority.value === 'new' ? 'viewLatest' : 'view'}`),
+)
+/** 强制阅读：多条未读公告作为多页，一页一条 */
+const forcedModalItems = computed(() => (isForcedAnnouncement.value ? unreadQueue.value : []))
 const languages = userLanguageOptions
 watch(locale, value => {
   currentLanguage.value = value
@@ -120,10 +122,8 @@ const formatAddress = (value: string) => `${value.slice(0, 6)}...${value.slice(-
 const normalizeAnnouncements = (items: AnnouncementItem[] = []) =>
   items
     .filter((item) => item.status !== 'draft' && item.status !== 'archived')
-    .map((item, index) => ({
+    .map((item) => ({
       ...item,
-      // 后台未设优先级时：最新一条标 new，便于铃铛提示
-      priority: (item.priority || (index === 0 ? 'new' : 'normal')) as AnnouncementPriority,
       status: item.status || 'published',
     }))
 const openSidebar = () => { showSidebar.value = true }
@@ -136,8 +136,6 @@ const handleWalletClick = async () => {
   const token = localStorage.getItem('token')
   const account = localStorage.getItem('account')
   try {
-    // 复用项目既有的钱包登录入口：清除当前授权后，由应用初始化流程
-    // 重新获取钱包账户、签名挑战并换取登录 token。
     localStorage.removeItem('token')
     localStorage.removeItem('account')
     await restartCurrentApp()
@@ -148,54 +146,34 @@ const handleWalletClick = async () => {
     isWalletSwitching.value = false
   }
 }
-let announcementRequest = 0
-const showAnnouncement = async (notice: AnnouncementItem, forced: boolean) => {
-  const requestId = ++announcementRequest
-  isForcedAnnouncement.value = forced
-  selectedAnnouncement.value = notice
-  if (!notice.id) return
-  try {
-    const detail = await getAnnouncementDetail(notice.id)
-    if (requestId !== announcementRequest) return
-    selectedAnnouncement.value = detail
-  } catch {
-    // 列表数据可作为详情接口临时不可用时的降级内容。
-  }
-}
-const openAnnouncement = async () => {
-  const topNotice = announcements.value[0]
-  if (topNotice) await showAnnouncement(topNotice, false)
-}
-const dismissAnnouncement = () => {
-  announcementRequest += 1
-  isForcedAnnouncement.value = false
-  selectedAnnouncement.value = null
+/** 喇叭：查看历史公告列表（不强制） */
+const openAnnouncement = () => {
+  router.push('/announcements')
 }
 const closeAnnouncement = () => {
   if (isForcedAnnouncement.value) return
-  dismissAnnouncement()
+  isForcedAnnouncement.value = false
 }
 const acknowledgeAnnouncement = () => {
-  const notice = selectedAnnouncement.value
-  if (notice) markAcknowledged(noticeStorageKey(notice))
-  dismissAnnouncement()
+  // 翻完所有未读页后一次性确认，全部标记已读
+  for (const notice of unreadQueue.value) {
+    markAcknowledged(noticeStorageKey(notice))
+  }
+  unreadQueue.value = []
+  isForcedAnnouncement.value = false
 }
 
 onMounted(async () => {
   try {
-    const result = await listAnnouncements({ page: 1, page_size: 20 })
-    const rank: Record<AnnouncementPriority, number> = { important: 3, new: 2, normal: 1 }
-    announcements.value = normalizeAnnouncements(result.list || []).sort(
-      (left, right) => rank[right.priority || 'normal'] - rank[left.priority || 'normal'],
-    )
-
-    const unreadAnnouncement = announcements.value.find((item) => !isAcknowledged(item))
-    if (unreadAnnouncement) {
-      // 未读公告强制确认；内容来自管理后台公告列表
-      await showAnnouncement(unreadAnnouncement, true)
+    const result = await listAnnouncements({ page: 1, page_size: 100 })
+    announcements.value = normalizeAnnouncements(result.list || [])
+    unreadQueue.value = announcements.value.filter((item) => !isAcknowledged(item))
+    if (unreadQueue.value.length > 0) {
+      isForcedAnnouncement.value = true
     }
   } catch {
     announcements.value = []
+    unreadQueue.value = []
   }
 })
 </script>

@@ -1,34 +1,50 @@
 <template>
-  <!-- Header 已经把本组件传送到 body。这里不再嵌套 Teleport：部分钱包的旧
-       WebView 在同一目标上嵌套传送时会留下一个遮罩，却没有挂载弹窗内容。 -->
-  <div v-if="announcement" class="notice-overlay" role="presentation" @click.self="requestClose">
+  <div v-if="visible" class="notice-overlay" role="presentation" @click.self="requestClose">
     <article class="notice-modal" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="forced ? instructionId : undefined">
       <header class="notice-head">
         <div>
-          <span v-if="announcement.priority === 'important'" class="notice-level notice-level--important">!!! {{ $t('announcement.important') }}</span>
-          <span v-else-if="announcement.priority === 'new'" class="notice-level notice-level--new">NEW {{ $t('announcement.latest') }}</span>
+          <span v-if="forced" class="notice-level notice-level--new">NEW {{ $t('announcement.latest') }}</span>
           <span v-else class="notice-level">{{ $t('announcement.notice') }}</span>
-          <h2 :id="titleId">{{ announcement.title || $t('announcement.details') }}</h2>
+          <h2 :id="titleId">{{ current.title || $t('announcement.details') }}</h2>
           <time v-if="noticeTime">{{ noticeTime }}</time>
         </div>
         <button v-if="!forced" type="button" class="notice-close" :aria-label="$t('announcement.close')" @click="requestClose">×</button>
       </header>
 
-      <p v-if="forced" :id="instructionId" class="notice-instruction">{{ $t('announcement.readBeforeConfirm') }}</p>
-      <div ref="bodyEl" class="notice-body" @scroll.passive="checkReadProgress">
-        <img
-          v-if="announcement.image_url"
-          class="notice-image"
-          :src="announcement.image_url"
-          :alt="announcement.title || $t('announcement.imageAlt')"
-          @load="checkReadProgress"
-        />
-        <div v-if="announcement.content" class="notice-content" v-html="announcement.content"></div>
-        <p v-else-if="announcement.summary" class="notice-summary">{{ announcement.summary }}</p>
+      <p v-if="forced" :id="instructionId" class="notice-instruction">
+        {{ $t('announcement.readBeforeConfirm') }}
+      </p>
+
+      <div class="notice-body">
+        <div v-if="loadingDetail" class="notice-loading">{{ $t('announcement.loading') }}</div>
+        <template v-else>
+          <img
+            v-if="current.image_url"
+            class="notice-image"
+            :src="current.image_url"
+            :alt="current.title || $t('announcement.imageAlt')"
+          />
+          <div v-if="current.content" class="notice-content" v-html="current.content"></div>
+          <p v-else-if="current.summary" class="notice-summary">{{ current.summary }}</p>
+        </template>
       </div>
+
+      <div v-if="totalPages > 1" class="notice-pager">
+        <button type="button" class="pager-btn" :disabled="currentPage <= 1 || loadingDetail" @click="goPrev">
+          {{ $t('announcement.prevPage') }}
+        </button>
+        <span class="pager-indicator">{{ $t('announcement.pageOf', { current: currentPage, total: totalPages }) }}</span>
+        <button type="button" class="pager-btn" :disabled="currentPage >= totalPages || loadingDetail" @click="goNext">
+          {{ $t('announcement.nextPage') }}
+        </button>
+      </div>
+      <div v-else class="notice-pager notice-pager--single">
+        <span class="pager-indicator">{{ $t('announcement.pageOf', { current: 1, total: 1 }) }}</span>
+      </div>
+
       <footer>
-        <button type="button" :disabled="!hasReadThrough" @click="acknowledge">
-          {{ $t(hasReadThrough ? 'announcement.acknowledged' : 'announcement.keepReading') }}
+        <button type="button" :disabled="!canConfirm" @click="acknowledge">
+          {{ $t(canConfirm ? 'announcement.acknowledged' : 'announcement.keepReading') }}
         </button>
       </footer>
     </article>
@@ -36,60 +52,108 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { AnnouncementItem } from '@/api/aix'
+import { getAnnouncementDetail, type AnnouncementItem } from '@/api/aix'
 
 const { t: $t } = useI18n()
-const props = withDefaults(defineProps<{ announcement: AnnouncementItem | null; forced?: boolean }>(), { forced: false })
+const props = withDefaults(
+  defineProps<{
+    items?: AnnouncementItem[]
+    forced?: boolean
+  }>(),
+  { items: () => [], forced: false },
+)
 const emit = defineEmits<{ (event: 'close'): void; (event: 'acknowledge'): void }>()
+
 const titleId = 'announcement-detail-title'
 const instructionId = 'announcement-read-instruction'
-const bodyEl = ref<HTMLElement | null>(null)
-const hasReadThrough = ref(false)
-const noticeTime = computed(() => props.announcement?.published_at || props.announcement?.created_at || '')
-const requestClose = () => { if (!props.forced) emit('close') }
+const currentPage = ref(1)
+const reachedLastPage = ref(false)
+const loadingDetail = ref(false)
+const detailCache = ref<Record<number, AnnouncementItem>>({})
+
+const visible = computed(() => (props.items?.length || 0) > 0)
+const totalPages = computed(() => Math.max(1, props.items?.length || 0))
+const current = computed<AnnouncementItem>(() => {
+  const list = props.items || []
+  const base = list[currentPage.value - 1] || {}
+  const id = Number(base.id || 0)
+  if (id && detailCache.value[id]) {
+    return { ...base, ...detailCache.value[id] }
+  }
+  return base
+})
+const noticeTime = computed(() => current.value.published_at || current.value.created_at || '')
+const canConfirm = computed(() => {
+  if (!visible.value || loadingDetail.value) return false
+  if (totalPages.value <= 1) return true
+  return reachedLastPage.value && currentPage.value >= totalPages.value
+})
+
+const requestClose = () => {
+  if (!props.forced) emit('close')
+}
 const acknowledge = () => {
-  if (!hasReadThrough.value) return
+  if (!canConfirm.value) return
   emit('acknowledge')
 }
 
-const BOTTOM_THRESHOLD = 16
-
-const checkReadProgress = () => {
-  const el = bodyEl.value
-  if (!el) return
-  const overflow = el.scrollHeight - el.clientHeight
-  if (overflow <= BOTTOM_THRESHOLD) {
-    hasReadThrough.value = true
-    return
+const loadCurrentDetail = async () => {
+  const list = props.items || []
+  const item = list[currentPage.value - 1]
+  const id = Number(item?.id || 0)
+  if (!id) return
+  if (detailCache.value[id]?.content) return
+  loadingDetail.value = true
+  try {
+    const detail = await getAnnouncementDetail(id)
+    detailCache.value = { ...detailCache.value, [id]: detail }
+  } catch {
+    // 列表内容可作降级
+  } finally {
+    loadingDetail.value = false
   }
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - BOTTOM_THRESHOLD) {
-    hasReadThrough.value = true
-  }
 }
 
-const bindContentImages = () => {
-  bodyEl.value?.querySelectorAll('img').forEach((img) => {
-    if (img.complete) return
-    img.addEventListener('load', checkReadProgress, { once: true })
-    img.addEventListener('error', checkReadProgress, { once: true })
-  })
+const goPrev = async () => {
+  if (currentPage.value <= 1) return
+  currentPage.value -= 1
+  await loadCurrentDetail()
+}
+const goNext = async () => {
+  if (currentPage.value >= totalPages.value) return
+  currentPage.value += 1
+  if (currentPage.value >= totalPages.value) reachedLastPage.value = true
+  await loadCurrentDetail()
 }
 
-const resetReadProgress = async () => {
-  hasReadThrough.value = false
-  await nextTick()
-  bindContentImages()
-  checkReadProgress()
-  requestAnimationFrame(checkReadProgress)
+const resetPager = async () => {
+  currentPage.value = 1
+  reachedLastPage.value = (props.items?.length || 0) <= 1
+  detailCache.value = {}
+  await loadCurrentDetail()
 }
 
-watch(() => props.announcement, value => {
-  document.body.style.overflow = value ? 'hidden' : ''
-  if (value) resetReadProgress()
-}, { immediate: true })
-onBeforeUnmount(() => { document.body.style.overflow = '' })
+watch(
+  () => props.items,
+  (items) => {
+    document.body.style.overflow = items && items.length ? 'hidden' : ''
+    if (items && items.length) resetPager()
+  },
+  { immediate: true, deep: true },
+)
+
+watch(
+  () => currentPage.value,
+  (page) => {
+    if (page >= totalPages.value) reachedLastPage.value = true
+  },
+)
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = ''
+})
 </script>
 
 <style scoped lang="scss">
@@ -100,7 +164,6 @@ onBeforeUnmount(() => { document.body.style.overflow = '' })
   right: 0;
   bottom: 0;
   left: 0;
-  /* inset 是增强项；四方向定位保证旧 Android WebView 也能铺满。 */
   inset: 0;
   display: flex;
   align-items: center;
@@ -158,11 +221,6 @@ onBeforeUnmount(() => { document.body.style.overflow = '' })
   color: #0052ff;
 }
 
-.notice-level--important {
-  color: #df1f32;
-  animation: urgent-pulse 1.3s ease-in-out infinite;
-}
-
 h2 {
   margin: 0;
   color: #101827;
@@ -194,9 +252,17 @@ time {
 
 .notice-body {
   flex: 1;
-  min-height: 0;
+  min-height: 160px;
+  max-height: 46vh;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 18px 24px;
+}
+
+.notice-loading {
+  color: #7e899c;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
 }
 
 .notice-image {
@@ -232,8 +298,44 @@ time {
   color: #0052ff;
 }
 
+.notice-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 22px 0;
+}
+
+.notice-pager--single {
+  justify-content: center;
+}
+
+.pager-btn {
+  min-width: 72px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 82, 255, 0.22);
+  border-radius: 17px;
+  background: #f2f5ff;
+  color: #0052ff;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pager-indicator {
+  color: #627089;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 footer {
-  padding: 24px 22px;
+  padding: 18px 22px 24px;
 }
 
 footer button {
@@ -264,16 +366,9 @@ footer button:not(:disabled):active {
     opacity: 0;
     transform: translateY(14px) scale(0.97);
   }
-
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes urgent-pulse {
-  50% {
-    opacity: 0.48;
   }
 }
 
@@ -295,17 +390,21 @@ footer button:not(:disabled):active {
   }
 
   .notice-body {
-    padding: 18px 20px;
+    padding: 16px 20px;
+    max-height: 48vh;
+  }
+
+  .notice-pager {
+    padding: 12px 20px 0;
   }
 
   footer {
-    padding: 20px 20px calc(18px + env(safe-area-inset-bottom));
+    padding: 16px 20px calc(18px + env(safe-area-inset-bottom));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .notice-modal,
-  .notice-level--important {
+  .notice-modal {
     animation: none;
   }
 }

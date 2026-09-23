@@ -11,6 +11,8 @@ curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only" || echo "[$TS] deposi
 echo
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only_win" || echo "[$TS] deposit_only_win FAILED"
 echo
+curl -fsS --max-time 15 "$BASE/api/admin_dhb/deposit_only_sdt" || echo "[$TS] deposit_only_sdt FAILED"
+echo
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/win_price_oracle" || echo "[$TS] win_price_oracle FAILED"
 echo
 curl -fsS --max-time 15 "$BASE/api/admin_dhb/withdraw_payout" || echo "[$TS] withdraw_payout FAILED"

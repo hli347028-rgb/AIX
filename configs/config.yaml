@@ -1,10 +1,10 @@
 server:
   http:
     addr: 0.0.0.0:9000
-    timeout: 5s
+    timeout: 30s
   grpc:
     addr: 0.0.0.0:9100
-    timeout: 5s
+    timeout: 30s
 data:
   database:
     driver: mysql
@@ -35,6 +35,9 @@ auth:
     - account: user3
       password: user3
       modules: []
+    - account: user4
+      password: user4
+      modules: []
   challenge_ttl: 5m
   open_api_keys:
     - "******"
@@ -57,8 +60,9 @@ transfer_partners:
       rate_limit_per_sec: 10
 wallet:
   deposit_contract: "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
-  win_deposit_contract: "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
+  win_deposit_contract: "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
   win_a_deposit_contract: "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
+  sdt_deposit_contract: "0x285d60af560663c5538D8fa8214361713B6c00aD"  # AIX-USDT BuySomething
   deposit_address: "0xB8726F15099956183C3a0431791458A096404Ca6"
   deposit_addresses:
     - "0xB8726F15099956183C3a0431791458A096404Ca6"
@@ -102,7 +106,7 @@ wallet:
   ave_kline_token_id: "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
   # 向交易所划转 AIX-USDT（WinBit 入金 POST /v2/winA/aixInbound）
   # 最低额默认 500，管理后台可调。
-  exchange_transfer_enabled: true
+  exchange_transfer_enabled: false
   exchange_transfer_api_url: "https://api.bitwinex.cloud/v2/winA/aixInbound"
   exchange_transfer_partner_id: "AIX10001"
   exchange_transfer_secret_keys_file: "configs/secrets/partner-AIX10001.test.key"

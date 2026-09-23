@@ -3,7 +3,7 @@
     <div v-if="visible" class="sidebar-overlay" @click="close">
       <aside class="sidebar" :aria-label="$t('futurefi.navigation')" @click.stop>
         <div class="ambient-logo" aria-hidden="true">
-          <img src="/assets/aix-orbit-logo.jpeg" alt="" />
+          <img src="/assets/aix-orbit-logo.webp" alt="" />
         </div>
 
         <header class="sidebar-head">

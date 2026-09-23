@@ -32,7 +32,7 @@
 
       <div class="reward-balance-row">
         <span>{{ balanceLabel }}</span>
-        <strong>{{ sourceBalance }} {{ currencyLabel }}</strong>
+        <strong>{{ balanceDisplay }} {{ currencyLabel }}</strong>
       </div>
 
       <section class="transfer-form">
@@ -92,7 +92,7 @@
         <button
           type="button"
           class="aix-btn transfer-submit"
-          :disabled="!canSubmit || loading"
+          :disabled="!canSubmit || loading || !fundsReady"
           @click="submitTransfer"
         >
           {{ loading ? $t('transfer.processing') : $t('transfer.confirm') }}
@@ -276,6 +276,8 @@ const boundExchangeAddress = computed(() => {
   return raw
 })
 const sourceBalance = computed(() => (transferMode.value === 'exchange' ? pointsBalance.value : rewardBalance.value))
+const fundsReady = computed(() => Boolean(person.loadAccount && person.profileReady))
+const balanceDisplay = computed(() => (fundsReady.value ? sourceBalance.value : $t('common.loading')))
 const currencyLabel = computed(() => (transferMode.value === 'exchange' ? 'AIX-USDT' : 'USDT'))
 const balanceLabel = computed(() =>
   transferMode.value === 'exchange' ? $t('transfer.aixUsdtBalance') : $t('transfer.rewardBalance'),
@@ -477,6 +479,10 @@ const fillAll = () => {
 }
 
 const submitTransfer = async () => {
+  if (!fundsReady.value) {
+    showFailToast($t('common.accountLoading'))
+    return
+  }
   if (loading.value) return
   if (!isPositiveAmount(amount.value)) {
     showFailToast($t('transfer.amountMustBePositive'))

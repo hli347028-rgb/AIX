@@ -1,10 +1,10 @@
 server:
   http:
     addr: 0.0.0.0:9000
-    timeout: 5s
+    timeout: 30s
   grpc:
     addr: 0.0.0.0:9100
-    timeout: 5s
+    timeout: 30s
 data:
   database:
     driver: mysql
@@ -35,6 +35,9 @@ auth:
     - account: user3
       password: user3
       modules: []
+    - account: user4
+      password: user4
+      modules: []
   challenge_ttl: 5m
   # 第三方 Open API 密钥（可配置多个）；请求头 X-API-Key: <key>
   open_api_keys:
@@ -42,8 +45,9 @@ auth:
 wallet:
   deposit_contract: "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
   # 原生 WIN 充值合约（BuySomething payable）
-  win_deposit_contract: "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
+  win_deposit_contract: "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
   win_a_deposit_contract: "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
+  sdt_deposit_contract: "0x285d60af560663c5538D8fa8214361713B6c00aD"  # AIX-USDT BuySomething
   # WIN-A 链上充值开关；false 时用户端显示暂未开放且不入账
   win_a_recharge_enabled: true
   deposit_address: "replace-with-your-deposit-address"

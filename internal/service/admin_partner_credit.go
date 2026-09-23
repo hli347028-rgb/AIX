@@ -24,6 +24,7 @@ type partnerCreditRow struct {
 	ID          int64
 	Address     string
 	Amount      decimal.Decimal
+	Asset       string
 	TxHash      string
 	CreatedTime time.Time
 }
@@ -32,7 +33,7 @@ func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Valu
 	db := s.data.DB().WithContext(ctx).
 		Table("recharges r").
 		Select(`r.id, COALESCE(NULLIF(r.from_address,''), u.address) as address,
-			r.amount, r.tx_hash, r.created_time`).
+			r.amount, r.asset, r.tx_hash, r.created_time`).
 		Joins("JOIN users u ON u.id = r.user_id").
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
 		Where("r.tx_hash LIKE ?", "partner:%")
@@ -48,6 +49,13 @@ func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Valu
 	}
 	if partnerID != "" {
 		db = db.Where("r.tx_hash LIKE ?", biz.PartnerIdempotencyPrefix(partnerID)+"%")
+	}
+	asset := strings.ToUpper(strings.TrimSpace(firstNonEmpty(q.Get("asset"), q.Get("coin"))))
+	if lower := strings.ToLower(asset); lower == "undefined" || lower == "null" {
+		asset = ""
+	}
+	if asset != "" {
+		db = db.Where("UPPER(r.asset) = ?", asset)
 	}
 	start, end := parseLegacyTimeRange(q)
 	if start != nil {
@@ -76,12 +84,12 @@ func (s *AdminLegacyService) partnerCreditStats(ctx context.Context, q url.Value
 	}, nil
 }
 
-// sumPartnerCreditWin 统计合作方（交易所）划转进来的 WIN。
-// 加款记录只增不删；since 非空时仅统计该时间之后的划转。
-func (s *AdminLegacyService) sumPartnerCreditWin(ctx context.Context, since *time.Time) (decimal.Decimal, error) {
+// sumPartnerCreditByAsset 统计合作方划转入账（按 asset：WIN / WIN-A）。
+func (s *AdminLegacyService) sumPartnerCreditByAsset(ctx context.Context, asset string, since *time.Time) (decimal.Decimal, error) {
 	db := s.data.DB().WithContext(ctx).Table("recharges").
 		Where("status = ?", biz.RechargeStatusConfirmed).
-		Where("tx_hash LIKE ?", "partner:%")
+		Where("tx_hash LIKE ?", "partner:%").
+		Where("UPPER(asset) = ?", strings.ToUpper(strings.TrimSpace(asset)))
 	if since != nil {
 		db = db.Where("created_time >= ?", *since)
 	}
@@ -108,7 +116,8 @@ func (s *AdminLegacyService) HandlePartnerCreditList(ctx khttp.Context) error {
 
 	var rows []partnerCreditRow
 	if err := s.partnerCreditListDB(ctx, q).
-		Order("r.id desc").Limit(pageSize).Offset(offset).
+		Order("r.id DESC").
+		Offset(offset).Limit(pageSize).
 		Scan(&rows).Error; err != nil {
 		return errors.InternalServer("DB_ERROR", "查询失败")
 	}
@@ -116,33 +125,35 @@ func (s *AdminLegacyService) HandlePartnerCreditList(ctx khttp.Context) error {
 	list := make([]map[string]interface{}, 0, len(rows))
 	for _, r := range rows {
 		partnerID, nonce := splitPartnerTxHash(r.TxHash)
+		asset := strings.TrimSpace(r.Asset)
+		if asset == "" {
+			asset = biz.TokenWIN
+		}
 		list = append(list, map[string]interface{}{
 			"id":        r.ID,
 			"partnerId": partnerID,
-			"nonce":     nonce,
 			"address":   r.Address,
-			"asset":     biz.TokenWIN,
 			"amount":    r.Amount.String(),
+			"asset":     asset,
+			"coinType":  partnerCoinTypeFromAsset(asset),
 			"aixTxnId":  biz.FormatAixTxnID(r.ID, r.CreatedTime),
+			"nonce":     nonce,
 			"createdAt": formatLegacyTime(r.CreatedTime),
 		})
 	}
 
-	total := int64(0)
-	if v, ok := stats["totalCount"].(int64); ok {
-		total = v
-	}
+	var total int64
+	_ = s.partnerCreditListDB(ctx, q).Count(&total).Error
+
 	return ctx.Result(200, map[string]interface{}{
-		"list":     list,
-		"count":    total,
-		"page":     page,
-		"pageSize": pageSize,
-		"stats":    stats,
+		"list":  list,
+		"count": total,
+		"page":  page,
+		"stats": stats,
 	})
 }
 
 // HandlePartnerCreditPartners GET /api/admin_dhb/partner_credit_partners
-// 返回已配置的合作方列表，供前端筛选下拉使用。
 func (s *AdminLegacyService) HandlePartnerCreditPartners(ctx khttp.Context) error {
 	if err := s.requireAdmin(ctx); err != nil {
 		return err
@@ -160,12 +171,25 @@ func (s *AdminLegacyService) HandlePartnerCreditPartners(ctx khttp.Context) erro
 }
 
 // splitPartnerTxHash 从 "partner:{partner_id}:{nonce}" 中拆出两段。
-// nonce 本身不含冒号，但用 SplitN 保证即使含也归到 nonce 一侧。
 func splitPartnerTxHash(txHash string) (partnerID, nonce string) {
 	rest := strings.TrimPrefix(strings.TrimSpace(txHash), "partner:")
 	parts := strings.SplitN(rest, ":", 2)
-	if len(parts) != 2 {
-		return rest, ""
+	if len(parts) == 0 {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
 	}
 	return parts[0], parts[1]
+}
+
+func partnerCoinTypeFromAsset(asset string) int {
+	switch strings.ToUpper(strings.TrimSpace(asset)) {
+	case biz.TokenWINA, "WINA":
+		return biz.PartnerCoinTypeWINA
+	case biz.TokenWIN:
+		return biz.PartnerCoinTypeWIN
+	default:
+		return biz.PartnerCoinTypeUnsupported
+	}
 }

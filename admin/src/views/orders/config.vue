@@ -48,11 +48,11 @@ const MODULE_OPTIONS = [
 ]
 
 function isModulesConfigId(id) {
-    return id === 102 || id === 104 || id === 106
+    return id === 102 || id === 104 || id === 106 || id === 108
 }
 
 function isPasswordConfigId(id) {
-    return id === 101 || id === 103 || id === 105
+    return id === 101 || id === 103 || id === 105 || id === 107
 }
 
 function formatModulesDisplay(raw) {
@@ -152,7 +152,7 @@ export default {
                 return
             }
 
-            let hint = '静态利率填百分数如 0.5；直推/W 收益系数填小数如 0.2 表示 20%；W 晋级金额为小区业绩门槛且必须逐级递增；出局倍数默认 4；USDT/WIN 充值最小值须 ≥ 10；提现审核阈值填 0 表示不审核；AIX兑换审核阈值填百分数如 40，表示全网当日兑换超过全网总AIX的40%后后续需审核（默认100）；交易所划转限额须满足：单笔下限 ≤ 单笔上限 ≤ 单日上限'
+            let hint = '静态利率填百分数如 0.5；直推/W 收益系数填小数如 0.2 表示 20%；W 晋级金额为小区业绩门槛且必须逐级递增；出局倍数默认 4；USDT/WIN 充值最小值须 ≥ 10；提现审核阈值填 0 表示不审核；AIX兑换审核阈值填百分数如 40，表示全网当日兑换超过全网总AIX的40%后后续需审核（默认100）；交易所划转限额 WIN/WIN-A 共用且须满足：单笔下限 ≤ 单笔上限 ≤ 单日上限；开通币种填如 1,2（1=WIN，2=WIN-A）'
             if (isPasswordConfigId(id)) {
                 hint = '子账户登录密码，修改后立即生效。'
             }

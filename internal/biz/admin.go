@@ -196,6 +196,34 @@ func (uc *AdminUsecase) SetFrozenTeam(ctx context.Context, tokenString string, r
 	return len(ids), nil
 }
 
+// SetExchangeEnabledTeam 关闭/开启该账户及其全部下级的 AIX 兑换功能。
+func (uc *AdminUsecase) SetExchangeEnabledTeam(ctx context.Context, tokenString string, rootUserID int64, enabled bool) (affected int, err error) {
+	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
+		return 0, err
+	}
+	if rootUserID <= 0 {
+		return 0, errors.BadRequest("INVALID_USER", "用户无效")
+	}
+	root, err := uc.userRepo.FindByID(ctx, rootUserID)
+	if err != nil {
+		return 0, err
+	}
+	if root == nil {
+		return 0, errors.NotFound("USER_NOT_FOUND", "用户不存在")
+	}
+	under, err := uc.userRepo.ListUserIDsUnder(ctx, rootUserID)
+	if err != nil {
+		return 0, err
+	}
+	ids := make([]int64, 0, 1+len(under))
+	ids = append(ids, rootUserID)
+	ids = append(ids, under...)
+	if err := uc.userRepo.SetExchangeEnabledForUsers(ctx, ids, enabled); err != nil {
+		return 0, err
+	}
+	return len(ids), nil
+}
+
 // SetUserInviter 后台修改用户上级（按钱包地址），并刷新团队业绩。
 func (uc *AdminUsecase) SetUserInviter(ctx context.Context, tokenString string, userID int64, inviterAddress string) error {
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
@@ -383,6 +411,7 @@ func (uc *AdminUsecase) buildConfigSnapshot() *conf.SystemConfigSnapshot {
 		PartnerMinAmount:           PartnerMinAmount,
 		PartnerMaxAmount:           PartnerMaxAmount,
 		PartnerDailyLimit:          PartnerDailyLimit,
+		PartnerCreditCoinTypes:     PartnerCreditCoinTypes,
 		ExchangeReviewThresholdPercent: ExchangeReviewThresholdPercent,
 		ExchangeTransferMinAmount:      ExchangeTransferMinAmount,
 		AdminSubAccounts:           append([]conf.AdminSubAccount(nil), uc.authCfg.GetAdminSubAccounts()...),
@@ -509,7 +538,24 @@ func (uc *AdminUsecase) TriggerSettlement(ctx context.Context, tokenString, sett
 	if _, err := uc.requireAdmin(ctx, tokenString); err != nil {
 		return err
 	}
-	return errors.Forbidden("SETTLEMENT_SYSTEM_ONLY", "每日结算仅由系统在中国时区 0 点自动执行，后台无法手动触发")
+	settlementDate = strings.TrimSpace(settlementDate)
+	if settlementDate == "" {
+		settlementDate = TodaySettlementDate(token.NowChina())
+	}
+	quotaDate := chinaDate(token.NowChina())
+	// 后台异步执行，避免 HTTP 超时中断长达数分钟的日结。
+	go func(date, qdate string) {
+		bg := context.Background()
+		if err := uc.settlement.EnsureDailyExchangeQuota(bg, qdate); err != nil {
+			uc.log.Errorf("settlement catch-up quota %s failed: %v", qdate, err)
+		}
+		if err := uc.settlement.RunDailySettlement(bg, date); err != nil {
+			uc.log.Errorf("settlement catch-up %s failed: %v", date, err)
+			return
+		}
+		uc.log.Infof("settlement catch-up %s completed", date)
+	}(settlementDate, quotaDate)
+	return nil
 }
 
 func (uc *AdminUsecase) AdminCreditBalance(ctx context.Context, tokenString, address, amount string) (string, string, error) {

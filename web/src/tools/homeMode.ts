@@ -1,7 +1,7 @@
 export type HomeMode = 'static' | 'cinematic'
 
 const STORAGE_KEY = 'aix-home-mode'
-const FIRST_SCENE = '/assets/timeline-04-consensus.png'
+const FIRST_SCENE = '/assets/timeline-04-consensus.webp'
 const PROBE_MS = 4000
 
 function readQueryParam(name: string): string | null {

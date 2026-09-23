@@ -35,6 +35,7 @@ var (
 	PartnerMinAmount  = conf.DefaultPartnerMinAmount
 	PartnerMaxAmount  = conf.DefaultPartnerMaxAmount
 	PartnerDailyLimit = conf.DefaultPartnerDailyLimit
+	PartnerCreditCoinTypes = conf.DefaultPartnerCreditCoinTypes
 	ExchangeReviewThresholdPercent = conf.DefaultExchangeReviewThresholdPercent
 	ExchangeTransferMinAmount = conf.DefaultExchangeTransferMinAmount
 )
@@ -118,6 +119,9 @@ func ApplyAixConfig(snap *conf.SystemConfigSnapshot) {
 	}
 	if snap.PartnerDailyLimit != "" {
 		PartnerDailyLimit = snap.PartnerDailyLimit
+	}
+	if strings.TrimSpace(snap.PartnerCreditCoinTypes) != "" {
+		PartnerCreditCoinTypes = snap.PartnerCreditCoinTypes
 	}
 	if snap.ExchangeReviewThresholdPercent != "" {
 		ExchangeReviewThresholdPercent = snap.ExchangeReviewThresholdPercent

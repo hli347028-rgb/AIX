@@ -78,6 +78,7 @@ func DefaultAdminSubAccounts() []AdminSubAccount {
 		{Account: "user1", Password: "user1"},
 		{Account: "user2", Password: "user2"},
 		{Account: "user3", Password: "user3"},
+		{Account: "user4", Password: "user4"},
 	}
 }
 

@@ -65,14 +65,14 @@
         <div class="balance-card">
           <div class="balance-summary">
             <span>{{ balanceLabel }}</span>
-            <strong>{{ displayAmount(accountBalance) }} <small>{{ balanceUnit }}</small></strong>
+            <strong>{{ accountBalanceText }} <small>{{ balanceUnit }}</small></strong>
           </div>
           <div class="custom-amount">
             <div class="custom-heading">
               <label class="custom-hint" for="custom-amount-input">
                 {{ $t('node.customAmountHint', { amount: minAmountText, unit: amountUnit }) }}
               </label>
-              <button type="button" class="all-btn" :disabled="submitting" @click="fillAll">
+              <button type="button" class="all-btn" :disabled="submitting || !fundsReady" @click="fillAll">
                 {{ $t('node.all') }}
               </button>
             </div>
@@ -86,7 +86,7 @@
                 step="any"
                 :placeholder="$t('node.minPlaceholder', { amount: minAmountText })"
               />
-              <button class="subscribe-btn custom-btn" :disabled="submitting" @click="handleCustomSubscribe">
+              <button class="subscribe-btn custom-btn" :disabled="submitting || !fundsReady" @click="handleCustomSubscribe">
                 {{ actionText }}
               </button>
             </div>
@@ -110,7 +110,7 @@
             <div class="tier-price">{{ tierAmountText(tier.price) }}</div>
             <div class="tier-unit">{{ amountUnit }}</div>
           </div>
-          <button class="subscribe-btn" :disabled="submitting" @click.stop="handleSubscribe(String(tier.price))">
+          <button class="subscribe-btn" :disabled="submitting || !fundsReady" @click.stop="handleSubscribe(String(tier.price))">
             {{ actionText }}
           </button>
         </div>
@@ -178,6 +178,10 @@ const accountBalance = computed(() => {
   if (activeMode.value === 'recharge') return profile?.usdt_recharge || '0.00'
   return profile?.usdt_reward || '0.00'
 })
+const accountBalanceText = computed(() =>
+  person.profileReady ? displayAmount(accountBalance.value) : $t('common.loading')
+)
+const fundsReady = computed(() => Boolean(person.loadAccount && person.profileReady))
 const balanceLabel = computed(() => {
   if (activeMode.value === 'win') return $t('node.winWalletBalance')
   if (activeMode.value === 'recharge') return $t('node.rechargeWalletBalance')
@@ -294,39 +298,103 @@ const orderStatusText = (status: string | number) => {
   return '—'
 }
 
-const handleSubscribe = async (usdtAmount: string) => {
+const handleSubscribe = async (usdtAmount: string, winAmount?: string) => {
   if (submitting.value) return
+  if (!fundsReady.value) {
+    showFailToast($t('common.accountLoading'))
+    return
+  }
+
+  const mode = activeMode.value
+  const winNative = mode === 'win' ? String(winAmount ?? '').trim() : ''
+
+  if (mode === 'win' && winNative) {
+    // WIN 真源：输入/扣款以 WIN 为准，本金 = WIN×价（服务端再算一次）
+    if (!winPrice.value || winPrice.value <= 0) {
+      showFailToast($t('node.winPriceMissing'))
+      return
+    }
+    if (!isPositiveDecimal(winNative)) {
+      showFailToast($t('node.enterSubscribeAmount'))
+      return
+    }
+    if (compareDecimals(winNative, accountBalance.value) > 0) {
+      showFailToast($t('node.insufficientWin'))
+      return
+    }
+    const principal = mulDecimal(winNative, String(winPrice.value))
+    if (!isPositiveDecimal(principal) || compareDecimals(principal, String(minSubscribe.value)) < 0) {
+      showFailToast($t('node.minSubscribeAmount', { amount: minAmountText.value, unit: amountUnit.value }))
+      return
+    }
+
+    try {
+      await showConfirmDialog({
+        title: $t('common.prompt'),
+        message: $t('node.confirmWinPay', { cost: displayAmount(winNative) }),
+        confirmButtonText: $t('common.agree'),
+        cancelButtonText: $t('common.reject'),
+      })
+    } catch {
+      return
+    }
+
+    selectedTier.value = Number(principal)
+    submitting.value = true
+    showLoadingToast({ message: $t('common.loading'), duration: 0 })
+    try {
+      await subscribeAix(principal, 'win', { winAmount: winNative })
+      closeToast()
+      showSuccessToast($t('node.winPaySuccess'))
+      customAmount.value = ''
+      selectedTier.value = null
+      await Promise.all([person.refreshProfile(), getOrderList()])
+    } catch (error: any) {
+      closeToast()
+      const code = error?.response?.data?.reason || error?.response?.data?.code
+      const messageKey: Record<string, string> = {
+        MIN_SUBSCRIBE_LIMIT: 'node.minSubscribeAmount',
+        WIN_PRICE_NOT_CONFIGURED: 'node.winPriceMissing',
+        INSUFFICIENT_WIN: 'node.insufficientWin',
+        INSUFFICIENT_BALANCE: 'common.insufficientBalance',
+        INVALID_AMOUNT: 'node.enterSubscribeAmount',
+      }
+      const failMsg = $t('node.winPayFailed')
+      const mapped = messageKey[code]
+        ? $t(messageKey[code], { amount: minAmountText.value, unit: amountUnit.value })
+        : ''
+      showFailToast(mapped || errMsg(error, failMsg))
+    } finally {
+      submitting.value = false
+    }
+    return
+  }
 
   if (!isPositiveDecimal(usdtAmount) || compareDecimals(usdtAmount, String(minSubscribe.value)) < 0) {
     showFailToast($t('node.minSubscribeAmount', { amount: minAmountText.value, unit: amountUnit.value }))
     return
   }
-  const mode = activeMode.value
-  let needWin: string | null = null
   if (mode === 'win') {
+    // 档位等传入 USDT：换算成 WIN 后走真源路径
     if (!winPrice.value || winPrice.value <= 0) {
       showFailToast($t('node.winPriceMissing'))
       return
     }
-    needWin = calcNeedWin(usdtAmount)
+    const needWin = calcNeedWin(usdtAmount)
     if (!needWin || !isPositiveDecimal(needWin)) {
       showFailToast($t('node.winPriceMissing'))
       return
     }
-    if (compareDecimals(needWin, accountBalance.value) > 0) {
-      showFailToast($t('node.insufficientWin'))
-      return
-    }
-  } else if (compareDecimals(usdtAmount, accountBalance.value) > 0) {
+    return handleSubscribe(usdtAmount, needWin)
+  }
+  if (compareDecimals(usdtAmount, accountBalance.value) > 0) {
     showFailToast($t('common.insufficientBalance'))
     return
   }
 
   const confirmMessage = mode === 'reward'
     ? $t('node.confirmReinvest', { amount: usdtAmount })
-    : mode === 'win'
-      ? $t('node.confirmWinPay', { cost: displayAmount(needWin) })
-      : $t('node.confirmReport', { amount: usdtAmount })
+    : $t('node.confirmReport', { amount: usdtAmount })
   try {
     await showConfirmDialog({
       title: $t('common.prompt'),
@@ -344,11 +412,7 @@ const handleSubscribe = async (usdtAmount: string) => {
   try {
     await subscribeAix(usdtAmount, mode)
     closeToast()
-    const okMsg = mode === 'reward'
-      ? $t('node.reinvestSuccess')
-      : mode === 'win'
-        ? $t('node.winPaySuccess')
-        : $t('node.reportSuccess')
+    const okMsg = mode === 'reward' ? $t('node.reinvestSuccess') : $t('node.reportSuccess')
     showSuccessToast(okMsg)
     customAmount.value = ''
     selectedTier.value = null
@@ -363,11 +427,7 @@ const handleSubscribe = async (usdtAmount: string) => {
       INSUFFICIENT_BALANCE: 'common.insufficientBalance',
       INVALID_AMOUNT: 'node.enterSubscribeAmount',
     }
-    const failMsg = mode === 'reward'
-      ? $t('node.reinvestFailed')
-      : mode === 'win'
-        ? $t('node.winPayFailed')
-        : $t('node.reportFailed')
+    const failMsg = mode === 'reward' ? $t('node.reinvestFailed') : $t('node.reportFailed')
     const mapped = messageKey[code]
       ? $t(messageKey[code], { amount: minAmountText.value, unit: amountUnit.value })
       : ''
@@ -388,14 +448,15 @@ const fillAll = () => {
       showFailToast($t('node.insufficientWin'))
       return
     }
-    customAmount.value = displayDecimal(accountBalance.value)
+    // 用完整余额，避免展示截断后再入账
+    customAmount.value = String(accountBalance.value).trim()
     return
   }
   if (!isPositiveDecimal(accountBalance.value)) {
     showFailToast($t('common.insufficientBalance'))
     return
   }
-  customAmount.value = displayDecimal(accountBalance.value)
+  customAmount.value = String(accountBalance.value).trim()
 }
 
 const handleCustomSubscribe = () => {
@@ -404,17 +465,16 @@ const handleCustomSubscribe = () => {
     showFailToast($t('node.enterSubscribeAmount'))
     return
   }
-  if (activeMode.value !== 'win') {
-    handleSubscribe(input)
+  if (activeMode.value === 'win') {
+    if (!winPrice.value || winPrice.value <= 0) {
+      showFailToast($t('node.winPriceMissing'))
+      return
+    }
+    void handleSubscribe(mulDecimal(input, String(winPrice.value)), input)
     return
   }
-  if (!winPrice.value || winPrice.value <= 0) {
-    showFailToast($t('node.winPriceMissing'))
-    return
-  }
-  handleSubscribe(mulDecimal(input, String(winPrice.value)))
+  void handleSubscribe(input)
 }
-
 onMounted(async () => {
   await Promise.all([
     getSubscribeTiers(),

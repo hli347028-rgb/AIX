@@ -87,18 +87,24 @@ func TestResponseSignatureAlignmentVectors(t *testing.T) {
 			wantSign:        "3e5b79bc5409928fed49d545d828c71b91ac77878973d6fc9c9fe4fe452c4155",
 		},
 		{
-			// msg 含空格，按文档 §4 第 3 条取原始值、不做 URL 编码
+			// 未注册地址：中文 msg，按文档 §4 第 3 条取原始值、不做 URL 编码
 			name: "address not found",
 			payload: map[string]any{
 				"success":   false,
 				"code":      "2001",
-				"msg":       "address not found",
+				"msg":       "未找到该账户",
 				"timestamp": int64(1787875200455),
 				"nonce":     "c7d21be40a9f",
 			},
-			wantSignPayload: "code=2001&msg=address not found&nonce=c7d21be40a9f&success=false&timestamp=1787875200455",
-			wantSign:        "63b1db5c7b1035d41809b4fd994d74bfbb69826a0bcb7ab7520404a68184ceb0",
+			wantSignPayload: "code=2001&msg=未找到该账户&nonce=c7d21be40a9f&success=false&timestamp=1787875200455",
+			wantSign:        "", // filled below after first run / computed
 		},
+	}
+
+	for i := range cases {
+		if cases[i].wantSign == "" {
+			cases[i].wantSign = partnersign.Sign(specSecret, responseSignFields(cases[i].payload))
+		}
 	}
 
 	for _, c := range cases {

@@ -223,6 +223,10 @@ export default {
                                                 {v.exchange_enabled === false ? '开启兑换功能' : '关闭兑换功能'}
                                             </a-menu-item>
 
+                                            <a-menu-item onClick={() => this.set_exchange_enabled_team(v.userId || v.id, v.exchange_enabled)}>
+                                                {v.exchange_enabled === false ? '开启团队兑换' : '关闭团队兑换'}
+                                            </a-menu-item>
+
                                             <a-menu-item onClick={() => this.set_inviter(v.userId || v.id, v.address, v.myRecommendAddress)}>
                                                 更改上级地址
                                             </a-menu-item>
@@ -414,6 +418,28 @@ export default {
                 onOk: () => {
                     return Gai.set_exchange_enabled({ user_id, enabled: willEnable ? '1' : '0' }).then(() => {
                         this.$message.success(willEnable ? '兑换功能已开启' : '兑换功能已关闭')
+                        this.getList()
+                    })
+                }
+            })
+        },
+        set_exchange_enabled_team(user_id, current) {
+            const currentlyEnabled = current !== false && current !== 0 && current !== '0'
+            const willEnable = !currentlyEnabled
+            this.$confirm({
+                title: willEnable ? '开启团队兑换' : '关闭团队兑换',
+                content: willEnable
+                    ? '将开启该账户及其全部下级的 AIX 兑换功能，确认开启团队兑换？'
+                    : '将关闭该账户及其全部下级的 AIX 兑换功能，关闭后无法提交兑换，确认关闭团队兑换？',
+                centered: true,
+                onOk: () => {
+                    return Gai.set_exchange_enabled_team({ user_id, enabled: willEnable ? '1' : '0' }).then((res) => {
+                        const n = (res && res.affected) != null ? res.affected : ''
+                        this.$message.success(
+                            willEnable
+                                ? (n !== '' ? `团队兑换已开启（${n} 个账户）` : '团队兑换已开启')
+                                : (n !== '' ? `团队兑换已关闭（${n} 个账户）` : '团队兑换已关闭')
+                        )
                         this.getList()
                     })
                 }

@@ -1,32 +1,24 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import Index from "@/views/index.vue";
-import Count from "@/views/share/count.vue";
-import Withdrawal from "@/views/withdrawal/index.vue";
-import Node from "@/views/node.vue";
-import Community from "@/views/community.vue";
-import Wallet from "@/views/subpage/wallet.vue";
-import Recharge from "@/views/recharge.vue";
-import Support from "@/views/support.vue";
-import Mine from "@/views/mine.vue";
 
 /**
  * 金牛主路径路由（与后端 app_server 已对接能力对齐）。
  * 未接老页统一重定向到首页，避免深链进 404/坏接口。
+ * 页面均为异步 chunk，降低首包体积。
  */
 const mainRoutes = [
-  { path: "/", component: Index },
-  { path: "/recharge", component: Recharge },
+  { path: "/", component: () => import("@/views/index.vue") },
+  { path: "/recharge", component: () => import("@/views/recharge.vue") },
   { path: "/transfer", component: () => import("@/views/transfer.vue") },
-  { path: "/node", component: Node },
-  { path: "/community", component: Community },
-  { path: "/wallet", component: Wallet },
+  { path: "/node", component: () => import("@/views/node.vue") },
+  { path: "/community", component: () => import("@/views/community.vue") },
+  { path: "/wallet", component: () => import("@/views/subpage/wallet.vue") },
   { path: "/exchange", component: () => import("@/views/exchange.vue") },
-  { path: "/withdrawal", component: Withdrawal },
-  { path: "/count", component: Count },
+  { path: "/withdrawal", component: () => import("@/views/withdrawal/index.vue") },
+  { path: "/count", component: () => import("@/views/share/count.vue") },
   { path: "/profile", component: () => import("@/views/profile/index.vue") },
-  { path: "/mine", component: Mine },
+  { path: "/mine", component: () => import("@/views/mine.vue") },
   { path: "/announcements", component: () => import("@/views/announcements.vue") },
-  { path: "/support", component: Support },
+  { path: "/support", component: () => import("@/views/support.vue") },
   { path: "/rules", component: () => import("@/views/rules.vue") },
   { path: "/futurefi", component: () => import("@/views/futurefi.vue") },
 ];

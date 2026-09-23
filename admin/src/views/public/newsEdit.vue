@@ -5,6 +5,8 @@
                 <div class="formCon">
                     <a>标题:</a>
                     <a-input v-model="form.title" placeholder="请输入标题"/>
+                    <a>排序（数字越小越靠前；新建默认置顶为 1）:</a>
+                    <a-input-number v-model="form.sort_order" :min="-999999" style="width: 100%" placeholder="可选，留空则新建置顶"/>
                     <a>内容:</a>
                     <tinymceForm v-model="form.content"></tinymceForm>
                     <a style="padding-top: 8px; color: rgba(0,0,0,.45); font-size: 12px;">
@@ -38,6 +40,7 @@
                     id:this.$route.query.id||undefined,
                     title:"",
                     content:"",
+                    sort_order: undefined,
                 }
             }
         },
@@ -50,6 +53,7 @@
                     this.loading = false
                     this.form.content = (res.data && res.data.content) || ''
                     this.form.title = (res.data && res.data.title) || ''
+                    this.form.sort_order = (res.data && res.data.sort_order != null) ? res.data.sort_order : undefined
                 }).catch(() => {
                     this.loading = false
                     this.$message.error('加载公告失败')
@@ -67,11 +71,15 @@
                     return
                 }
                 this.loading = true
-                Art.addArticle({
+                const payload = {
                     id: this.form.id,
                     title,
                     content,
-                }).then(() => {
+                }
+                if (this.form.sort_order !== undefined && this.form.sort_order !== null && this.form.sort_order !== '') {
+                    payload.sort_order = this.form.sort_order
+                }
+                Art.addArticle(payload).then(() => {
                     this.loading = false
                     this.$router.back()
                 }).catch(() => {

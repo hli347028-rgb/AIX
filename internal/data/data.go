@@ -36,6 +36,9 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	); err != nil {
 		return nil, nil, err
 	}
+	if err := migrateAnnouncementSortOrder(db); err != nil {
+		return nil, nil, err
+	}
 	if err := ensureWithdrawalPayoutGuards(db); err != nil {
 		return nil, nil, err
 	}
@@ -58,6 +61,9 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 	// 历史回灌修复 migrateRepairUserPointsBalance 已完成使命，不再挂到 NewData，
 	// 避免每次部署/重启按公式重写余额（含误伤手工扣减）。
 	if err := migrateWinRechargeBalance(db); err != nil {
+		return nil, nil, err
+	}
+	if err := migratePartnerWinABalanceToWin(db); err != nil {
 		return nil, nil, err
 	}
 	if err := ensureUserAdminColumns(db); err != nil {
@@ -162,6 +168,41 @@ func ensureSettlementBatchExchangeQuotaColumns(db *gorm.DB) error {
 	return nil
 }
 
+// migrateAnnouncementSortOrder 回填排序：数字越小越靠前。
+// 历史数据按「越新越靠前」映射为更小的 sort_order（与原先 id DESC 观感一致）。
+func migrateAnnouncementSortOrder(db *gorm.DB) error {
+	var unset int64
+	if err := db.Raw(`SELECT COUNT(1) FROM announcements WHERE sort_order = 0`).Scan(&unset).Error; err != nil {
+		return err
+	}
+	if unset == 0 {
+		return nil
+	}
+	var total int64
+	if err := db.Model(&AnnouncementPO{}).Count(&total).Error; err != nil {
+		return err
+	}
+	if total == 0 {
+		return nil
+	}
+	// 全部为 0 时一次性回填；若已有人工排序（存在非 0），只修仍为 0 的行。
+	var nonzero int64
+	if err := db.Raw(`SELECT COUNT(1) FROM announcements WHERE sort_order <> 0`).Scan(&nonzero).Error; err != nil {
+		return err
+	}
+	if nonzero == 0 {
+		return db.Exec(`
+			UPDATE announcements
+			SET sort_order = ((SELECT mx FROM (SELECT COALESCE(MAX(id), 0) + 1 AS mx FROM announcements) t) - id)
+		`).Error
+	}
+	return db.Exec(`
+		UPDATE announcements
+		SET sort_order = ((SELECT mx FROM (SELECT COALESCE(MAX(id), 0) + 1 AS mx FROM announcements) t) - id)
+		WHERE sort_order = 0
+	`).Error
+}
+
 // migrateOverflowReward 将历史 pending_mgmt_reward 迁入 overflow_reward，并保持两列同步。
 func migrateOverflowReward(db *gorm.DB) error {
 	return db.Exec(`
@@ -232,9 +273,11 @@ func migratePointsSource(db *gorm.DB) error {
 	`).Error; err != nil {
 		return err
 	}
+	// 仅回填仍为 0 的累计值；禁止每次启动全表重算（用户量大时会长时间占住启动、无法监听端口）。
 	return db.Exec(`
 		UPDATE users u
 		SET points_all = COALESCE((SELECT SUM(o.points) FROM orders o WHERE o.user_id = u.id), 0)
+		WHERE u.points_all = 0
 	`).Error
 }
 

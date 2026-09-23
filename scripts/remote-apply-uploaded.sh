@@ -26,6 +26,7 @@ if [ -f "${ADMIN_SRC}/dist/index.html" ]; then
 fi
 sudo rsync -a --delete --no-owner --no-group "${ADMIN_SRC}/" /opt/aix/www/admin/
 sudo chown -R ubuntu:ubuntu /opt/aix/www/admin
+sudo chmod -R a+rX /opt/aix/www/admin
 
 echo "=== restart aix (config.yaml not touched) ==="
 sudo systemctl restart aix

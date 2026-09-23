@@ -12,7 +12,8 @@
       <div class="page-header">
         <h1 class="page-title">{{ $t('withdraw.usdtAvailableBalance') }}</h1>
         <p class="page-balance">
-          {{ displayAmount(usdtBalance) }}<span class="page-balance-unit">USDT</span>
+          <template v-if="fundsReady">{{ displayAmount(usdtBalance) }}<span class="page-balance-unit">USDT</span></template>
+          <template v-else>{{ $t('common.loading') }}</template>
         </p>
         <p class="page-hint">{{ $t('withdraw.usdtWithdrawHint') }}</p>
       </div>
@@ -39,7 +40,7 @@
 
         <button
           class="subscribe-btn custom-btn"
-          :disabled="!canSubmit || loading"
+          :disabled="!canSubmit || loading || !fundsReady"
           @click="handleWithdrawal"
         >
           {{ loading ? $t('withdraw.processing') : $t('withdraw.confirm') }}
@@ -114,6 +115,7 @@ const amountList = ref<WinWithdrawRecord[]>([])
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const usdtBalance = computed(() => String(person.profile?.usdt_withdrawable || '0'))
+const fundsReady = computed(() => Boolean(person.loadAccount && person.profileReady))
 
 const filteredRecords = computed(() =>
   amountList.value.filter((item) => String(item.asset || '').toUpperCase() === 'USDT')
@@ -221,6 +223,10 @@ const checkAmount = (e: Event) => {
 
 const handleWithdrawal = async () => {
   if (loading.value || !canSubmit.value) return
+  if (!fundsReady.value) {
+    showToast($t('common.accountLoading'))
+    return
+  }
   loading.value = true
   try {
     const result = await withdrawUsdt(amountInput.value)

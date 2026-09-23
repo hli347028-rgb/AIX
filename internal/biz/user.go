@@ -144,6 +144,15 @@ type DirectInvitee struct {
 	CreatedAt        time.Time
 }
 
+// AreaFundingBreakdown 大小区资金构成明细。
+type AreaFundingBreakdown struct {
+	Usdt        string // 认购 USDT 入金
+	Win         string // 认购 WIN 原生数量
+	ExchangeWin string // 交易所划转 WIN 充值（仅明细，不计入业绩）
+	Reward      string // 奖励钱包认购（USDT 本金）
+	TotalUsdt   string // 业绩 USDT 本位：SUM(principal)=USDT认购+WIN认购×当时价+复投
+}
+
 const MaxDownlineGenerations = 10
 
 // Challenge represents a login challenge message.
@@ -169,10 +178,16 @@ type UserRepo interface {
 	CountSubscribeOrders(ctx context.Context, userID int64) (int64, error)
 	ListDownlineInvitees(ctx context.Context, userID int64, maxDepth int) ([]*DownlineInvitee, error)
 	ListAllUsers(ctx context.Context) ([]*User, error)
+	// ListUsersPaged 管理端用户列表：按 id desc 分页；address 非空时地址模糊匹配（不区分大小写）。
+	ListUsersPaged(ctx context.Context, addressFilter string, offset, limit int) (users []*User, total int64, err error)
+	// CountDirectInviteesByUserIDs 批量统计直推人数。
+	CountDirectInviteesByUserIDs(ctx context.Context, userIDs []int64) (map[int64]int, error)
 	ListDirectInvitees(ctx context.Context, userID int64) ([]*User, error)
 	ListUsersUnder(ctx context.Context, rootID int64) ([]*User, error)
 	CountUsersUnder(ctx context.Context, rootID int64) (int32, error)
 	ListUserIDsUnder(ctx context.Context, rootID int64) ([]int64, error)
+	// SumAreaFundingBreakdown 大区/小区资金构成（USDT/WIN/交易所划转WIN/奖励钱包）。
+	SumAreaFundingBreakdown(ctx context.Context, rootID int64) (large, small AreaFundingBreakdown, err error)
 	SumPrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
 	// SumCumulativePrincipalByUserIDs 累计认购本金（active+exited），与 team_perf 口径一致
 	SumCumulativePrincipalByUserIDs(ctx context.Context, userIDs []int64) (map[int64]string, error)
@@ -186,6 +201,8 @@ type UserRepo interface {
 	AdminUpdateUser(ctx context.Context, update *AdminUserUpdate) error
 	// SetFrozenForUsers 批量设置冻结状态（含 frozen_at），用于冻结/解冻团队。
 	SetFrozenForUsers(ctx context.Context, userIDs []int64, frozen bool) error
+	// SetExchangeEnabledForUsers 批量设置 AIX 兑换开关，用于关闭/开启团队兑换。
+	SetExchangeEnabledForUsers(ctx context.Context, userIDs []int64, enabled bool) error
 	// ResolveExchangeBindAddress 解析/绑定向交易所划转地址：已绑定不可改；未绑定则绑定且全局唯一。
 	ResolveExchangeBindAddress(ctx context.Context, userID int64, requestedAddress string) (bound string, err error)
 	UpdateUsername(ctx context.Context, userID int64, username string) error

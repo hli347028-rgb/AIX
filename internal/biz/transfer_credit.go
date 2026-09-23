@@ -27,6 +27,7 @@ const (
 	TransferCodeBelowMin       = "2003"
 	TransferCodeAboveMax       = "2004"
 	TransferCodeAboveDaily     = "2005"
+	TransferCodeUnsupportedCoin = "2006" // coin_type=0 或未开通币种
 	TransferCodeBadSign        = "1001"
 	TransferCodePartnerUnknown = "1002"
 	TransferCodeStaleTimestamp = "1003"
@@ -67,6 +68,15 @@ const (
 	PartnerCreditUserFrozen
 )
 
+// 合作方加款 coin_type（对接说明 §2）。
+const (
+	PartnerCoinTypeUnsupported = 0
+	PartnerCoinTypeWIN         = 1
+	PartnerCoinTypeWINA        = 2
+	// DefaultPartnerCoinType 请求省略 coin_type 时的流水币种标记（余额仍入 WIN）。
+	DefaultPartnerCoinType = PartnerCoinTypeWIN
+)
+
 // PartnerCreditInput 加款入参。
 type PartnerCreditInput struct {
 	// IdempotencyKey 写入 recharges.tx_hash，靠唯一索引保证不重复加款。
@@ -76,6 +86,8 @@ type PartnerCreditInput struct {
 	Amount    string
 	PartnerID string
 	Nonce     string
+	// Asset 管理端币种标记（WIN / WIN-A）；余额一律进入 win_recharge_balance。
+	Asset string
 }
 
 // PartnerCreditResult 加款结果。
@@ -109,7 +121,7 @@ func TransferCodeOf(err error) (string, string) {
 	if errors.As(err, &te) {
 		return te.Code, te.Message
 	}
-	return TransferCodeInternal, "internal error"
+	return TransferCodeInternal, "系统更新中"
 }
 
 // TransferCreditRequest 已解析的请求体。
@@ -120,18 +132,61 @@ type TransferCreditRequest struct {
 	Timestamp int64
 	Nonce     string
 	Sign      string
+	// CoinType 解析后的币种码（缺省已填 DefaultPartnerCoinType）。
+	CoinType int
+	// CoinTypeInBody 请求体是否显式带了 coin_type（决定是否参与签名）。
+	CoinTypeInBody bool
 }
 
 // SignedFields 返回参与签名的字段（不含 sign）。
 // 地址与金额一律用原始字符串：任何大小写或格式归一化都会让签名对不上（文档 §3.1）。
+// 仅当请求体显式包含 coin_type 时才纳入签名（对接说明 §2.1）。
 func (r *TransferCreditRequest) SignedFields() map[string]string {
-	return map[string]string{
+	fields := map[string]string{
 		"address":    r.Address,
 		"amount":     r.Amount,
 		"partner_id": r.PartnerID,
 		"timestamp":  fmt.Sprintf("%d", r.Timestamp),
 		"nonce":      r.Nonce,
 	}
+	if r.CoinTypeInBody {
+		fields["coin_type"] = fmt.Sprintf("%d", r.CoinType)
+	}
+	return fields
+}
+
+// ResolvePartnerCoinAsset 将 coin_type 映射为内部资产符号；未知码返回 false。
+func ResolvePartnerCoinAsset(coinType int) (asset string, ok bool) {
+	switch coinType {
+	case PartnerCoinTypeWIN:
+		return TokenWIN, true
+	case PartnerCoinTypeWINA:
+		return TokenWINA, true
+	default:
+		return "", false
+	}
+}
+
+// PartnerCoinTypeEnabled 管理端白名单是否开通该 coin_type。
+func PartnerCoinTypeEnabled(coinType int) bool {
+	if coinType == PartnerCoinTypeUnsupported {
+		return false
+	}
+	raw := GetPartnerCreditCoinTypes()
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		// 允许 "1" 或 "1=WIN" 写法
+		if i := strings.IndexByte(part, '='); i >= 0 {
+			part = strings.TrimSpace(part[:i])
+		}
+		if part == fmt.Sprintf("%d", coinType) {
+			return true
+		}
+	}
+	return false
 }
 
 // TransferCreditReceipt 加款成功的回执。
@@ -210,7 +265,7 @@ func (uc *TransferCreditUsecase) OccupyNonce(ctx context.Context, req *TransferC
 	if err != nil {
 		// 无法判定是否重放时宁可拒绝，但要用「未受理」语义让对方安全退款。
 		uc.log.Errorf("nonce occupy failed partner=%s: %v", req.PartnerID, err)
-		return transferErr(TransferCodeUnavailable, "nonce store unavailable")
+		return transferErr(TransferCodeUnavailable, "系统更新中")
 	}
 	if !fresh {
 		return transferErr(TransferCodeReplay, "duplicate nonce")
@@ -235,6 +290,14 @@ func (uc *TransferCreditUsecase) Credit(
 		return nil, transferErr(TransferCodeBadFormat, "invalid amount")
 	}
 
+	if req.CoinType == PartnerCoinTypeUnsupported || !PartnerCoinTypeEnabled(req.CoinType) {
+		return nil, transferErr(TransferCodeUnsupportedCoin, "unsupported coin type")
+	}
+	asset, ok := ResolvePartnerCoinAsset(req.CoinType)
+	if !ok {
+		return nil, transferErr(TransferCodeUnsupportedCoin, "unsupported coin type")
+	}
+
 	if err := uc.checkLimits(ctx, req.PartnerID, partner, amount); err != nil {
 		return nil, err
 	}
@@ -245,22 +308,23 @@ func (uc *TransferCreditUsecase) Credit(
 		Amount:         amount.String(),
 		PartnerID:      req.PartnerID,
 		Nonce:          req.Nonce,
+		Asset:          asset,
 	})
 	if err != nil {
 		// 事务失败：是否加款不确定，必须用 5000 让对方转人工而不是自动退款。
 		uc.log.Errorf("partner credit tx failed partner=%s nonce=%s: %v", req.PartnerID, req.Nonce, err)
-		return nil, transferErr(TransferCodeInternal, "credit failed")
+		return nil, transferErr(TransferCodeInternal, "系统更新中")
 	}
 
 	switch res.Outcome {
 	case PartnerCreditUserNotFound:
-		return nil, transferErr(TransferCodeAddressUnknown, "address not found")
+		return nil, transferErr(TransferCodeAddressUnknown, "未找到该账户")
 	case PartnerCreditUserFrozen:
 		return nil, transferErr(TransferCodeAccountFrozen, "account frozen")
 	}
 
-	uc.log.Infof("partner credit ok partner=%s nonce=%s amount=%s balance=%s duplicate=%t",
-		req.PartnerID, req.Nonce, amount.String(), res.NewBalance, res.Outcome == PartnerCreditDuplicate)
+	uc.log.Infof("partner credit ok partner=%s nonce=%s coin_type=%d asset=%s amount=%s balance=%s duplicate=%t",
+		req.PartnerID, req.Nonce, req.CoinType, asset, amount.String(), res.NewBalance, res.Outcome == PartnerCreditDuplicate)
 
 	return &TransferCreditReceipt{
 		AixTxnID:   FormatAixTxnID(res.RechargeID, res.CreditedAt),
@@ -306,7 +370,7 @@ func (uc *TransferCreditUsecase) checkLimits(
 	if err != nil {
 		// 查不到已用额度就无法保证不超限，按「未受理」拒绝比冒险放行安全。
 		uc.log.Errorf("daily limit lookup failed partner=%s: %v", partnerID, err)
-		return transferErr(TransferCodeUnavailable, "limit check unavailable")
+		return transferErr(TransferCodeUnavailable, "系统更新中")
 	}
 	used, _ := decimal.NewFromString(sum)
 	if used.Add(amount).GreaterThan(daily) {

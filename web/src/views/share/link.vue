@@ -31,12 +31,17 @@ const userinfo = $computed(() => person.userinfo);
 
 let qrCodeUrl = $ref('');
 
-const linkList: any = {
+const linkList: Record<string, string> = {
   test: `http://${window.location.host}/test_go/www/#/?inviteCode=-inviteTdh-${userinfo.inviteUrl}-inviteTdh-`,
-  prod: `https://${window.location.host}/#/?inviteCode=-inviteTdh-${userinfo.inviteUrl}-inviteTdh-`
+  prod: `https://${window.location.host}/#/?inviteCode=-inviteTdh-${userinfo.inviteUrl}-inviteTdh-`,
+  development: `http://${window.location.host}/#/?inviteCode=-inviteTdh-${userinfo.inviteUrl}-inviteTdh-`,
 }
 
-const inviteUrl = $computed(() => userinfo.inviteUrl && userinfo.LocationList.length !== 0 ? linkList[import.meta.env.MODE] : ``,)
+const inviteUrl = $computed(() => {
+  if (!userinfo.inviteUrl || userinfo.LocationList.length === 0) return ''
+  const mode = String(import.meta.env.MODE || 'prod')
+  return linkList[mode] || linkList.prod
+})
 
 const generateQRCode = () => {
   if (userinfo.LocationList.length === 0) return

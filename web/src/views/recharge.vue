@@ -14,20 +14,28 @@
     <header class="balance-head">
       <p class="aix-label">{{ $t('recharge.balance') }}</p>
       <div class="balance-primary">
-        <span class="balance-value aix-figure">{{ displayAmount(rechargeBalance) }}</span>
+        <span class="balance-value aix-figure">{{ fundsReady ? displayAmount(rechargeBalance) : $t('common.loading') }}</span>
         <span class="balance-unit aix-figure-unit">USDT</span>
       </div>
 
       <div class="balance-secondary">
         <p class="aix-label">{{ $t('recharge.winBalance') }}</p>
         <div class="balance-primary">
-          <span class="balance-value aix-figure">{{ displayAmount(winBalance) }}</span>
+          <span class="balance-value aix-figure">{{ fundsReady ? displayAmount(winBalance) : $t('common.loading') }}</span>
           <span class="balance-unit aix-figure-unit">WIN</span>
         </div>
       </div>
 
+      <div class="balance-secondary">
+        <p class="aix-label">{{ $t('recharge.sdtBalance') }}</p>
+        <div class="balance-primary">
+          <span class="balance-value aix-figure">{{ fundsReady ? displayAmount(sdtBalance) : $t('common.loading') }}</span>
+          <span class="balance-unit aix-figure-unit">AIX-USDT</span>
+        </div>
+      </div>
+
       <!-- 这是本页唯一的主操作，给它实心填充；其余一切保持安静。 -->
-      <button class="aix-btn recharge-btn" type="button" @click="showRecharge">
+      <button class="aix-btn recharge-btn" type="button" :disabled="!fundsReady" @click="showRecharge">
         <van-icon name="gold-coin-o" aria-hidden="true" />
         {{ $t('recharge.recharge') }}
       </button>
@@ -70,7 +78,7 @@
           <i>{{ recordAssetUnit }}</i>
         </span>
         <span class="st" :class="statusClass(item.status)">
-          {{ rechargeStatusText(item.status) }}
+          {{ recordStatusLabel(item) }}
         </span>
       </div>
 
@@ -114,6 +122,8 @@ const userinfo = $computed(() => person.userinfo);
 const profile = $computed(() => person.profile);
 const rechargeBalance = $computed(() => String(profile.usdt_recharge || userinfo.usdt || '0'))
 const winBalance = $computed(() => String(profile.win_recharge_balance || '0'))
+const sdtBalance = $computed(() => String(profile.points || userinfo.points || '0'))
+const fundsReady = $computed(() => Boolean(person.loadAccount && person.profileReady))
 /* winPrice 已移除：它唯一的引用是模板里一行被注释掉的价格展示，
    等于一个永远不会显示的计算属性。 */
 const displayAmount = (value) => displayDecimal(value, 4)
@@ -123,16 +133,26 @@ const recordTab = ref('usdt')
 const recordTabs = [
   { key: 'usdt', label: 'USDT' },
   { key: 'win', label: 'WIN' },
+  { key: 'sdt', label: 'AIX-USDT' },
 ]
 let usdtRecords = $ref([])
 let winRecords = $ref([])
+let sdtRecords = $ref([])
 let page = $ref(1)
 let allPageCount = $ref(1)
 let usdtBalance = $ref("0");
 let usdtApproved = $ref(false);
 
-const currentRecords = computed(() => recordTab.value === 'win' ? winRecords : usdtRecords)
-const recordAssetUnit = computed(() => recordTab.value === 'win' ? 'WIN' : 'USDT')
+const currentRecords = computed(() => {
+  if (recordTab.value === 'win') return winRecords
+  if (recordTab.value === 'sdt') return sdtRecords
+  return usdtRecords
+})
+const recordAssetUnit = computed(() => {
+  if (recordTab.value === 'win') return 'WIN'
+  if (recordTab.value === 'sdt') return 'AIX-USDT'
+  return 'USDT'
+})
 
 const rechargeStatusText = (status) => {
   switch (String(status || '').toLowerCase()) {
@@ -141,6 +161,13 @@ const rechargeStatusText = (status) => {
     case 'pending':
     default: return $t('recharge.statusPending')
   }
+}
+
+const recordStatusLabel = (item) => {
+  if (String(item?.source || '').toLowerCase() === 'exchange') {
+    return $t('recharge.statusExchange')
+  }
+  return rechargeStatusText(item?.status)
 }
 
 const statusClass = (status) => {
@@ -164,6 +191,7 @@ const switchRecordTab = async (tab) => {
   recordTab.value = tab
   page = 1
   if (tab === 'win') await getWinRecords(1)
+  else if (tab === 'sdt') await getSdtRecords(1)
   else await getUsdtRecords(1)
 }
 
@@ -225,6 +253,7 @@ const getWinRecords = async (pageNum = 1) => {
       id: item.id ?? index,
       createdAt: item.createdAt || item.created_at || '-',
       status: item.status || 'pending',
+      source: item.source || (String(item.tx_hash || item.txHash || '').toLowerCase().startsWith('partner:') ? 'exchange' : 'chain'),
     }))
     page = pageNum
   } catch {
@@ -233,15 +262,35 @@ const getWinRecords = async (pageNum = 1) => {
   }
 }
 
+const getSdtRecords = async (pageNum = 1) => {
+  try {
+    const res = await request.get('app_server/deposit_sdt_list', {
+      params: { page: pageNum },
+    })
+    allPageCount = Math.max(1, Math.ceil(Number(res.count || 0) / 10))
+    sdtRecords = (res.list || res.recharges || []).map((item, index) => ({
+      ...item,
+      id: item.id ?? index,
+      createdAt: item.createdAt || item.created_at || '-',
+      status: item.status || 'pending',
+    }))
+    page = pageNum
+  } catch {
+    sdtRecords = []
+    allPageCount = 1
+  }
+}
+
 const onPageChange = async (pageNum = 1) => {
   if (recordTab.value === 'win') await getWinRecords(pageNum)
+  else if (recordTab.value === 'sdt') await getSdtRecords(pageNum)
   else await getUsdtRecords(pageNum)
 }
 
 const handleRechargeChange = async (pageNum = 1) => {
-  const loadRecords = recordTab.value === 'win'
-    ? getWinRecords(pageNum)
-    : getUsdtRecords(pageNum)
+  let loadRecords = getUsdtRecords(pageNum)
+  if (recordTab.value === 'win') loadRecords = getWinRecords(pageNum)
+  else if (recordTab.value === 'sdt') loadRecords = getSdtRecords(pageNum)
   await Promise.allSettled([
     person.refreshProfile?.(),
     getBalance(),

@@ -125,6 +125,7 @@ const local = {
     downlineSubscribeAmount: '下級認購金額',
     downlineRechargeUsdt: '下級USDT充值金額',
     downlineRechargeWin: '下級WIN充值金額',
+    downlineExchangeWin: '下級取引所振替金額',
     directLedgerTabs: '下級明細',
     teamIdoTotal: 'チームIDO総量',
     personalRedeemed: '個人償還業績',

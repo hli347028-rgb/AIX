@@ -123,7 +123,7 @@ func (s *WalletService) Subscribe(ctx context.Context, req *v1.SubscribeRequest)
 		}
 	}
 	if req.Amount != "" && payFrom != "" {
-		order, bal, err := s.uc.SubscribeAIX(ctx, resolveToken(ctx, req.Token), req.Amount, payFrom)
+		order, bal, err := s.uc.SubscribeAIX(ctx, resolveToken(ctx, req.Token), req.Amount, payFrom, "")
 		if err != nil {
 			return nil, err
 		}

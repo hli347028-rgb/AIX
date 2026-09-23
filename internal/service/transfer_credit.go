@@ -83,6 +83,8 @@ type creditRequestBody struct {
 	Timestamp int64  `json:"timestamp"`
 	Nonce     string `json:"nonce"`
 	Sign      string `json:"sign"`
+	// CoinType 可选；nil 表示请求体未传，流水标记默认 WIN（余额仍入 WIN）。
+	CoinType *int `json:"coin_type"`
 }
 
 // HandleCredit 按文档 §5 的顺序校验并加款。
@@ -97,7 +99,7 @@ func (s *TransferCreditService) HandleCredit(ctx khttp.Context) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			s.log.Errorf("transfer credit panic ip=%s: %v\n%s", ip, rec, debug.Stack())
-			err = s.respond(ctx, nil, biz.TransferCodeInternal, "internal error", nil)
+			err = s.respond(ctx, nil, biz.TransferCodeInternal, "系统更新中", nil)
 		}
 	}()
 
@@ -121,8 +123,13 @@ func (s *TransferCreditService) HandleCredit(ctx khttp.Context) (err error) {
 		Timestamp: body.Timestamp,
 		Nonce:     body.Nonce,
 		Sign:      body.Sign,
+		CoinType:  biz.DefaultPartnerCoinType,
 	}
-	echo := map[string]any{"address": body.Address, "amount": body.Amount}
+	if body.CoinType != nil {
+		creditReq.CoinType = *body.CoinType
+		creditReq.CoinTypeInBody = true
+	}
+	echo := map[string]any{"address": body.Address, "amount": body.Amount, "coin_type": creditReq.CoinType}
 
 	if missing := missingCreditFields(body); missing != "" {
 		s.log.Warnf("transfer credit missing field=%s ip=%s", missing, ip)
@@ -159,8 +166,8 @@ func (s *TransferCreditService) HandleCredit(ctx khttp.Context) (err error) {
 		return s.finish(ctx, creditReq, err, echo, ip, started)
 	}
 
-	s.log.Infof("transfer credit ok partner=%s nonce=%s amount=%s txn=%s ip=%s cost=%s",
-		body.PartnerID, body.Nonce, body.Amount, receipt.AixTxnID, ip, time.Since(started))
+	s.log.Infof("transfer credit ok partner=%s nonce=%s coin_type=%d amount=%s txn=%s ip=%s cost=%s",
+		body.PartnerID, body.Nonce, creditReq.CoinType, body.Amount, receipt.AixTxnID, ip, time.Since(started))
 
 	return s.respond(ctx, creditReq, biz.TransferCodeOK, "success", map[string]any{
 		"aix_txn_id":  receipt.AixTxnID,

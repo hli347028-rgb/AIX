@@ -42,6 +42,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
 	r.POST("/v1/wallet/recharge-win/confirm", wallet.HandleConfirmWinRecharge)
 	r.GET("/v1/wallet/recharges-win", wallet.HandleListWinRecharges)
+	r.GET("/v1/wallet/recharges-sdt", wallet.HandleListSdtRecharges)
 }
 
 func transferRecordPagination(ctx khttp.Context) (page, pageSize int, err error) {
@@ -106,6 +107,8 @@ type subscribeAIXReq struct {
 	Token   string `json:"token"`
 	Amount  string `json:"amount"`
 	PayFrom string `json:"pay_from"`
+	// WinAmount：WIN 认购真源数量；有值时服务端按 WIN×价算本金并直接扣该 WIN。
+	WinAmount string `json:"win_amount"`
 	// 已废弃：混合报单
 	PayFrom2 string `json:"pay_from_2"`
 	Amount1  string `json:"amount_1"`
@@ -124,7 +127,7 @@ func (s *WalletService) HandleSubscribeAIX(ctx khttp.Context) error {
 		})
 	}
 	token := tokenFromRequest(ctx, req.Token)
-	order, bal, err := s.uc.SubscribeAIX(ctx, token, req.Amount, req.PayFrom)
+	order, bal, err := s.uc.SubscribeAIX(ctx, token, req.Amount, req.PayFrom, req.WinAmount)
 	if err != nil {
 		return err
 	}
@@ -427,10 +430,47 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 	if directTotal, directErr := s.uc.GetDirectRewardTotal(ctx, token); directErr == nil && strings.TrimSpace(directTotal) != "" {
 		directRewardTotal = directTotal
 	}
+
+	// 默认走轻量：业绩用 users 落库字段。伞下扫树 / 大区拆解仅 include=... 时计算（团队页按需）。
+	includeRaw := strings.ToLower(strings.TrimSpace(ctx.Request().URL.Query().Get("include")))
+	includeAll := includeRaw == "1" || includeRaw == "all" || includeRaw == "heavy"
+	wantAreaFunding := includeAll || strings.Contains(includeRaw, "area_funding")
+	wantTeamActive := includeAll || strings.Contains(includeRaw, "team_active") || wantAreaFunding
+
 	teamActiveSubscribe := "0"
-	if user != nil {
+	if wantTeamActive && user != nil {
 		if v, sumErr := s.uc.GetTeamActiveSubscribePrincipal(ctx, token); sumErr == nil && strings.TrimSpace(v) != "" {
 			teamActiveSubscribe = v
+		}
+	}
+	areaLarge := map[string]any{
+		"usdt": "0", "win": "0", "exchange_win": "0", "reward": "0",
+		"total_usdt": zeroIfEmpty(largeArea),
+	}
+	areaSmall := map[string]any{
+		"usdt": "0", "win": "0", "exchange_win": "0", "reward": "0",
+		"total_usdt": zeroIfEmpty(smallArea),
+	}
+	teamFundingUsdt := zeroIfEmpty(teamPerf)
+	if wantAreaFunding {
+		if largeBr, smallBr, brErr := s.uc.GetAreaFundingBreakdown(ctx, token); brErr == nil {
+			areaLarge = map[string]any{
+				"usdt":         zeroIfEmpty(largeBr.Usdt),
+				"win":          zeroIfEmpty(largeBr.Win),
+				"exchange_win": zeroIfEmpty(largeBr.ExchangeWin),
+				"reward":       zeroIfEmpty(largeBr.Reward),
+				"total_usdt":   zeroIfEmpty(largeBr.TotalUsdt),
+			}
+			areaSmall = map[string]any{
+				"usdt":         zeroIfEmpty(smallBr.Usdt),
+				"win":          zeroIfEmpty(smallBr.Win),
+				"exchange_win": zeroIfEmpty(smallBr.ExchangeWin),
+				"reward":       zeroIfEmpty(smallBr.Reward),
+				"total_usdt":   zeroIfEmpty(smallBr.TotalUsdt),
+			}
+			largeDec, _ := decimal.NewFromString(strings.TrimSpace(largeBr.TotalUsdt))
+			smallDec, _ := decimal.NewFromString(strings.TrimSpace(smallBr.TotalUsdt))
+			teamFundingUsdt = largeDec.Add(smallDec).String()
 		}
 	}
 
@@ -500,6 +540,11 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 		"large_area_perf":      largeArea,
 		"small_area_perf":      smallArea,
 		"team_perf":            teamPerf,
+		"area_funding": map[string]any{
+			"large":          areaLarge,
+			"small":          areaSmall,
+			"team_total_usdt": teamFundingUsdt,
+		},
 		"team_active_subscribe_principal": teamActiveSubscribe,
 		"server_time":          serverTime,
 		"next_release_at":      nextReleaseAt,
@@ -530,7 +575,7 @@ func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
 	}
-	records, total, err := s.uc.ListDownlineUSDTRecharges(ctx, token, page, pageSize)
+	records, total, amountTotal, err := s.uc.ListDownlineUSDTRecharges(ctx, token, page, pageSize)
 	if err != nil {
 		return err
 	}
@@ -553,21 +598,29 @@ func (s *WalletService) HandleDownlineUSDTRecharges(ctx khttp.Context) error {
 		})
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"records": items,
-		"count":   total,
-		"page":    page,
-		"page_size": pageSize,
+		"records":      items,
+		"count":        total,
+		"total_amount": amountTotal,
+		"page":         page,
+		"page_size":    pageSize,
 	})
 }
 
-// HandleDownlineWINRecharges 当前用户所有下级 WIN 充值记录（链上充值 + 交易所划转）。
+// HandleDownlineWINRecharges 当前用户所有下级 WIN 充值记录。
+// Query source: 空=全部；chain=链上充值；exchange=交易所划转。
 func (s *WalletService) HandleDownlineWINRecharges(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	page, pageSize, err := transferRecordPagination(ctx)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
 	}
-	records, total, err := s.uc.ListDownlineWINRecharges(ctx, token, page, pageSize)
+	source := strings.ToLower(strings.TrimSpace(ctx.Request().URL.Query().Get("source")))
+	switch source {
+	case "", "chain", "exchange":
+	default:
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid source"})
+	}
+	records, total, amountTotal, err := s.uc.ListDownlineWINRecharges(ctx, token, page, pageSize, source)
 	if err != nil {
 		return err
 	}
@@ -580,9 +633,9 @@ func (s *WalletService) HandleDownlineWINRecharges(ctx khttp.Context) error {
 		if rec.ConfirmedTime != nil {
 			createdAt = rec.ConfirmedTime.Unix()
 		}
-		source := "chain"
+		recSource := "chain"
 		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rec.TxHash)), "partner:") {
-			source = "exchange"
+			recSource = "exchange"
 		}
 		items = append(items, map[string]any{
 			"id":         rec.ID,
@@ -590,15 +643,17 @@ func (s *WalletService) HandleDownlineWINRecharges(ctx khttp.Context) error {
 			"amount":     rec.Amount,
 			"asset":      rec.Asset,
 			"status":     rec.Status,
-			"source":     source,
+			"source":     recSource,
 			"created_at": createdAt,
 		})
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"records":   items,
-		"count":     total,
-		"page":      page,
-		"page_size": pageSize,
+		"records":      items,
+		"count":        total,
+		"total_amount": amountTotal,
+		"page":         page,
+		"page_size":    pageSize,
+		"source":       source,
 	})
 }
 
@@ -609,7 +664,7 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
 	}
-	records, total, err := s.uc.ListDownlineSubscribeOrders(ctx, token, page, pageSize)
+	records, total, amountTotal, err := s.uc.ListDownlineSubscribeOrders(ctx, token, page, pageSize)
 	if err != nil {
 		return err
 	}
@@ -640,10 +695,11 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 		})
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"records":   items,
-		"count":     total,
-		"page":      page,
-		"page_size": pageSize,
+		"records":      items,
+		"count":        total,
+		"total_amount": amountTotal,
+		"page":         page,
+		"page_size":    pageSize,
 	})
 }
 
@@ -861,7 +917,7 @@ func (s *WalletService) HandleConfirmWinRecharge(ctx khttp.Context) error {
 	})
 }
 
-// HandleListWinRecharges 查询本人 WIN 充值记录
+// HandleListWinRecharges 查询本人 WIN 充值记录（含交易所划转）
 func (s *WalletService) HandleListWinRecharges(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	records, err := s.uc.ListWinRecharges(ctx, token)
@@ -870,8 +926,40 @@ func (s *WalletService) HandleListWinRecharges(ctx khttp.Context) error {
 	}
 	items := make([]map[string]any, 0, len(records))
 	for _, r := range records {
+		source := "chain"
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.TxHash)), "partner:") {
+			source = "exchange"
+		}
+		asset := r.Asset
+		// 用户端 WIN 专区统一展示为 WIN（历史划转可能记为 WIN-A）
+		if source == "exchange" {
+			asset = biz.TokenWIN
+		}
 		item := map[string]any{
-			"id": r.ID, "asset": r.Asset, "amount": r.Amount,
+			"id": r.ID, "asset": asset, "amount": r.Amount,
+			"tx_hash": r.TxHash, "status": r.Status,
+			"source":     source,
+			"created_at": r.CreatedAt.Unix(),
+		}
+		if r.ConfirmedAt != nil {
+			item["confirmed_at"] = r.ConfirmedAt.Unix()
+		}
+		items = append(items, item)
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{"recharges": items})
+}
+
+// HandleListSdtRecharges 查询本人 AIX-USDT（SDT）充值记录
+func (s *WalletService) HandleListSdtRecharges(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	records, err := s.uc.ListSdtRecharges(ctx, token)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, r := range records {
+		item := map[string]any{
+			"id": r.ID, "asset": "AIX-USDT", "amount": r.Amount,
 			"tx_hash": r.TxHash, "status": r.Status,
 			"created_at": r.CreatedAt.Unix(),
 		}

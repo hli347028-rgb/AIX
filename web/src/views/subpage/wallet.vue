@@ -317,7 +317,8 @@ const getRewardList = async (pageNum = 1, reqType = active) => {
       const count = Number(res?.count || 0)
       allPageCount = Math.max(1, Math.ceil(count / 10));
       rewardList = (res?.list || []).map((item) => {
-        const exited = String(item.status) === '2'
+        const st = String(item.status || '').toLowerCase()
+        const exited = st === '2' || st === 'exited' || st === 'completed'
         const acc = item.accumulated ?? item.amountGet ?? '0'
         const target = item.exit_target ?? item.amountMax ?? ''
         return {
@@ -397,8 +398,13 @@ watch(locale, () => {
   getRewardList(page, active)
 })
 
-onMounted(async () => {
-  await Promise.allSettled([person.getUser?.(), person.refreshProfile()])
+onMounted(() => {
+  // 余额优先用 pinia 缓存；缺资料时补 lite。资产页再拉一次 aix-profile，
+  // 确保 WIN 充值余额等字段写入 profile（user_info 映射曾漏接）。
+  if (!person.profileReady) {
+    void person.getUser?.('lite').catch((error) => console.error('[wallet:lite]', error))
+  }
+  void person.refreshProfile?.().catch((error) => console.error('[wallet:profile]', error))
   getRewardList(1)
 })
 

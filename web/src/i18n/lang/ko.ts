@@ -125,6 +125,7 @@ const local = {
     downlineSubscribeAmount: '하위 구독 금액',
     downlineRechargeUsdt: '하위 USDT 충전 금액',
     downlineRechargeWin: '하위 WIN 충전 금액',
+    downlineExchangeWin: '하위 거래소 이체 금액',
     directLedgerTabs: '하위 내역',
     teamIdoTotal: '팀 IDO 총량',
     personalRedeemed: '개인 상환 실적',

@@ -4,7 +4,7 @@
   "质押": "Stake",
   "我的": "Mine",
   "返回": "Back",
-  "合约验证中": "Verifying",
+  "合约验证中": "Loading account",
   "钱包连接中": "Connecting",
   "签名失败": "Sign Fail",
   "用户已锁定": "User Locked",

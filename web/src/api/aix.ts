@@ -40,8 +40,9 @@ export function login(address: string, signature: string, inviteCode: string) {
   })
 }
 
-export function getAixProfile() {
-  return get<AixProfile>('/v1/wallet/aix-profile')
+/** include: area_funding / team_active / all — 团队页重字段，默认不拉以减负 */
+export function getAixProfile(params?: { include?: string }) {
+  return get<AixProfile>('/v1/wallet/aix-profile', params)
 }
 
 /** AIX-USDT 链上代币合约（用户端展示与校验备用，部署时需与后端 sdt_contract 一致） */
@@ -159,8 +160,17 @@ export function getWinWithdrawRecords() {
   return get<{ records: WinWithdrawRecord[] }>('/v1/wallet/withdraw-records')
 }
 
-export function subscribeAix(amount: string, payFrom: 'recharge' | 'reward' | 'win') {
-  return post('/v1/wallet/subscribe-aix', { amount, pay_from: payFrom })
+export function subscribeAix(
+  amount: string,
+  payFrom: 'recharge' | 'reward' | 'win',
+  opts?: { winAmount?: string },
+) {
+  const payload: Record<string, string> = { amount, pay_from: payFrom }
+  const winAmount = String(opts?.winAmount || '').trim()
+  if (payFrom === 'win' && winAmount) {
+    payload.win_amount = winAmount
+  }
+  return post('/v1/wallet/subscribe-aix', payload)
 }
 
 function formatUnixTime(value: unknown): string {
@@ -212,6 +222,7 @@ export interface AnnouncementItem {
   content?: string
   image_url?: string
   priority?: AnnouncementPriority
+  sort_order?: number
   status?: 'draft' | 'published' | 'archived'
   published_at?: string
   created_at?: string

@@ -38,9 +38,11 @@ type SystemConfigSnapshot struct {
 	UsdtWithdrawReviewThreshold string `json:"usdt_withdraw_review_threshold"` // 可提 U 提现审核阈值
 
 	// 交易所划转（合作方转账加款接口 /v1/transfer/credit）限额
-	PartnerMinAmount  string `json:"partner_min_amount"`  // 单笔下限
-	PartnerMaxAmount  string `json:"partner_max_amount"`  // 单笔上限
-	PartnerDailyLimit string `json:"partner_daily_limit"` // 单日累计上限
+	PartnerMinAmount  string `json:"partner_min_amount"`  // 单笔下限（WIN/WIN-A 共用）
+	PartnerMaxAmount  string `json:"partner_max_amount"`  // 单笔上限（WIN/WIN-A 共用）
+	PartnerDailyLimit string `json:"partner_daily_limit"` // 单日累计上限（WIN/WIN-A 共用）
+	// PartnerCreditCoinTypes 开通的 coin_type，逗号分隔，如 "1,2" 或 "1=WIN,2=WIN-A"
+	PartnerCreditCoinTypes string `json:"partner_credit_coin_types"`
 
 	// AIX 兑换审核：全网当日已兑换 AIX 超过「全网总AIX × 阈值%」后，后续兑换进待审核
 	ExchangeReviewThresholdPercent string `json:"exchange_review_threshold_percent"`
@@ -69,7 +71,7 @@ const (
 	DefaultExitMultiplier  = 4.0
 	DefaultDirectRate      = 0.5
 	DefaultAixPrice              = 1.0
-	DefaultAixPriceDailyGrowth   = 0.02 // AIX 每日上涨 2%
+	DefaultAixPriceDailyGrowth   = 0.05 // AIX 每日上涨 5%
 	DefaultWinPrice          = 1.0
 	DefaultWinAPrice         = 1.0
 	DefaultExchangeFeeRate   = 0.05
@@ -84,6 +86,8 @@ const (
 	DefaultPartnerMinAmount  = "10"
 	DefaultPartnerMaxAmount  = "100000"
 	DefaultPartnerDailyLimit = "1000000"
+	// DefaultPartnerCreditCoinTypes 默认开通 WIN(1) 与 WIN-A(2)
+	DefaultPartnerCreditCoinTypes = "1,2"
 
 	// 兑换审核阈值（%）：当日已兑换 AIX 超过「全网总AIX × 该百分比」后，后续兑换需审核。默认 100。
 	DefaultExchangeReviewThresholdPercent = "100"
@@ -139,6 +143,9 @@ func NormalizeBusinessDefaults(s *SystemConfigSnapshot) {
 	s.PartnerMinAmount = normalizePositiveAmount(s.PartnerMinAmount, DefaultPartnerMinAmount)
 	s.PartnerMaxAmount = normalizePositiveAmount(s.PartnerMaxAmount, DefaultPartnerMaxAmount)
 	s.PartnerDailyLimit = normalizePositiveAmount(s.PartnerDailyLimit, DefaultPartnerDailyLimit)
+	if strings.TrimSpace(s.PartnerCreditCoinTypes) == "" {
+		s.PartnerCreditCoinTypes = DefaultPartnerCreditCoinTypes
+	}
 	s.ExchangeReviewThresholdPercent = normalizePercent(s.ExchangeReviewThresholdPercent, DefaultExchangeReviewThresholdPercent)
 	s.ExchangeTransferMinAmount = normalizePositiveAmount(s.ExchangeTransferMinAmount, DefaultExchangeTransferMinAmount)
 	if len(s.MgmtThresholds) != 10 {

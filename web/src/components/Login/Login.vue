@@ -6,7 +6,7 @@
                 <div v-if="person.authError" class="error-text">{{ person.authError }}</div>
                 <div v-else-if="person.authStage === 'connecting'">{{lang('common.walletConnecting')}}</div>
                 <div v-else-if="person.authStage === 'authenticating'">{{lang('common.authorizing')}}</div>
-                <div v-else>{{lang('common.contractVerifying')}}</div>
+                <div v-else>{{lang('common.loadingAccount')}}</div>
                 <p v-if="!person.authError && showRetry" class="loading-hint">{{ lang('common.walletWaitingHint') }}</p>
             </div>
             <button v-if="person.authError || showRetry" class="retry-button" type="button" @click="retry">

@@ -24,6 +24,12 @@
             return {
                 columns: [
                     {
+                        title: '排序',
+                        dataIndex: 'sort_order',
+                        width: 80,
+                        customRender: (v) => (v === 0 || v ? v : '-')
+                    },
+                    {
                         title: '标题',
                         dataIndex: 'title',
                     },
@@ -36,22 +42,26 @@
                         title: '操作',
                         key: 'action',
                         fixed: 'right',
-                        width: 110,
+                        width: 200,
                         customRender: (v) => {
                             return (
-                                <a-dropdown>
-                                    <a-menu slot="overlay">
-                                        <a-menu-item onClick={() => {
-                                            this.changeBanner(v.id)
-                                        }}>删除
-                                        </a-menu-item>
-                                        <a-menu-item onClick={() => {
-                                            this.$router.push({name:"newsEdit",query:{id:v.id}})
-                                        }}>编辑
-                                        </a-menu-item>
-                                    </a-menu>
-                                    <a-button>操作 <a-icon type="down"/></a-button>
-                                </a-dropdown>
+                                <span>
+                                    <a-button size="small" style="margin-right:6px" onClick={() => this.moveItem(v.id, 'up')}>上移</a-button>
+                                    <a-button size="small" style="margin-right:6px" onClick={() => this.moveItem(v.id, 'down')}>下移</a-button>
+                                    <a-dropdown>
+                                        <a-menu slot="overlay">
+                                            <a-menu-item onClick={() => {
+                                                this.changeBanner(v.id)
+                                            }}>删除
+                                            </a-menu-item>
+                                            <a-menu-item onClick={() => {
+                                                this.$router.push({name:"newsEdit",query:{id:v.id}})
+                                            }}>编辑
+                                            </a-menu-item>
+                                        </a-menu>
+                                        <a-button size="small">更多 <a-icon type="down"/></a-button>
+                                    </a-dropdown>
+                                </span>
                             )
                         }
                     }
@@ -72,31 +82,25 @@
                     this.total = parseInt(res.count)
                 })
             },
+            moveItem (id, direction) {
+                Art.moveArticle({ id, direction }).then(() => {
+                    this.getList()
+                }).catch(() => {
+                    this.$message.error('调整顺序失败')
+                })
+            },
             changeBanner (id) {
                 this.$confirm({
                     title: `删除提示`,
                     content: `确定要删除此公告吗?`,
                     centered: true,
                     onOk: () => {
-                        return new Promise((resolve, reject) => {
-                            Art.deleteArticle({ id }).then(res => {
-                                resolve()
-                                this.getList()
-                            }).catch(res => {
-                                reject()
-                            })
+                        return Art.deleteArticle({id}).then(()=>{
+                            this.getList()
                         })
                     }
                 })
-            },
+            }
         }
     }
 </script>
-
-<style scoped lang="less">
-    .inputGroup {
-        > div {
-            margin-bottom: 20px;
-        }
-    }
-</style>

@@ -125,6 +125,7 @@ const local = {
     downlineSubscribeAmount: 'จำนวนการสมัครของลูกทีม',
     downlineRechargeUsdt: 'จำนวนเติม USDT ของลูกทีม',
     downlineRechargeWin: 'จำนวนเติม WIN ของลูกทีม',
+    downlineExchangeWin: 'จำนวนโอนจากตลาดของลูกทีม',
     directLedgerTabs: 'รายการลูกทีม',
     teamIdoTotal: 'IDO ทีมรวม',
     personalRedeemed: 'แลกส่วนตัว',

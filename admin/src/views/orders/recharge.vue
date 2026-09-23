@@ -17,6 +17,7 @@
                         <a-select-option value="admin">后台充值</a-select-option>
                         <a-select-option value="usdt">USDT充值</a-select-option>
                         <a-select-option value="win">WIN充值</a-select-option>
+                        <a-select-option value="sdt">AIX-USDT充值</a-select-option>
                         <a-select-option value="win_a">WIN-A充值</a-select-option>
                     </a-select>
                 </a-col>
@@ -44,6 +45,7 @@
                 <span>总笔数：<b>{{ stats.totalCount || 0 }}</b></span>
                 <span>USDT充值：<b>{{ formatAmount4(stats.usdtTotal) }}</b></span>
                 <span>WIN充值：<b>{{ formatAmount4(stats.winTotal) }}</b></span>
+                <span>AIX-USDT充值：<b>{{ formatAmount4(stats.sdtTotal) }}</b></span>
                 <span>WIN-A充值：<b>{{ formatAmount4(stats.winATotal) }}</b></span>
                 <span>后台充值：<b>{{ formatAmount4(stats.adminTotal) }}</b></span>
             </div>
@@ -78,7 +80,15 @@ export default {
                     title: '充值数量',
                     dataIndex: 'amount',
                     customRender: (v, row) => {
-                        const asset = (row && row.asset) || (row && row.type === 'win' ? 'WIN' : (row && row.type === 'win_a' ? 'WIN-A' : 'USDT'))
+                        let asset = (row && row.asset) || ''
+                        if (!asset) {
+                            if (row && row.type === 'win') asset = 'WIN'
+                            else if (row && row.type === 'win_a') asset = 'WIN-A'
+                            else if (row && row.type === 'sdt') asset = 'AIX-USDT'
+                            else asset = 'USDT'
+                        } else if (String(asset).toUpperCase() === 'SDT') {
+                            asset = 'AIX-USDT'
+                        }
                         return `${v || 0} ${asset}`
                     }
                 },
@@ -86,7 +96,7 @@ export default {
                     title: '类型',
                     dataIndex: 'remark',
                     customRender: (v) => {
-                        if (v === '后台充值' || v === 'USDT充值' || v === 'WIN充值' || v === 'WIN-A充值') return v
+                        if (v === '后台充值' || v === 'USDT充值' || v === 'WIN充值' || v === 'WIN-A充值' || v === 'AIX-USDT充值') return v
                         if (v === '链上充值') return 'USDT充值'
                         return v || '-'
                     }

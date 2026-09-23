@@ -9,13 +9,13 @@ import (
 func TestBumpAixPrice(t *testing.T) {
 	base := decimal.NewFromFloat(1)
 	got := bumpAixPrice(base)
-	want := decimal.NewFromFloat(1.02)
+	want := decimal.NewFromFloat(1.05)
 	if !got.Equal(want) {
 		t.Fatalf("bumpAixPrice(1) = %s, want %s", got, want)
 	}
 
 	got2 := bumpAixPrice(decimal.NewFromFloat(2))
-	want2 := decimal.NewFromFloat(2.04)
+	want2 := decimal.NewFromFloat(2.1)
 	if !got2.Equal(want2) {
 		t.Fatalf("bumpAixPrice(2) = %s, want %s", got2, want2)
 	}

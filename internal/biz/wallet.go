@@ -135,6 +135,14 @@ func GetPartnerDailyLimit() string {
 	return PartnerDailyLimit
 }
 
+// GetPartnerCreditCoinTypes 返回开通的 coin_type 白名单（如 "1,2"）。
+func GetPartnerCreditCoinTypes() string {
+	if strings.TrimSpace(PartnerCreditCoinTypes) == "" {
+		return conf.DefaultPartnerCreditCoinTypes
+	}
+	return PartnerCreditCoinTypes
+}
+
 // GetRegisterBonus 返回注册赠送金额，非法或非正数一律视为不赠送。
 func GetRegisterBonus() decimal.Decimal {
 	amount, err := decimal.NewFromString(strings.TrimSpace(RegisterBonus))
@@ -363,6 +371,9 @@ type ExchangeRecord struct {
 type SubscribeInput struct {
 	Amount     string  // 总本金 USDT
 	PayFrom    string  // recharge | reward | win
+	// WinAmount 非空时：WIN 模式以 WIN 为真源扣款，Amount 须已由上层按 WIN×价算好。
+	// 为空时：兼容旧逻辑，按 Amount÷价 反算扣款 WIN。
+	WinAmount  string
 	ExitMul    float64
 	DirectRate float64
 }
@@ -430,6 +441,8 @@ type WalletRepo interface {
 	AutoCreditWinRecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinRechargeBalance string, err error)
 	// AutoCreditWinARecharge 链上入账 WIN-A → win_a_recharge_balance（按 tx_hash 幂等）
 	AutoCreditWinARecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newWinARechargeBalance string, err error)
+	// AutoCreditSdtRecharge 链上 AIX-USDT 充值入账 → points / points_all（按 tx_hash 幂等）
+	AutoCreditSdtRecharge(ctx context.Context, txHash, fromAddress, toAddress, amount string) (credited bool, newPointsBalance string, err error)
 	// CreditPartnerWin 合作方转账加款：单事务完成「查用户 → 加 win_recharge_balance → 落流水」。
 	// txHash 传合成幂等键（partner:{partner_id}:{nonce}），复用 recharges.tx_hash 唯一索引。
 	CreditPartnerWin(ctx context.Context, in PartnerCreditInput) (*PartnerCreditResult, error)
@@ -437,16 +450,22 @@ type WalletRepo interface {
 	SumPartnerCreditedSince(ctx context.Context, partnerID string, since time.Time) (string, error)
 	ListRechargesByUser(ctx context.Context, userID int64) ([]*Recharge, error)
 	ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*Recharge, error)
-	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
-	// ListConfirmedWINRechargesByUserIDs 下级已确认 WIN 充值：含链上充值与交易所划转入账（tx_hash 以 partner: 开头）。
-	ListConfirmedWINRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, error)
+	// ListConfirmedUSDTRechargesByUserIDs 返回记录、笔数、金额合计（已确认 USDT）。
+	ListConfirmedUSDTRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*Recharge, int64, string, error)
+	// ListConfirmedWINRechargesByUserIDs 下级已确认 WIN 充值。
+	// source: ""=全部；"chain"=链上充值（排除 partner:*）；"exchange"=交易所划转入账（仅 partner:*）。
+	// 返回记录、笔数、金额合计（WIN）。
+	ListConfirmedWINRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int, source string) ([]*Recharge, int64, string, error)
 	// ListOrdersByUserIDs 按用户 ID 集合分页认购订单（含地址），供下级认购列表。
-	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*AdminOrderDetail, int64, error)
+	// 返回记录、笔数、USDT 本金合计（SUM principal）。
+	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*AdminOrderDetail, int64, string, error)
 
 	// Subscribe 单源报单（recharge / reward / win）。
 	Subscribe(ctx context.Context, userID int64, in SubscribeInput) (*Order, string, error)
 	ListOrdersByUser(ctx context.Context, userID int64) ([]*Order, error)
 	ListAllOrders(ctx context.Context) ([]*AdminOrderDetail, error)
+	// ListAdminOrdersFiltered 管理端认购列表：SQL 过滤 + 分页，避免全表 N+1。
+	ListAdminOrdersFiltered(ctx context.Context, f AdminOrderListFilter) (items []*AdminOrderDetail, total int64, principalTotal string, err error)
 	// ListSubscribeOrdersPaged 全平台认购订单分页（含用户地址），供第三方 Open API
 	ListSubscribeOrdersPaged(ctx context.Context, offset, limit int) (items []*AdminOrderDetail, total int64, err error)
 	FindOrder(ctx context.Context, id int64) (*Order, error)
@@ -528,6 +547,18 @@ type WalletRepo interface {
 type AdminOrderDetail struct {
 	Order       *Order
 	UserAddress string
+}
+
+// AdminOrderListFilter 管理端认购订单列表过滤条件。
+type AdminOrderListFilter struct {
+	Address    string
+	Status     string
+	FundSource string
+	UserIDs    []int64 // 非空时仅这些用户（团队查询）；含 -1 表示空结果
+	Start      *time.Time
+	End        *time.Time
+	Offset     int
+	Limit      int
 }
 
 // AdminOrderUpdate 管理员修改订单字段

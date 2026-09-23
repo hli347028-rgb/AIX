@@ -27,7 +27,7 @@ type UserPO struct {
 	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                         // 当前 AIX-USDT
 	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                     // 累计 AIX-USDT
 	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 上级划入累计的复投额度；下级复投可产生 AIX-USDT
-	TransferReinvestBlocked decimal.Decimal `gorm:"column:transfer_reinvest_blocked;type:decimal(36,18);default:0;not null"`     // 阻断额；再转下级不产生复投 AIX-USDT
+	TransferReinvestBlocked decimal.Decimal `gorm:"column:transfer_reinvest_blocked;type:decimal(36,18);default:0;not null"`     // 历史阻断额（已停用传递；存量可人工清零）
 	StaticUsdtTotal   decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`   // 静态总收益（USDT 金本位累计）
 	MgmtLevel         int32           `gorm:"column:mgmt_level;default:0;not null"`
 	MgmtLevelLocked   bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
@@ -271,6 +271,7 @@ type AnnouncementPO struct {
 	Title       string    `gorm:"size:256;not null"`
 	Content     string    `gorm:"type:longtext;not null"`
 	Status      int32     `gorm:"default:1;not null"` // 1=发布 0=下架
+	SortOrder   int32     `gorm:"column:sort_order;default:0;not null;index"` // 越小越靠前
 	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime time.Time `gorm:"column:updated_time;autoUpdateTime"`
 }

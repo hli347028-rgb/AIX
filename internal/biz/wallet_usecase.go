@@ -316,16 +316,17 @@ func (uc *WalletUsecase) ListRecharges(ctx context.Context, tokenString string) 
 }
 
 // ListDownlineUSDTRecharges 当前用户所有下级 USDT 充值记录（已确认；不含 WIN）。
+// 第四返回值为金额合计。
 func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 	ctx context.Context, tokenString string, page, pageSize int,
-) ([]*Recharge, int64, error) {
+) ([]*Recharge, int64, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	if page <= 0 {
 		page = 1
@@ -341,17 +342,18 @@ func (uc *WalletUsecase) ListDownlineUSDTRecharges(
 }
 
 // ListDownlineWINRecharges 当前用户所有下级 WIN 充值记录（已确认）。
-// 含链上 WIN 充值，以及交易所划转入账（recharges.tx_hash 以 partner: 开头）。
+// source: ""=全部；"chain"=链上；"exchange"=交易所划转（tx_hash 以 partner: 开头）。
+// 第四返回值为金额合计。
 func (uc *WalletUsecase) ListDownlineWINRecharges(
-	ctx context.Context, tokenString string, page, pageSize int,
-) ([]*Recharge, int64, error) {
+	ctx context.Context, tokenString string, page, pageSize int, source string,
+) ([]*Recharge, int64, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	if page <= 0 {
 		page = 1
@@ -363,20 +365,21 @@ func (uc *WalletUsecase) ListDownlineWINRecharges(
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
-	return uc.walletRepo.ListConfirmedWINRechargesByUserIDs(ctx, ids, offset, pageSize)
+	return uc.walletRepo.ListConfirmedWINRechargesByUserIDs(ctx, ids, offset, pageSize, source)
 }
 
 // ListDownlineSubscribeOrders 当前用户所有下级的认购订单（含复投 / WIN 支付）。
+// 第四返回值为 USDT 本金合计（SUM principal）。
 func (uc *WalletUsecase) ListDownlineSubscribeOrders(
 	ctx context.Context, tokenString string, page, pageSize int,
-) ([]*AdminOrderDetail, int64, error) {
+) ([]*AdminOrderDetail, int64, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	if page <= 0 {
 		page = 1
@@ -573,8 +576,9 @@ func (uc *WalletUsecase) Subscribe(ctx context.Context, tokenString string, prod
 	return nil, "", errors.BadRequest("PAY_FROM_REQUIRED", "请使用 /v1/wallet/subscribe-aix 并传 pay_from=recharge|reward|win")
 }
 
-// SubscribeAIX 单源认购：recharge（USDT 充值钱包）/ reward（复投）/ win
-func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountStr, payFrom string) (*Order, string, error) {
+// SubscribeAIX 单源认购：recharge（USDT 充值钱包）/ reward（复投）/ win。
+// winAmountStr 非空且 payFrom=win 时：以 WIN 数量为真源扣款，本金 = WIN×价（只舍入一次）。
+func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountStr, payFrom, winAmountStr string) (*Order, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
 		return nil, "", err
@@ -591,24 +595,48 @@ func (uc *WalletUsecase) SubscribeAIX(ctx context.Context, tokenString, amountSt
 	if err != nil {
 		minSubscribe = decimal.NewFromInt(100)
 	}
-	total, err := ParseAmount(strings.TrimSpace(amountStr))
-	if err != nil || !total.GreaterThan(decimal.Zero) {
-		return nil, "", errors.BadRequest("INVALID_AMOUNT", "认购金额必须大于0")
-	}
-	if total.LessThan(minSubscribe) {
-		return nil, "", errors.BadRequest("MIN_SUBSCRIBE_LIMIT", fmt.Sprintf("认购金额不能低于 %s USDT", minSubscribe.String()))
-	}
 
-	if payFrom == PayFromWin {
+	winAmountStr = strings.TrimSpace(winAmountStr)
+	var total decimal.Decimal
+	var winNative string
+	if payFrom == PayFromWin && winAmountStr != "" {
 		winPrice := decimal.NewFromFloat(GetWinPrice())
 		if !winPrice.IsPositive() {
 			return nil, "", errors.BadRequest("WIN_PRICE_NOT_CONFIGURED", "WIN 价格未配置")
+		}
+		native, nErr := ParseAmount(winAmountStr)
+		if nErr != nil || !native.GreaterThan(decimal.Zero) {
+			return nil, "", errors.BadRequest("INVALID_AMOUNT", "WIN 数量必须大于0")
+		}
+		total = native.Mul(winPrice).Round(8)
+		if !total.GreaterThan(decimal.Zero) {
+			return nil, "", errors.BadRequest("INVALID_AMOUNT", "换算后本金过小")
+		}
+		if total.LessThan(minSubscribe) {
+			return nil, "", errors.BadRequest("MIN_SUBSCRIBE_LIMIT", fmt.Sprintf("认购金额不能低于 %s USDT", minSubscribe.String()))
+		}
+		winNative = native.String()
+	} else {
+		var aErr error
+		total, aErr = ParseAmount(strings.TrimSpace(amountStr))
+		if aErr != nil || !total.GreaterThan(decimal.Zero) {
+			return nil, "", errors.BadRequest("INVALID_AMOUNT", "认购金额必须大于0")
+		}
+		if total.LessThan(minSubscribe) {
+			return nil, "", errors.BadRequest("MIN_SUBSCRIBE_LIMIT", fmt.Sprintf("认购金额不能低于 %s USDT", minSubscribe.String()))
+		}
+		if payFrom == PayFromWin {
+			winPrice := decimal.NewFromFloat(GetWinPrice())
+			if !winPrice.IsPositive() {
+				return nil, "", errors.BadRequest("WIN_PRICE_NOT_CONFIGURED", "WIN 价格未配置")
+			}
 		}
 	}
 
 	order, bal, err := uc.walletRepo.Subscribe(ctx, user.ID, SubscribeInput{
 		Amount:     total.String(),
 		PayFrom:    payFrom,
+		WinAmount:  winNative,
 		ExitMul:    ExitMultiplier,
 		DirectRate: DirectRate,
 	})
@@ -760,6 +788,14 @@ func (uc *WalletUsecase) ListWinARecharges(ctx context.Context, tokenString stri
 	return uc.walletRepo.ListRechargesByUserAsset(ctx, user.ID, TokenWINA)
 }
 
+func (uc *WalletUsecase) ListSdtRecharges(ctx context.Context, tokenString string) ([]*Recharge, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return nil, err
+	}
+	return uc.walletRepo.ListRechargesByUserAsset(ctx, user.ID, TokenSDT)
+}
+
 func (uc *WalletUsecase) WinContract() string {
 	return uc.walletCfg.GetWinContract()
 }
@@ -786,6 +822,10 @@ func (uc *WalletUsecase) WinDecimals() int32 {
 
 func (uc *WalletUsecase) SdtContract() string {
 	return uc.walletCfg.GetSdtContract()
+}
+
+func (uc *WalletUsecase) SdtDepositContract() string {
+	return uc.walletCfg.GetSdtDepositContract()
 }
 
 func (uc *WalletUsecase) SdtDecimals() int32 {
@@ -969,6 +1009,17 @@ func (uc *WalletUsecase) GetTeamActiveSubscribePrincipal(ctx context.Context, to
 		return "0", err
 	}
 	return uc.userRepo.SumActivePrincipalUnder(ctx, user.ID)
+}
+
+// GetAreaFundingBreakdown 当前用户大区/小区资金构成。
+// TotalUsdt 为认购本金合计（USDT + WIN×当时价 + 复投），不含交易所划转充值。
+func (uc *WalletUsecase) GetAreaFundingBreakdown(ctx context.Context, tokenString string) (large, small AreaFundingBreakdown, err error) {
+	zero := AreaFundingBreakdown{Usdt: "0", Win: "0", ExchangeWin: "0", Reward: "0", TotalUsdt: "0"}
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return zero, zero, err
+	}
+	return uc.userRepo.SumAreaFundingBreakdown(ctx, user.ID)
 }
 
 func (uc *WalletUsecase) GetMgmtRewardSummary(ctx context.Context, tokenString string) (*MgmtRewardSummary, error) {

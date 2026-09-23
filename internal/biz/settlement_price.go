@@ -11,7 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// bumpAixPrice applies the daily growth rate (default +2%) on top of the previous day's price.
+// bumpAixPrice applies the daily growth rate (default +5%) on top of the previous day's price.
 func bumpAixPrice(base decimal.Decimal) decimal.Decimal {
 	if !base.IsPositive() {
 		base = decimal.NewFromFloat(AixPriceInitial)
@@ -59,7 +59,7 @@ func (uc *SettlementUsecase) resolvePriceOnDate(ctx context.Context, date string
 	return decimal.NewFromFloat(AixPriceInitial), nil
 }
 
-// ensureAixPriceForSettlement 每日 0 点：写入「今日」自然日价格（昨日价 +2%），静态结算仍用结算日价格。
+// ensureAixPriceForSettlement 每日 0 点：写入「今日」自然日价格（昨日价 +5%），静态结算仍用结算日价格。
 func (uc *SettlementUsecase) ensureAixPriceForSettlement(ctx context.Context, settlementDate string) (decimal.Decimal, error) {
 	today := token.NowChina().Format("2006-01-02")
 	yesterday, err := previousChinaDate(today)
@@ -73,7 +73,7 @@ func (uc *SettlementUsecase) ensureAixPriceForSettlement(ctx context.Context, se
 	}
 	todayPrice := bumpAixPrice(base)
 	todayStr := FormatAixPriceDecimal(todayPrice)
-	if err := uc.stakingRepo.UpsertAixPrice(ctx, today, todayStr, "daily +2%"); err != nil {
+	if err := uc.stakingRepo.UpsertAixPrice(ctx, today, todayStr, "daily +5%"); err != nil {
 		return decimal.Zero, err
 	}
 	if err := uc.persistAixPriceInitial(ctx, todayPrice); err != nil {
@@ -92,7 +92,7 @@ func (uc *SettlementUsecase) ensureAixPriceForSettlement(ctx context.Context, se
 	if settlementDate != today {
 		if existing, _ := uc.stakingRepo.GetAixPrice(ctx, settlementDate); existing == "" {
 			settleStr := FormatAixPriceDecimal(settlePrice)
-			if err := uc.stakingRepo.UpsertAixPrice(ctx, settlementDate, settleStr, "daily +2%"); err != nil {
+			if err := uc.stakingRepo.UpsertAixPrice(ctx, settlementDate, settleStr, "daily +5%"); err != nil {
 				return decimal.Zero, err
 			}
 		}

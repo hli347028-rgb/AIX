@@ -125,6 +125,7 @@ const local = {
     downlineSubscribeAmount: 'Số tiền đăng ký cấp dưới',
     downlineRechargeUsdt: 'Số tiền nạp USDT cấp dưới',
     downlineRechargeWin: 'Số tiền nạp WIN cấp dưới',
+    downlineExchangeWin: 'Số tiền chuyển sàn cấp dưới',
     directLedgerTabs: 'Chi tiết cấp dưới',
     teamIdoTotal: 'Tổng IDO nhóm',
     personalRedeemed: 'Thành tích đã chuộc cá nhân',

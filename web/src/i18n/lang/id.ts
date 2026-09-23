@@ -125,6 +125,7 @@ const local = {
     downlineSubscribeAmount: 'Jumlah Langganan Bawahan',
     downlineRechargeUsdt: 'Jumlah Isi Ulang USDT Bawahan',
     downlineRechargeWin: 'Jumlah Isi Ulang WIN Bawahan',
+    downlineExchangeWin: 'Jumlah Transfer Bursa Bawahan',
     directLedgerTabs: 'Catatan bawahan',
     teamIdoTotal: 'Total IDO Tim',
     personalRedeemed: 'Ditebus Pribadi',

@@ -38,7 +38,7 @@ func init() {
 }
 
 // defaultServerTimeout 兜底的单请求预算；kratos 自身默认仅 1s，对本服务偏紧。
-const defaultServerTimeout = 5 * time.Second
+const defaultServerTimeout = 30 * time.Second
 
 // durationFromConfig 按路径读取形如 "5s" 的时长配置。
 // 不能用 config.Value.Duration()：kratos 的实现是先按 int 解析再当纳秒，

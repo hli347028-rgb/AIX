@@ -116,6 +116,15 @@ func (r *walletRepo) ConfirmRechargeCredit(ctx context.Context, id int64, txHash
 		if asset == biz.TokenWINA {
 			return fmt.Errorf("win-a recharge disabled")
 		}
+		if asset == biz.TokenSDT {
+			user.Points = user.Points.Add(po.Amount)
+			user.PointsAll = user.PointsAll.Add(po.Amount)
+			newBal = user.Points.String()
+			return tx.Model(&user).Updates(map[string]interface{}{
+				"points":     user.Points,
+				"points_all": user.PointsAll,
+			}).Error
+		}
 		user.UsdtRecharge = user.UsdtRecharge.Add(po.Amount)
 		newBal = user.UsdtRecharge.String()
 		if err := payUSDTRechargeRoleRewards(tx, user.ID, po.Amount); err != nil {
@@ -280,6 +289,81 @@ func (r *walletRepo) AutoCreditWinARecharge(
 	return false, "", fmt.Errorf("win-a recharge disabled")
 }
 
+// AutoCreditSdtRecharge 确认链上 AIX-USDT 充值并入账 points / points_all（tx_hash 幂等）。
+func (r *walletRepo) AutoCreditSdtRecharge(
+	ctx context.Context,
+	txHash, fromAddress, toAddress, amount string,
+) (bool, string, error) {
+	txHash = strings.TrimSpace(txHash)
+	fromAddress = strings.TrimSpace(fromAddress)
+	toAddress = strings.TrimSpace(toAddress)
+	amountDec, err := decimal.NewFromString(strings.TrimSpace(amount))
+	if txHash == "" || fromAddress == "" || toAddress == "" || err != nil || !amountDec.GreaterThan(decimal.Zero) {
+		return false, "", fmt.Errorf("invalid sdt recharge")
+	}
+
+	credited := false
+	var newBal string
+	err = r.data.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing RechargePO
+		findErr := tx.Where("tx_hash = ?", txHash).First(&existing).Error
+		if findErr == nil {
+			if existing.Status == biz.RechargeStatusConfirmed && strings.EqualFold(existing.Asset, biz.TokenSDT) {
+				var user UserPO
+				if err := tx.First(&user, existing.UserID).Error; err != nil {
+					return err
+				}
+				newBal = user.Points.String()
+			}
+			return nil
+		}
+		if findErr != nil && findErr != gorm.ErrRecordNotFound {
+			return findErr
+		}
+
+		var user UserPO
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("LOWER(address) = ?", strings.ToLower(fromAddress)).First(&user).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("user not found")
+			}
+			return err
+		}
+
+		now := time.Now()
+		recharge := &RechargePO{
+			UserID:        user.ID,
+			Asset:         biz.TokenSDT,
+			Amount:        amountDec,
+			TxHash:        txHash,
+			FromAddress:   fromAddress,
+			ToAddress:     toAddress,
+			Status:        biz.RechargeStatusConfirmed,
+			Message:       "sdt_deposit_only",
+			ConfirmedTime: &now,
+		}
+		if err := tx.Create(recharge).Error; err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+				return nil
+			}
+			return err
+		}
+
+		user.Points = user.Points.Add(amountDec)
+		user.PointsAll = user.PointsAll.Add(amountDec)
+		if err := tx.Model(&user).Updates(map[string]interface{}{
+			"points":     user.Points,
+			"points_all": user.PointsAll,
+		}).Error; err != nil {
+			return err
+		}
+		newBal = user.Points.String()
+		credited = true
+		return nil
+	})
+	return credited, newBal, err
+}
+
 func (r *walletRepo) ListRechargesByUser(ctx context.Context, userID int64) ([]*biz.Recharge, error) {
 	var list []RechargePO
 	if err := r.data.db.WithContext(ctx).Where("user_id = ?", userID).Order("id desc").Find(&list).Error; err != nil {
@@ -294,11 +378,21 @@ func (r *walletRepo) ListRechargesByUser(ctx context.Context, userID int64) ([]*
 
 func (r *walletRepo) ListRechargesByUserAsset(ctx context.Context, userID int64, asset string) ([]*biz.Recharge, error) {
 	asset = strings.ToUpper(strings.TrimSpace(asset))
-	q := r.data.db.WithContext(ctx).Where("user_id = ?", userID).
-		// 交易所划转不在用户充值记录中展示
-		Where("tx_hash NOT LIKE ?", "partner:%")
-	if asset != "" {
-		q = q.Where("asset = ?", asset)
+	q := r.data.db.WithContext(ctx).Where("user_id = ?", userID)
+	switch asset {
+	case biz.TokenWIN:
+		// WIN 充值专区：链上 WIN + 交易所划转（余额一律进 WIN；历史划转 asset 可能为 WIN-A）
+		q = q.Where(`(
+			(UPPER(asset) = ? AND LOWER(tx_hash) NOT LIKE ?)
+			OR (LOWER(tx_hash) LIKE ? AND UPPER(asset) IN (?, ?))
+		)`, biz.TokenWIN, "partner:%", "partner:%", biz.TokenWIN, biz.TokenWINA)
+	case "":
+		// 未指定资产时仍排除交易所划转，避免串到 USDT 等列表
+		q = q.Where("LOWER(tx_hash) NOT LIKE ?", "partner:%")
+	default:
+		// USDT / SDT / WIN-A 链上等：不展示交易所划转
+		q = q.Where("UPPER(asset) = ?", asset).
+			Where("LOWER(tx_hash) NOT LIKE ?", "partner:%")
 	}
 	var list []RechargePO
 	if err := q.Order("id desc").Find(&list).Error; err != nil {
@@ -313,9 +407,9 @@ func (r *walletRepo) ListRechargesByUserAsset(ctx context.Context, userID int64,
 
 func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 	ctx context.Context, userIDs []int64, offset, limit int,
-) ([]*biz.Recharge, int64, error) {
+) ([]*biz.Recharge, int64, string, error) {
 	if len(userIDs) == 0 {
-		return nil, 0, nil
+		return nil, 0, "0", nil
 	}
 	if offset < 0 {
 		offset = 0
@@ -333,7 +427,16 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
+	}
+	var amountSum decimal.Decimal
+	if err := r.data.db.WithContext(ctx).Model(&RechargePO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status = ?", biz.RechargeStatusConfirmed).
+		Where(assetCond, biz.TokenUSDT).
+		Select("COALESCE(SUM(amount),0)").
+		Scan(&amountSum).Error; err != nil {
+		return nil, 0, "0", err
 	}
 	type rechargeRow struct {
 		RechargePO
@@ -351,7 +454,7 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 		Offset(offset).
 		Limit(limit).
 		Scan(&rows).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	out := make([]*biz.Recharge, 0, len(rows))
 	for i := range rows {
@@ -364,14 +467,14 @@ func (r *walletRepo) ListConfirmedUSDTRechargesByUserIDs(
 		}
 		out = append(out, rec)
 	}
-	return out, total, nil
+	return out, total, amountSum.String(), nil
 }
 
 func (r *walletRepo) ListConfirmedWINRechargesByUserIDs(
-	ctx context.Context, userIDs []int64, offset, limit int,
-) ([]*biz.Recharge, int64, error) {
+	ctx context.Context, userIDs []int64, offset, limit int, source string,
+) ([]*biz.Recharge, int64, string, error) {
 	if len(userIDs) == 0 {
-		return nil, 0, nil
+		return nil, 0, "0", nil
 	}
 	if offset < 0 {
 		offset = 0
@@ -379,34 +482,57 @@ func (r *walletRepo) ListConfirmedWINRechargesByUserIDs(
 	if limit <= 0 {
 		limit = 10
 	}
-	// 下级 WIN 充值：链上 WIN + 交易所划转入账（partner:*）；不含 WIN-A。
+	source = strings.ToLower(strings.TrimSpace(source))
+	applySource := func(db *gorm.DB, col string) *gorm.DB {
+		switch source {
+		case "exchange":
+			return db.Where("LOWER("+col+") LIKE ?", "partner:%")
+		case "chain":
+			return db.Where("LOWER("+col+") NOT LIKE ?", "partner:%")
+		default:
+			return db
+		}
+	}
+	// 下级 WIN 充值：默认链上 + 交易所划转（partner:*）；不含 WIN-A。可按 source 过滤。
 	base := r.data.db.WithContext(ctx).
 		Model(&RechargePO{}).
 		Where("user_id IN ?", userIDs).
 		Where("status = ?", biz.RechargeStatusConfirmed).
 		Where("UPPER(asset) = ?", biz.TokenWIN)
+	base = applySource(base, "tx_hash")
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
+	}
+	sumQ := r.data.db.WithContext(ctx).Model(&RechargePO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status = ?", biz.RechargeStatusConfirmed).
+		Where("UPPER(asset) = ?", biz.TokenWIN)
+	sumQ = applySource(sumQ, "tx_hash")
+	var amountSum decimal.Decimal
+	if err := sumQ.Select("COALESCE(SUM(amount),0)").Scan(&amountSum).Error; err != nil {
+		return nil, 0, "0", err
 	}
 	type rechargeRow struct {
 		RechargePO
 		UserAddress string `gorm:"column:user_address"`
 	}
-	var rows []rechargeRow
-	if err := r.data.db.WithContext(ctx).
+	listQ := r.data.db.WithContext(ctx).
 		Table("recharges r").
 		Select("r.*, u.address AS user_address").
 		Joins("JOIN users u ON u.id = r.user_id").
 		Where("r.user_id IN ?", userIDs).
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
-		Where("UPPER(r.asset) = ?", biz.TokenWIN).
+		Where("UPPER(r.asset) = ?", biz.TokenWIN)
+	listQ = applySource(listQ, "r.tx_hash")
+	var rows []rechargeRow
+	if err := listQ.
 		Order("r.id DESC").
 		Offset(offset).
 		Limit(limit).
 		Scan(&rows).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	out := make([]*biz.Recharge, 0, len(rows))
 	for i := range rows {
@@ -419,14 +545,14 @@ func (r *walletRepo) ListConfirmedWINRechargesByUserIDs(
 		}
 		out = append(out, rec)
 	}
-	return out, total, nil
+	return out, total, amountSum.String(), nil
 }
 
 func (r *walletRepo) ListOrdersByUserIDs(
 	ctx context.Context, userIDs []int64, offset, limit int,
-) ([]*biz.AdminOrderDetail, int64, error) {
+) ([]*biz.AdminOrderDetail, int64, string, error) {
 	if len(userIDs) == 0 {
-		return nil, 0, nil
+		return nil, 0, "0", nil
 	}
 	if offset < 0 {
 		offset = 0
@@ -443,7 +569,15 @@ func (r *walletRepo) ListOrdersByUserIDs(
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
+	}
+	var principalSum decimal.Decimal
+	if err := r.data.db.WithContext(ctx).Model(&OrderPO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status <> ?", biz.OrderStatusCancelled).
+		Select("COALESCE(SUM(principal),0)").
+		Scan(&principalSum).Error; err != nil {
+		return nil, 0, "0", err
 	}
 	type row struct {
 		ID          int64
@@ -465,7 +599,7 @@ func (r *walletRepo) ListOrdersByUserIDs(
 		Offset(offset).Limit(limit).
 		Scan(&rows).Error
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "0", err
 	}
 	out := make([]*biz.AdminOrderDetail, 0, len(rows))
 	for _, rw := range rows {
@@ -481,7 +615,7 @@ func (r *walletRepo) ListOrdersByUserIDs(
 		o.SyncCompatFields()
 		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rw.Address})
 	}
-	return out, total, nil
+	return out, total, principalSum.String(), nil
 }
 
 func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.SubscribeInput) (*biz.Order, string, error) {
@@ -564,9 +698,20 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 			if !winPriceSnap.IsPositive() {
 				return fmt.Errorf("win price not configured")
 			}
-			nativeAmt := principal.Div(winPriceSnap).Round(8)
-			if !nativeAmt.IsPositive() {
-				return fmt.Errorf("win amount too small")
+			var nativeAmt decimal.Decimal
+			if winRaw := strings.TrimSpace(in.WinAmount); winRaw != "" {
+				// WIN 真源：按指定 WIN 数量扣款（本金已由上层按 WIN×价算好）
+				var pErr error
+				nativeAmt, pErr = decimal.NewFromString(winRaw)
+				if pErr != nil || !nativeAmt.IsPositive() {
+					return fmt.Errorf("win amount too small")
+				}
+			} else {
+				// 兼容旧客户端：本金÷价反算 WIN
+				nativeAmt = principal.Div(winPriceSnap).Round(8)
+				if !nativeAmt.IsPositive() {
+					return fmt.Errorf("win amount too small")
+				}
 			}
 			if user.WinRechargeBalance.LessThan(nativeAmt) {
 				return fmt.Errorf("insufficient win_recharge_balance")
@@ -619,15 +764,16 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 				return err
 			}
 		}
-		// Keep the order and every ancestor's cached performance atomic.
-		if err := refreshAncestorPerformance(tx, userID); err != nil {
-			return err
-		}
-		// 管理奖：充值钱包 / WIN 报单产生（大区、小区均可）；奖励复投只增加上级业绩
+		// 管理奖须在刷新上级业绩/等级之前发放：用本笔入金前的等级算级差，
+		// 晋级当笔业绩吃不到新档；下一笔起才按新等级发。
 		if !skipMgmt {
 			if err := r.createManagementRewards(tx, &user, po); err != nil {
 				return err
 			}
+		}
+		// 订单已写入后刷新上级链业绩缓存（可晋级）；不影响上面已按旧等级结算的管理奖。
+		if err := refreshAncestorPerformance(tx, userID); err != nil {
+			return err
 		}
 		// 本人新认购：只释放直推溢出；管理奖已在下级认购时一次性入账
 		if err := r.releasePendingManagementRewards(tx, userID); err != nil {
@@ -641,6 +787,7 @@ func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.Subscri
 // createManagementRewards 下级认购时按级差发放管理奖。
 // 规则：等级由小区业绩门槛决定（不要求大区达标）；管理奖对大区、小区来源均发放。
 // 向上级差：仅正 gap 产生奖励；平级不发。
+// 调用方须在 refreshAncestorPerformance 之前调用，避免本笔晋级业绩按新档发奖。
 // 可释放部分进 usdt_reward 并计入出局，超出进 overflow_reward，待本人下次认购释放。
 func (r *walletRepo) createManagementRewards(tx *gorm.DB, sourceUser *UserPO, sourceOrder *OrderPO) error {
 	if sourceUser == nil || sourceOrder == nil || sourceUser.InviterID == nil || !sourceOrder.Principal.IsPositive() {
@@ -1067,22 +1214,102 @@ func (r *walletRepo) ListOrdersByUser(ctx context.Context, userID int64) ([]*biz
 }
 
 func (r *walletRepo) ListAllOrders(ctx context.Context) ([]*biz.AdminOrderDetail, error) {
-	var list []OrderPO
-	if err := r.data.db.WithContext(ctx).Order("id desc").Find(&list).Error; err != nil {
+	type row struct {
+		OrderPO
+		Address string `gorm:"column:address"`
+	}
+	var rows []row
+	err := r.data.db.WithContext(ctx).Table("orders AS o").
+		Select("o.*, COALESCE(u.address,'') AS address").
+		Joins("LEFT JOIN users AS u ON u.id = o.user_id").
+		Order("o.id DESC").
+		Scan(&rows).Error
+	if err != nil {
 		return nil, err
 	}
-	out := make([]*biz.AdminOrderDetail, 0, len(list))
-	for i := range list {
-		addr := ""
-		var u UserPO
-		if err := r.data.db.WithContext(ctx).Select("address").First(&u, list[i].UserID).Error; err == nil {
-			addr = u.Address
-		}
-		o := r.orderToBiz(&list[i])
-		o.SyncCompatFields()
-		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: addr})
+	out := make([]*biz.AdminOrderDetail, 0, len(rows))
+	for i := range rows {
+		po := rows[i].OrderPO
+		o := r.orderToBiz(&po)
+		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rows[i].Address})
 	}
 	return out, nil
+}
+
+func (r *walletRepo) ListAdminOrdersFiltered(ctx context.Context, f biz.AdminOrderListFilter) ([]*biz.AdminOrderDetail, int64, string, error) {
+	offset, limit := f.Offset, f.Limit
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	for _, id := range f.UserIDs {
+		if id < 0 {
+			return []*biz.AdminOrderDetail{}, 0, "0", nil
+		}
+	}
+
+	apply := func(db *gorm.DB) *gorm.DB {
+		db = db.Table("orders AS o").Joins("LEFT JOIN users AS u ON u.id = o.user_id")
+		if len(f.UserIDs) > 0 {
+			db = db.Where("o.user_id IN ?", f.UserIDs)
+		}
+		addr := strings.TrimSpace(f.Address)
+		if addr != "" {
+			db = db.Where("LOWER(u.address) LIKE ?", "%"+strings.ToLower(addr)+"%")
+		}
+		status := strings.ToLower(strings.TrimSpace(f.Status))
+		if status != "" {
+			db = db.Where("LOWER(o.status) = ?", status)
+		}
+		fs := strings.ToLower(strings.TrimSpace(f.FundSource))
+		if fs != "" {
+			db = db.Where("LOWER(o.fund_source) = ?", fs)
+		}
+		if f.Start != nil {
+			db = db.Where("o.created_time >= ?", *f.Start)
+		}
+		if f.End != nil {
+			db = db.Where("o.created_time <= ?", *f.End)
+		}
+		return db
+	}
+
+	var total int64
+	if err := apply(r.data.db.WithContext(ctx)).Count(&total).Error; err != nil {
+		return nil, 0, "0", err
+	}
+	var principalSum decimal.Decimal
+	if err := apply(r.data.db.WithContext(ctx)).
+		Select("COALESCE(SUM(o.principal),0)").
+		Scan(&principalSum).Error; err != nil {
+		return nil, 0, "0", err
+	}
+
+	type row struct {
+		OrderPO
+		Address string `gorm:"column:address"`
+	}
+	var rows []row
+	err := apply(r.data.db.WithContext(ctx)).
+		Select("o.*, COALESCE(u.address,'') AS address").
+		Order("o.id DESC").
+		Offset(offset).Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, "0", err
+	}
+	out := make([]*biz.AdminOrderDetail, 0, len(rows))
+	for i := range rows {
+		po := rows[i].OrderPO
+		o := r.orderToBiz(&po)
+		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rows[i].Address})
+	}
+	return out, total, principalSum.String(), nil
 }
 
 func (r *walletRepo) ListSubscribeOrdersPaged(ctx context.Context, offset, limit int) ([]*biz.AdminOrderDetail, int64, error) {
@@ -1221,20 +1448,13 @@ func (r *walletRepo) CreateTransfer(ctx context.Context, t *biz.Transfer) (*biz.
 		if !uplineToDownline {
 			return fmt.Errorf("transfer only allowed from upline to downline")
 		}
-		// 上级→下级每笔划转都给下级增加复投 AIX-USDT 额度（阻断额除外）。
-		blockedPass := decimal.Min(amount, from.TransferReinvestBlocked)
-		if blockedPass.IsPositive() {
-			from.TransferReinvestBlocked = from.TransferReinvestBlocked.Sub(blockedPass)
-			fromUpdates["transfer_reinvest_blocked"] = from.TransferReinvestBlocked
-			to.TransferReinvestBlocked = to.TransferReinvestBlocked.Add(blockedPass)
-			toUpdates["transfer_reinvest_blocked"] = to.TransferReinvestBlocked
-		}
-		creditAdd := amount.Sub(blockedPass)
+		// 上级→下级：划转金额全额计入下级复投额度（1:1 认购可得 AIX-USDT），不再传递阻断额。
+		creditAdd := amount
 		if creditAdd.IsPositive() {
 			to.TransferReinvestCredit = to.TransferReinvestCredit.Add(creditAdd)
 			toUpdates["transfer_reinvest_credit"] = to.TransferReinvestCredit
 		}
-		// 上级自身若仍有可复投额度，按本次实际新增额度扣减，避免钱转走后仍用旧额度复投。
+		// 上级自身若仍有可复投额度，按本次划转金额扣减，避免钱转走后仍用旧额度复投。
 		if from.TransferReinvestCredit.IsPositive() && creditAdd.IsPositive() {
 			deduct := decimal.Min(creditAdd, from.TransferReinvestCredit)
 			from.TransferReinvestCredit = from.TransferReinvestCredit.Sub(deduct)

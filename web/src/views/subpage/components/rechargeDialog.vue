@@ -16,6 +16,7 @@
       <a-radio-group v-model:value="assetType" button-style="solid" class="asset-tabs" @change="onAssetTypeChange">
         <a-radio-button value="usdt">USDT</a-radio-button>
         <a-radio-button value="win">WIN</a-radio-button>
+        <a-radio-button value="sdt">AIX-USDT</a-radio-button>
       </a-radio-group>
 
       <div class="dialog-main">
@@ -48,6 +49,19 @@
           </div>
         </template>
 
+        <template v-else-if="assetType === 'sdt'">
+          <a-input-number
+            autofocus
+            v-model:value="amount"
+            :min="minSdtRecharge"
+            size="large"
+            :placeholder="$t('recharge.enterAmount')"
+          />
+          <div class="dialog-info">
+            <p><QuestionCircleOutlined style="margin-right: 5px" />{{ $t('recharge.minRechargeAmount') }}: {{ minSdtRecharge }} AIX-USDT</p>
+          </div>
+        </template>
+
       </div>
 
       <a-button class="withdraw-btn" :disabled="loading" size="large" @click="handleSubmit" type="primary">
@@ -72,8 +86,11 @@ import { sendBuyTransaction, sendErc20Approve } from '@/tools/walletTx'
 
 const BUY_USDT_ADDR = import.meta.env.VITE_BUY_USDT || import.meta.env.VITE_BUY
 const BUY_WIN_ADDR = import.meta.env.VITE_BUY
+const BUY_SDT_ADDR = import.meta.env.VITE_BUY_SDT || ''
 const USDT_ADDR = import.meta.env.VITE_USDT || ''
+const SDT_ADDR = import.meta.env.VITE_AIX_USDT_CONTRACT || ''
 const USDT = USDT_ADDR ? new Contract(USDT_ADDR, 'ERC20') : null
+const SDT = SDT_ADDR ? new Contract(SDT_ADDR, 'ERC20') : null
 
 const person = userPerson()
 const { t: $t } = useI18n()
@@ -105,6 +122,11 @@ const minWinRecharge = computed(() => {
 const minUsdtRecharge = computed(() => {
   const min = Number(person.profile?.min_usdt_recharge || 10)
   return Number.isFinite(min) && min >= 10 ? min : 10
+})
+
+const minSdtRecharge = computed(() => {
+  const min = Number(person.profile?.min_sdt_recharge || person.profile?.min_usdt_recharge || 10)
+  return Number.isFinite(min) && min >= 1 ? min : 10
 })
 
 const winPayableAmount = computed(() => {
@@ -268,6 +290,110 @@ const submitUsdtRecharge = async () => {
   await finishUsdtSuccess()
 }
 
+const sendSdtBuy = (count, extra = {}) => sendBuyTransaction({
+  buyContract: BUY_SDT_ADDR,
+  num: count,
+  gasLimit: 350000,
+  onTxHash: () => startRechargeLoading($t('recharge.processing')),
+  ...extra,
+})
+
+const explainSdtFailure = async () => {
+  const [sdtRaw, winBal, allowance] = await Promise.all([
+    SDT.call('balanceOf', [ETH.account]),
+    ETH.getNativeBalance(),
+    SDT.call('allowance', [ETH.account, BUY_SDT_ADDR]),
+  ])
+  nativeWinBalance.value = winBal
+  const sdtBal = ethers.utils.formatUnits(sdtRaw?.toString?.() || String(sdtRaw || '0'), 18)
+  return { sdtBal, winBal, allowance }
+}
+
+const submitSdtRecharge = async () => {
+  if (!SDT || !SDT_ADDR) {
+    showRechargeToast($t('recharge.sdtNotConfigured'))
+    return
+  }
+  if (!BUY_SDT_ADDR) {
+    showRechargeToast($t('recharge.sdtNotConfigured'))
+    return
+  }
+  const count = Number(amount.value)
+  if (!Number.isFinite(count) || count < minSdtRecharge.value) {
+    showRechargeToast($t('recharge.minimumErrorSdt', { amount: minSdtRecharge.value }))
+    return
+  }
+
+  await ETH.getAccount('eoeo')
+  const beforeBalance = String(person.profile?.points || '0')
+  let hash = ''
+  try {
+    const result = await sendSdtBuy(count, { silent: true })
+    hash = result?.hash || ''
+  } catch (error) {
+    if (isWalletCancelled(error)) throw error
+    stopRechargeLoading()
+    const { sdtBal, winBal, allowance } = await explainSdtFailure()
+    if (!(Number(allowance) > 0)) {
+      await sendErc20Approve({
+        tokenContract: SDT_ADDR,
+        spender: BUY_SDT_ADDR,
+        amount: MAX_USDT_ALLOWANCE,
+        gasLimit: 120000,
+        logDecimals: true,
+        onTxHash: () => startRechargeLoading($t('recharge.processing')),
+      })
+      stopRechargeLoading()
+      const result = await sendSdtBuy(count)
+      hash = result?.hash || ''
+      await finishSdtSuccess(hash, beforeBalance)
+      return
+    }
+    if (compareDecimals(String(sdtBal), String(count)) < 0) {
+      showRechargeToast($t('recharge.insufficientSdt'))
+      return
+    }
+    if (compareDecimals(String(winBal), MIN_GAS_WIN) < 0) {
+      showRechargeToast($t('recharge.winInsufficientNative'))
+      return
+    }
+    throw error
+  }
+  await finishSdtSuccess(hash, beforeBalance)
+}
+
+const finishSdtSuccess = async (hash = '', beforeBalance = '0') => {
+  stopRechargeLoading()
+  startRechargeLoading($t('recharge.winConfirming'))
+  const pollResult = await pollWinBalance(
+    () => person.refreshProfile?.(),
+    beforeBalance,
+    30,
+    2000,
+    'points',
+  )
+  stopRechargeLoading()
+
+  const successMessage = pollResult.updated
+    ? $t('recharge.sdtRechargeSuccess')
+    : $t('recharge.winRechargePending')
+  const hashLine = hash
+    ? `\n${$t('recharge.txHash')}: ${hash.slice(0, 10)}…${hash.slice(-8)}`
+    : ''
+
+  await showDialog({
+    title: $t('common.prompt'),
+    message: `${successMessage}${hashLine}`,
+    theme: 'round-button',
+    confirmButtonColor: '#0052ff',
+    confirmButtonText: $t('common.gotIt'),
+  })
+
+  await person.getUser()
+  await props.onChange?.()
+  isOpen.value = false
+}
+
 const submitWinRecharge = async () => {
   const num = Number(amount.value)
   if (!Number.isInteger(num) || num < minWinRecharge.value) {
@@ -338,7 +464,8 @@ const handleSubmit = async () => {
   try {
     if (assetType.value === 'usdt') {
       await submitUsdtRecharge()
-
+    } else if (assetType.value === 'sdt') {
+      await submitSdtRecharge()
     } else {
       await submitWinRecharge()
     }

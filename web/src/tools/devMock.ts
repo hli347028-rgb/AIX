@@ -112,7 +112,7 @@ const PROFILE = () => ({
   server_time: nowSec(),
   aix_contract: '0x314D550572a0fA001B465a9EBc1dd04D834a0688',
   sdt_contract: '0x314D550572a0fA001B465a9EBc1dd04D834a0688',
-  win_contract: '0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e',
+  win_contract: '0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1',
   usdt_contract: '0x926632975149221891f1b9B56Efd125Dfe90ba2f',
   points: '1280',
   points_all: '3400',
@@ -188,14 +188,18 @@ const routes: Record<string, Handler> = {
   '/v1/wallet/withdrawals': () => ({ records: [], list: [], count: 0 }),
   '/v1/wallet/recharges': () => ({ recharges: [{ id: 1, amount: '1000.0000', asset: 'USDT', status: 'completed', tx_hash: '0xdevusdt', created_at: nowSec() - 26 * DAY }], count: 1 }),
   '/v1/wallet/recharges-win': () => ({ recharges: [{ id: 2, amount: '300.0000', asset: 'WIN', status: 'completed', tx_hash: '0xdevwin', created_at: nowSec() - 14 * DAY }], count: 1 }),
-  '/v1/wallet/downline-usdt-recharges': () => ({ records: INVITEES.map((v, i) => ({ id: 10 + i, address: v.address, amount: v.team_stake, asset: 'USDT', status: 'completed', created_at: v.created_at })), count: INVITEES.length }),
-  '/v1/wallet/downline-win-recharges': () => ({
-    records: [
+  '/v1/wallet/downline-usdt-recharges': () => {
+    const records = INVITEES.map((v, i) => ({ id: 10 + i, address: v.address, amount: v.team_stake, asset: 'USDT', status: 'completed', created_at: v.created_at }))
+    const total = records.reduce((s, r) => s + Number(r.amount || 0), 0)
+    return { records, count: records.length, total_amount: String(total) }
+  },
+  '/v1/wallet/downline-win-recharges': () => {
+    const records = [
       { id: 20, address: INVITEES[0]?.address || addr(), amount: '100.0000', asset: 'WIN', source: 'chain', status: 'completed', created_at: nowSec() - DAY },
       { id: 21, address: INVITEES[1]?.address || addr(), amount: '250.0000', asset: 'WIN', source: 'exchange', status: 'completed', created_at: nowSec() - 2 * DAY },
-    ],
-    count: 2,
-  }),
+    ]
+    return { records, count: records.length, total_amount: '350' }
+  },
   '/v1/wallet/transfer-records/lineal': () => ({ records: [], count: 0 }),
 
   '/v1/announcements': () => ({ list: ANNOUNCEMENTS, count: ANNOUNCEMENTS.length, page: 1 }),

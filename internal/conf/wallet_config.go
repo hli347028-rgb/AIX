@@ -9,8 +9,9 @@ import (
 
 const (
 	DefaultDepositContract     = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
-	DefaultWinDepositContract  = "0x94db6bb040107ef9a2F1e9DB9d84dD8D6D98997e"
+	DefaultWinDepositContract  = "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
 	DefaultWinADepositContract = "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
+	DefaultSdtDepositContract  = "0x285d60af560663c5538D8fa8214361713B6c00aD" // AIX-USDT BuySomething
 	DefaultSdtContract         = "0x314D550572a0fA001B465a9EBc1dd04D834a0688"
 	DefaultRPCURL              = "https://rpc1.eoeo.info"
 	DefaultBscRPCURL           = "https://bsc-dataseed.binance.org"
@@ -23,6 +24,7 @@ type WalletConfig struct {
 	DepositContract                  string   `json:"deposit_contract" yaml:"deposit_contract"`             // USDT BuySomething
 	WinDepositContract               string   `json:"win_deposit_contract" yaml:"win_deposit_contract"`     // 原生 WIN BuySomething
 	WinADepositContract              string   `json:"win_a_deposit_contract" yaml:"win_a_deposit_contract"` // WIN-A BuySomething
+	SdtDepositContract               string   `json:"sdt_deposit_contract" yaml:"sdt_deposit_contract"`     // AIX-USDT BuySomething
 	WinARechargeEnabled              *bool    `json:"win_a_recharge_enabled" yaml:"win_a_recharge_enabled"`   // WIN-A 链上充值开关（nil/true=开放）
 	UsdtContract                     string   `json:"usdt_contract" yaml:"usdt_contract"`
 	UsdtDecimals                     int32    `json:"usdt_decimals" yaml:"usdt_decimals"`
@@ -30,7 +32,7 @@ type WalletConfig struct {
 	WinDecimals                      int32    `json:"win_decimals" yaml:"win_decimals"`
 	WinAContract                     string   `json:"win_a_contract" yaml:"win_a_contract"` // WIN-A ERC20 代币
 	WinADecimals                     int32    `json:"win_a_decimals" yaml:"win_a_decimals"`
-	SdtContract                      string   `json:"sdt_contract" yaml:"sdt_contract"`
+	SdtContract                      string   `json:"sdt_contract" yaml:"sdt_contract"` // AIX-USDT ERC20（提现打款）
 	SdtDecimals                      int32    `json:"sdt_decimals" yaml:"sdt_decimals"`
 	RPCURL                           string   `json:"rpc_url" yaml:"rpc_url"`         // EOEO（WIN 充值 / 价格 / 提现）
 	BscRPCURL                        string   `json:"bsc_rpc_url" yaml:"bsc_rpc_url"` // BSC（USDT 充值）
@@ -97,6 +99,13 @@ func (w *WalletConfig) GetWinDepositContract() string {
 		return DefaultWinDepositContract
 	}
 	return strings.TrimSpace(w.WinDepositContract)
+}
+
+func (w *WalletConfig) GetSdtDepositContract() string {
+	if w == nil || strings.TrimSpace(w.SdtDepositContract) == "" {
+		return DefaultSdtDepositContract
+	}
+	return strings.TrimSpace(w.SdtDepositContract)
 }
 
 func (w *WalletConfig) GetWinADepositContract() string {
