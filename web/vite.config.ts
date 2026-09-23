@@ -14,7 +14,11 @@ export default defineConfig(({ mode }) => {
         name: 'aix-build-id',
         transformIndexHtml(html) {
             const id = process.env.AIX_BUILD_ID || new Date().toISOString()
-            return html.replace('</head>', `    <meta name="aix-build" content="${id}">\n  </head>`)
+            const v = encodeURIComponent(id)
+            return html
+                .replaceAll('href="/favicon.png"', `href="/favicon.png?v=${v}"`)
+                .replaceAll('href="/favicon.ico"', `href="/favicon.ico?v=${v}"`)
+                .replace('</head>', `    <meta name="aix-build" content="${id}">\n  </head>`)
         },
     }],
     resolve: {
