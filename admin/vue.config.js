@@ -7,7 +7,7 @@ function resolve (dir) {
 
 // vue.config.js
 module.exports = {
-    publicPath: '/admin',
+    publicPath: '/console',
     /*
       Vue-cli3:
       Crashed when using Webpack `import()` #2463

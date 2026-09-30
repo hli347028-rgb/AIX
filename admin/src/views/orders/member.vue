@@ -207,6 +207,17 @@ export default {
                                         </a-button>
 
                                         <a-menu slot="overlay">
+                                            <a-menu-item
+                                                onClick={() => {
+                                                    this.$router.push({
+                                                        name: 'loginDevices',
+                                                        query: { address: v.address, user_id: v.userId || v.id },
+                                                    })
+                                                }}
+                                            >
+                                                登录设备
+                                            </a-menu-item>
+
                                             <a-menu-item onClick={() => this.add_account_balance(v.address)}>
                                                 添加充值余额
                                             </a-menu-item>

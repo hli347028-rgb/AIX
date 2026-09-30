@@ -34,6 +34,12 @@
                         dataIndex: 'title',
                     },
                     {
+                        title: '状态',
+                        dataIndex: 'status',
+                        width: 90,
+                        customRender: (v) => (Number(v) === 0 ? '已关闭' : '显示中')
+                    },
+                    {
                         title: '添加时间',
                         dataIndex: 'add_time',
                         customRender: (v) => this.timeOne(v)
@@ -42,12 +48,14 @@
                         title: '操作',
                         key: 'action',
                         fixed: 'right',
-                        width: 200,
+                        width: 280,
                         customRender: (v) => {
+                            const closed = Number(v.status) === 0
                             return (
                                 <span>
                                     <a-button size="small" style="margin-right:6px" onClick={() => this.moveItem(v.id, 'up')}>上移</a-button>
                                     <a-button size="small" style="margin-right:6px" onClick={() => this.moveItem(v.id, 'down')}>下移</a-button>
+                                    <a-button size="small" style="margin-right:6px" onClick={() => this.setStatus(v, closed ? 1 : 0)}>{closed ? '打开' : '关闭'}</a-button>
                                     <a-dropdown>
                                         <a-menu slot="overlay">
                                             <a-menu-item onClick={() => {
@@ -87,6 +95,19 @@
                     this.getList()
                 }).catch(() => {
                     this.$message.error('调整顺序失败')
+                })
+            },
+            setStatus (row, status) {
+                const closing = status === 0
+                this.$confirm({
+                    title: closing ? '关闭公告' : '打开公告',
+                    content: closing ? '关闭后用户端不再显示此公告，确定关闭吗？' : '打开后用户端会重新显示此公告，确定打开吗？',
+                    centered: true,
+                    onOk: () => {
+                        return Art.setArticleStatus({ id: row.id, status }).then(() => {
+                            this.getList()
+                        })
+                    }
                 })
             },
             changeBanner (id) {

@@ -458,7 +458,8 @@ type WalletRepo interface {
 	ListConfirmedWINRechargesByUserIDs(ctx context.Context, userIDs []int64, offset, limit int, source string) ([]*Recharge, int64, string, error)
 	// ListOrdersByUserIDs 按用户 ID 集合分页认购订单（含地址），供下级认购列表。
 	// 返回记录、笔数、USDT 本金合计（SUM principal）。
-	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int) ([]*AdminOrderDetail, int64, string, error)
+	// fundSource 为空表示全部；否则列表与合计都只含该充值类型。win 含历史 win_a。
+	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int, fundSource string) ([]*AdminOrderDetail, int64, string, error)
 
 	// Subscribe 单源报单（recharge / reward / win）。
 	Subscribe(ctx context.Context, userID int64, in SubscribeInput) (*Order, string, error)

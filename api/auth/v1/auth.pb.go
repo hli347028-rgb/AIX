@@ -47,6 +47,8 @@ type LoginRequest struct {
 	Address    string `json:"address"`
 	Signature  string `json:"signature"`
 	InviteCode string `json:"invite_code"`
+	DeviceID   string `json:"device_id"`
+	Client     string `json:"client"`
 }
 
 type LoginReply struct {

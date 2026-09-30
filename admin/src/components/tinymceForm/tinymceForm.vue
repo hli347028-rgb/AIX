@@ -16,8 +16,8 @@
     import 'tinymce/plugins/lists'
     import 'tinymce/plugins/wordcount'
 
-    // admin 部署在 /admin 下，皮肤与语言包必须走 publicPath，否则编辑区空白无法输入
-    const publicBase = String(process.env.BASE_URL || '/admin/').replace(/\/?$/, '/')
+    // 后台部署在 /console 下，皮肤与语言包必须走 publicPath，否则编辑区空白无法输入
+    const publicBase = String(process.env.BASE_URL || '/console/').replace(/\/?$/, '/')
 
     export default {
         name: 'tinymceForm',

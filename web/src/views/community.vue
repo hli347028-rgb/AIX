@@ -254,6 +254,19 @@
       </div>
 
       <div v-show="directLedgerTab === 'subscribe'" class="ledger" role="tabpanel">
+        <div class="subscribe-type-filters" role="group" :aria-label="$t('community.subscribeType')">
+          <button
+            v-for="opt in subscribeTypeOptions"
+            :key="opt.value || 'all'"
+            type="button"
+            class="subscribe-type-filter"
+            :class="{ active: subscribeTypeFilter === opt.value }"
+            :aria-pressed="subscribeTypeFilter === opt.value"
+            @click="setSubscribeTypeFilter(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
         <div class="ledger-head">
           <span>{{ $t('community.walletAddress') }}</span>
           <span class="type">{{ $t('community.subscribeType') }}</span>
@@ -516,6 +529,13 @@ let downlineOrderList = $ref<any[]>([])
 let downlinePage = $ref(1)
 let downlinePageCount = $ref(1)
 let downlineSubscribeTotal = $ref('0')
+let subscribeTypeFilter = $ref('')
+const subscribeTypeOptions = computed(() => [
+  { value: '', label: $t('community.subscribeTypeAll') },
+  { value: 'recharge', label: $t('community.subscribeTypeRecharge') },
+  { value: 'reward', label: $t('community.subscribeTypeReward') },
+  { value: 'win', label: $t('community.subscribeTypeWin') },
+])
 let downlineRechargeList = $ref<any[]>([])
 let downlineRechargePage = $ref(1)
 let downlineRechargePageCount = $ref(1)
@@ -567,8 +587,7 @@ const formatLedgerTotal = (value: any, digits = 2) => {
 const formatSubscribeType = (fundSource: string) => {
   const key = String(fundSource || '').toLowerCase()
   if (key === 'reward') return $t('community.subscribeTypeReward')
-  if (key === 'win') return $t('community.subscribeTypeWin')
-  if (key === 'win_a') return $t('community.subscribeTypeWinA')
+  if (key === 'win' || key === 'win_a') return $t('community.subscribeTypeWin')
   return $t('community.subscribeTypeRecharge')
 }
 
@@ -631,12 +650,19 @@ const copyToClipboard = (text: string) => {
 }
 
 const getDownlineOrders = async (pageNum: number = 1) => {
-  const res: any = await request.get('app_server/downline_subscribe_orders', {
-    params: { page: pageNum },
-  })
+  const params: Record<string, any> = { page: pageNum }
+  if (subscribeTypeFilter) params.fund_source = subscribeTypeFilter
+  const res: any = await request.get('app_server/downline_subscribe_orders', { params })
   downlinePageCount = Math.ceil((res.count || 0) / 10) || 1
   downlineOrderList = res.list || []
   downlineSubscribeTotal = String(res.total_amount ?? res.totalAmount ?? '0')
+}
+
+const setSubscribeTypeFilter = (value: string) => {
+  if (subscribeTypeFilter === value) return
+  subscribeTypeFilter = value
+  downlinePage = 1
+  void getDownlineOrders(1)
 }
 
 const getDownlineRecharges = async (pageNum: number = 1) => {
@@ -1126,6 +1152,37 @@ onBeforeUnmount(() => {
 /* 账目表。四列：地址 / 充值类型 / 金额 / 时间；三列：地址 / 金额 / 时间 */
 .ledger {
   margin-top: 2px;
+}
+
+.subscribe-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.subscribe-type-filter {
+  padding: 4px 10px;
+  border: 1px solid var(--hair-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+
+  &.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent-bright);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 .direct-ledger-section {

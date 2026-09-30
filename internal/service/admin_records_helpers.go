@@ -198,6 +198,30 @@ func (s *AdminLegacyService) sumStaticAixAmount(ctx context.Context, settlementD
 	return total, nil
 }
 
+// sumAllOrderPrincipal 全部报单本金，含已作废订单。
+func (s *AdminLegacyService) sumAllOrderPrincipal(ctx context.Context, since *time.Time) (decimal.Decimal, error) {
+	db := s.data.DB().WithContext(ctx).Table("orders")
+	if since != nil {
+		db = db.Where("created_time >= ?", *since)
+	}
+	var total decimal.Decimal
+	if err := db.Select("COALESCE(SUM(principal),0)").Scan(&total).Error; err != nil {
+		return decimal.Zero, err
+	}
+	return total, nil
+}
+
+// sumSettlementStaticTotal 每日结算静态合计（AIX），与列表「静态合计」同口径，含失败批次上已记下的发放。
+func (s *AdminLegacyService) sumSettlementStaticTotal(ctx context.Context) (decimal.Decimal, error) {
+	var total decimal.Decimal
+	err := s.data.DB().WithContext(ctx).Table("settlement_batches").
+		Select("COALESCE(SUM(static_amount),0)").Scan(&total).Error
+	if err != nil {
+		return decimal.Zero, err
+	}
+	return total, nil
+}
+
 func (s *AdminLegacyService) sumOrderPrincipal(ctx context.Context, fundSource string, since *time.Time) (decimal.Decimal, error) {
 	db := s.data.DB().WithContext(ctx).Table("orders").
 		Where("status IN ?", []string{biz.OrderStatusActive, biz.OrderStatusExited})
@@ -325,6 +349,176 @@ type rewardListRow struct {
 	CreatedTime    time.Time
 }
 
+func isAixUsdtTypeFilter(typeFilter string) bool {
+	switch strings.ToLower(strings.TrimSpace(typeFilter)) {
+	case "sdt", "aix-usdt", "aix_usdt":
+		return true
+	default:
+		return false
+	}
+}
+
+// aixUsdtLedgerUnion 充值(SDT) + 报单积分(points>0) 流水 UNION，供订单奖励「AIX-USDT」筛选。
+func (s *AdminLegacyService) aixUsdtLedgerUnion(ctx context.Context, q url.Values) (unionSQL string, args []interface{}, err error) {
+	addressFilter := strings.TrimSpace(q.Get("address"))
+	teamIDs, teamMode, err := s.teamUserIDsForQuery(ctx, q)
+	if err != nil {
+		return "", nil, err
+	}
+	start, end := parseLegacyTimeRange(q)
+
+	rechargeWhere := "r.status = ? AND UPPER(r.asset) = ? AND r.tx_hash NOT LIKE ?"
+	rechargeArgs := []interface{}{biz.RechargeStatusConfirmed, biz.TokenSDT, "partner:%"}
+	orderWhere := "o.points > 0"
+	var orderArgs []interface{}
+
+	if teamMode {
+		rechargeWhere += " AND r.user_id IN ?"
+		rechargeArgs = append(rechargeArgs, teamIDs)
+		orderWhere += " AND o.user_id IN ?"
+		orderArgs = append(orderArgs, teamIDs)
+	} else if addressFilter != "" {
+		like := "%" + addressFilter + "%"
+		rechargeWhere += " AND (r.from_address LIKE ? OR u.address LIKE ?)"
+		rechargeArgs = append(rechargeArgs, like, like)
+		orderWhere += " AND u.address LIKE ?"
+		orderArgs = append(orderArgs, like)
+	}
+	if start != nil {
+		rechargeWhere += " AND r.created_time >= ?"
+		rechargeArgs = append(rechargeArgs, *start)
+		orderWhere += " AND o.created_time >= ?"
+		orderArgs = append(orderArgs, *start)
+	}
+	if end != nil {
+		rechargeWhere += " AND r.created_time <= ?"
+		rechargeArgs = append(rechargeArgs, *end)
+		orderWhere += " AND o.created_time <= ?"
+		orderArgs = append(orderArgs, *end)
+	}
+
+	unionSQL = fmt.Sprintf(`
+(SELECT r.id AS id,
+	'AIX-USDT充值' AS type,
+	'AIX-USDT' AS asset,
+	r.amount AS amount,
+	COALESCE(NULLIF(r.from_address,''), u.address) AS address,
+	COALESCE(r.tx_hash,'') AS from_address,
+	CAST(NULL AS CHAR) AS settlement_date,
+	r.created_time AS created_time
+ FROM recharges r
+ JOIN users u ON u.id = r.user_id
+ WHERE %s)
+UNION ALL
+(SELECT o.id AS id,
+	CASE o.points_source
+		WHEN '%s' THEN 'USDT认购'
+		WHEN '%s' THEN 'WIN认购'
+		WHEN '%s' THEN '复投（上级划转）'
+		WHEN '%s' THEN '复投（历史规则回补）'
+		ELSE '报单积分'
+	END AS type,
+	'AIX-USDT' AS asset,
+	o.points AS amount,
+	u.address AS address,
+	'' AS from_address,
+	CAST(NULL AS CHAR) AS settlement_date,
+	o.created_time AS created_time
+ FROM orders o
+ JOIN users u ON u.id = o.user_id
+ WHERE %s)`,
+		rechargeWhere,
+		biz.PointsSourceRecharge,
+		biz.PointsSourceWin,
+		biz.PointsSourceTransferReinvest,
+		biz.PointsSourceRewardLegacy,
+		orderWhere,
+	)
+	args = append(rechargeArgs, orderArgs...)
+	return unionSQL, args, nil
+}
+
+func (s *AdminLegacyService) aixUsdtLedgerCount(ctx context.Context, q url.Values) (int64, error) {
+	unionSQL, args, err := s.aixUsdtLedgerUnion(ctx, q)
+	if err != nil {
+		return 0, err
+	}
+	var total int64
+	err = s.data.DB().WithContext(ctx).
+		Raw("SELECT COUNT(*) FROM ("+unionSQL+") AS aix_usdt_ledger", args...).
+		Scan(&total).Error
+	return total, err
+}
+
+func (s *AdminLegacyService) aixUsdtLedgerPage(ctx context.Context, q url.Values, offset, limit int) ([]rewardListRow, error) {
+	unionSQL, args, err := s.aixUsdtLedgerUnion(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	sql := "SELECT id, type, asset, amount, address, from_address, settlement_date, created_time FROM (" +
+		unionSQL + ") AS aix_usdt_ledger ORDER BY created_time DESC, id DESC"
+	pageArgs := append([]interface{}{}, args...)
+	if limit > 0 {
+		sql += " LIMIT ? OFFSET ?"
+		pageArgs = append(pageArgs, limit, offset)
+	}
+	var rows []rewardListRow
+	if err := s.data.DB().WithContext(ctx).Raw(sql, pageArgs...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (s *AdminLegacyService) aixUsdtLedgerStats(ctx context.Context, q url.Values) (map[string]interface{}, error) {
+	unionSQL, args, err := s.aixUsdtLedgerUnion(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	type statRow struct {
+		TotalCount     int64
+		TotalAmount    decimal.Decimal
+		RechargeTotal  decimal.Decimal
+		RechargeCount  int64
+		OrderPtsTotal  decimal.Decimal
+		OrderPtsCount  int64
+	}
+	var row statRow
+	err = s.data.DB().WithContext(ctx).Raw(`
+SELECT COUNT(*) AS total_count,
+	COALESCE(SUM(amount),0) AS total_amount,
+	COALESCE(SUM(CASE WHEN type = 'AIX-USDT充值' THEN amount ELSE 0 END),0) AS recharge_total,
+	COALESCE(SUM(CASE WHEN type = 'AIX-USDT充值' THEN 1 ELSE 0 END),0) AS recharge_count,
+	COALESCE(SUM(CASE WHEN type <> 'AIX-USDT充值' THEN amount ELSE 0 END),0) AS order_pts_total,
+	COALESCE(SUM(CASE WHEN type <> 'AIX-USDT充值' THEN 1 ELSE 0 END),0) AS order_pts_count
+FROM (`+unionSQL+`) AS aix_usdt_ledger`, args...).Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	assetTotals := []map[string]interface{}{}
+	if row.TotalCount > 0 {
+		assetTotals = append(assetTotals, map[string]interface{}{
+			"asset": "AIX-USDT",
+			"total": row.TotalAmount.String(),
+			"count": row.TotalCount,
+		})
+	}
+	return map[string]interface{}{
+		"assetTotals":           assetTotals,
+		"totalCount":            row.TotalCount,
+		"aixTotal":              "0",
+		"usdtTotal":             "0",
+		"staticAixTotal":        "0",
+		"dynamicTotal":          "0",
+		"mgmtTotal":             "0",
+		"zeroAccountTotal":      "0",
+		"communitySubsidyTotal": "0",
+		"rechargeTotal":         row.RechargeTotal.String(),
+		"rechargeCount":         row.RechargeCount,
+		"orderPointsTotal":      row.OrderPtsTotal.String(),
+		"orderPointsCount":      row.OrderPtsCount,
+	}, nil
+}
+
 func (s *AdminLegacyService) rewardListDB(ctx context.Context, q url.Values) *gorm.DB {
 	addressFilter := strings.TrimSpace(q.Get("address"))
 	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
@@ -339,7 +533,7 @@ func (s *AdminLegacyService) rewardListDB(ctx context.Context, q url.Values) *go
 		db = db.Where("u.address LIKE ?", "%"+addressFilter+"%")
 	}
 	if typeFilter != "" && typeFilter != "undefined" && typeFilter != "null" {
-		switch typeFilter {
+		switch strings.ToLower(typeFilter) {
 		case "mgmt", "mgmt_pool_release", "管理奖":
 			db = db.Where("rl.type IN ?", mgmtRewardTypes)
 		case "dynamic_usdt", "direct_pool_release", "直推奖":
@@ -515,6 +709,8 @@ func rewardTypeLabel(t string) string {
 		return "零号账户(USDT)"
 	case "community_subsidy":
 		return "社区补贴(USDT)"
+	case "AIX-USDT充值", "USDT认购", "WIN认购", "复投（上级划转）", "复投（历史规则回补）", "报单积分":
+		return t
 	default:
 		if t == "" {
 			return "-"

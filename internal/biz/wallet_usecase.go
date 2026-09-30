@@ -369,9 +369,9 @@ func (uc *WalletUsecase) ListDownlineWINRecharges(
 }
 
 // ListDownlineSubscribeOrders 当前用户所有下级的认购订单（含复投 / WIN 支付）。
-// 第四返回值为 USDT 本金合计（SUM principal）。
+// fundSource 为空统计全部；否则列表与 USDT 本金合计都只含该充值类型。win 含历史 win_a。
 func (uc *WalletUsecase) ListDownlineSubscribeOrders(
-	ctx context.Context, tokenString string, page, pageSize int,
+	ctx context.Context, tokenString string, page, pageSize int, fundSource string,
 ) ([]*AdminOrderDetail, int64, string, error) {
 	user, err := uc.resolveUser(ctx, tokenString)
 	if err != nil {
@@ -391,7 +391,7 @@ func (uc *WalletUsecase) ListDownlineSubscribeOrders(
 		pageSize = 100
 	}
 	offset := (page - 1) * pageSize
-	return uc.walletRepo.ListOrdersByUserIDs(ctx, ids, offset, pageSize)
+	return uc.walletRepo.ListOrdersByUserIDs(ctx, ids, offset, pageSize, fundSource)
 }
 
 func (uc *WalletUsecase) CreateWithdraw(ctx context.Context, tokenString, amount, toAddress, signature string, withdrawAt int64) (*Withdrawal, string, error) {

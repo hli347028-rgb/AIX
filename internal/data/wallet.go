@@ -549,7 +549,7 @@ func (r *walletRepo) ListConfirmedWINRechargesByUserIDs(
 }
 
 func (r *walletRepo) ListOrdersByUserIDs(
-	ctx context.Context, userIDs []int64, offset, limit int,
+	ctx context.Context, userIDs []int64, offset, limit int, fundSource string,
 ) ([]*biz.AdminOrderDetail, int64, string, error) {
 	if len(userIDs) == 0 {
 		return nil, 0, "0", nil
@@ -563,18 +563,31 @@ func (r *walletRepo) ListOrdersByUserIDs(
 	if limit > 100 {
 		limit = 100
 	}
-	base := r.data.db.WithContext(ctx).Model(&OrderPO{}).
-		Where("user_id IN ?", userIDs).
-		Where("status <> ?", biz.OrderStatusCancelled)
+	fs := strings.ToLower(strings.TrimSpace(fundSource))
+	switch fs {
+	case "", biz.PayFromRecharge, biz.PayFromReward, biz.PayFromWin, biz.PayFromWinA:
+	default:
+		fs = ""
+	}
+	applyOrders := func(db *gorm.DB) *gorm.DB {
+		db = db.Where("user_id IN ?", userIDs).Where("status <> ?", biz.OrderStatusCancelled)
+		switch fs {
+		case biz.PayFromWin:
+			// 历史 WIN-A 认购并入 WIN 支付，筛选与合计都算在一起。
+			db = db.Where("LOWER(fund_source) IN ?", []string{biz.PayFromWin, biz.PayFromWinA})
+		case "":
+		default:
+			db = db.Where("LOWER(fund_source) = ?", fs)
+		}
+		return db
+	}
 
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	if err := applyOrders(r.data.db.WithContext(ctx).Model(&OrderPO{})).Count(&total).Error; err != nil {
 		return nil, 0, "0", err
 	}
 	var principalSum decimal.Decimal
-	if err := r.data.db.WithContext(ctx).Model(&OrderPO{}).
-		Where("user_id IN ?", userIDs).
-		Where("status <> ?", biz.OrderStatusCancelled).
+	if err := applyOrders(r.data.db.WithContext(ctx).Model(&OrderPO{})).
 		Select("COALESCE(SUM(principal),0)").
 		Scan(&principalSum).Error; err != nil {
 		return nil, 0, "0", err
@@ -584,17 +597,26 @@ func (r *walletRepo) ListOrdersByUserIDs(
 		UserID      int64
 		Principal   decimal.Decimal
 		FromWin     decimal.Decimal
+		FromWinA    decimal.Decimal
 		FundSource  string
 		Status      string
 		CreatedTime time.Time
 		Address     string
 	}
 	var rows []row
-	err := r.data.db.WithContext(ctx).Table("orders AS o").
-		Select("o.id, o.user_id, o.principal, o.from_win, o.fund_source, o.status, o.created_time, COALESCE(u.address,'') AS address").
+	listQ := r.data.db.WithContext(ctx).Table("orders AS o").
+		Select("o.id, o.user_id, o.principal, o.from_win, o.from_win_a, o.fund_source, o.status, o.created_time, COALESCE(u.address,'') AS address").
 		Joins("LEFT JOIN users AS u ON u.id = o.user_id").
 		Where("o.user_id IN ?", userIDs).
-		Where("o.status <> ?", biz.OrderStatusCancelled).
+		Where("o.status <> ?", biz.OrderStatusCancelled)
+	switch fs {
+	case biz.PayFromWin:
+		listQ = listQ.Where("LOWER(o.fund_source) IN ?", []string{biz.PayFromWin, biz.PayFromWinA})
+	case "":
+	default:
+		listQ = listQ.Where("LOWER(o.fund_source) = ?", fs)
+	}
+	err := listQ.
 		Order("o.id DESC").
 		Offset(offset).Limit(limit).
 		Scan(&rows).Error
@@ -608,6 +630,7 @@ func (r *walletRepo) ListOrdersByUserIDs(
 			UserID:      rw.UserID,
 			Principal:   rw.Principal.String(),
 			FromWin:     rw.FromWin.String(),
+			FromWinA:    rw.FromWinA.String(),
 			FundSource:  rw.FundSource,
 			Status:      rw.Status,
 			CreatedTime: rw.CreatedTime,

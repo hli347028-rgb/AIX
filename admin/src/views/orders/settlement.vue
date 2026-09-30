@@ -12,6 +12,9 @@
                     <a-button :loading="loading" @click="getListTwo">刷新列表</a-button>
                 </a-col>
             </a-row>
+            <div class="stats-bar">
+                <span>总静态合计：<b>{{ formatAmount4(staticAmountTotal) }}</b> AIX</span>
+            </div>
             <a-table
                 :loading="loading"
                 :columns="columns"
@@ -28,12 +31,15 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import { formatAmount4 } from '../../utils/formatAmount'
 
 export default {
     name: 'settlement',
     mixins: [listMixin],
     data() {
         return {
+            staticAmountTotal: '0',
+            formatAmount4,
             columns: [
                 {
                     title: 'ID',
@@ -116,6 +122,7 @@ export default {
                     return { ...value, key }
                 })
                 this.total = parseInt(res.total || res.count || 0)
+                this.staticAmountTotal = res.staticAmountTotal || '0'
                 this.loading = false
             }).catch(() => {
                 this.loading = false
@@ -129,6 +136,19 @@ export default {
 .inputGroup {
     > div {
         margin-bottom: 12px;
+    }
+}
+
+.stats-bar {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    border-radius: 4px;
+    color: #333;
+
+    b {
+        color: #389e0d;
     }
 }
 </style>

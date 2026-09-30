@@ -15,7 +15,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewUserRepo, NewChallengeRepo, NewWalletRepo, NewStakingRepo, NewSettingsRepo, NewPartnerNonceRepo)
+var ProviderSet = wire.NewSet(NewData, NewUserRepo, NewChallengeRepo, NewWalletRepo, NewStakingRepo, NewSettingsRepo, NewPartnerNonceRepo, NewLoginDeviceRepo)
 
 // Data .
 type Data struct {
@@ -32,7 +32,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		&UserPO{}, &OrderPO{}, &RechargePO{}, &TransferPO{}, &WithdrawalPO{}, &WithdrawalPayoutPO{},
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
 		&ExchangeRecordPO{}, &AnnouncementPO{}, &FeedbackPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
-		&ExchangeTransferPO{}, &DailyExchangeQuotaPO{},
+		&ExchangeTransferPO{}, &DailyExchangeQuotaPO{}, &UserLoginLogPO{},
 	); err != nil {
 		return nil, nil, err
 	}

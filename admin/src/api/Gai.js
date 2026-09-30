@@ -82,6 +82,27 @@ export default {
             params: parameter
         })
     },
+    login_device_list: (parameter) => {
+        return axios({
+            url: `${api8005}/login_device_list`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    login_device_users: (parameter) => {
+        return axios({
+            url: `${api8005}/login_device_users`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    user_login_devices: (parameter) => {
+        return axios({
+            url: `${api8005}/user_login_devices`,
+            method: 'get',
+            params: parameter
+        })
+    },
     location_list: (parameter) => {
         return axios({
             url: `${api8005}/location_list`,

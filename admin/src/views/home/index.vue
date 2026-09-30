@@ -39,7 +39,7 @@ const statMeta = {
     totalUser: { label: '报单人数', icon: 'team' },
     todayUserR: { label: '今日注册', icon: 'team' },
     todayUser: { label: '今日报单人数', icon: 'team' },
-    buyTotal: { label: '报单总额', icon: 'pay-circle' },
+    buyTotal: { label: '所有报单总额', icon: 'pay-circle' },
     todayBuy: { label: '今日报单', icon: 'pay-circle' },
     totalUsdtChainRecharge: { label: '总链上充值（USDT）', icon: 'wallet' },
     todayUsdtChainRecharge: { label: '今日链上充值（USDT）', icon: 'wallet' },

@@ -22,6 +22,13 @@ export default {
             data: parameter
         })
     },
+    setArticleStatus: (parameter) => {
+        return axios({
+            url: `${api}/announcement_status`,
+            method: 'post',
+            data: parameter
+        })
+    },
     changeArticle: (parameter) => {
         return axios({
             url: `${api}/announcement_save`,

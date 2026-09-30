@@ -71,7 +71,7 @@ const (
 	DefaultExitMultiplier  = 4.0
 	DefaultDirectRate      = 0.5
 	DefaultAixPrice              = 1.0
-	DefaultAixPriceDailyGrowth   = 0.05 // AIX 每日上涨 5%
+	DefaultAixPriceDailyGrowth   = 0.02 // AIX 每日上涨 2%
 	DefaultWinPrice          = 1.0
 	DefaultWinAPrice         = 1.0
 	DefaultExchangeFeeRate   = 0.05

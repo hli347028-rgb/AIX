@@ -658,13 +658,24 @@ func (s *WalletService) HandleDownlineWINRecharges(ctx khttp.Context) error {
 }
 
 // HandleDownlineSubscribeOrders 当前用户所有下级的认购订单。
+// Query fund_source: 空=全部；recharge / reward / win 时列表与 total_amount 只统计该类型。
+// win 含历史 win_a，对外都按 WIN 支付。
 func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
 	page, pageSize, err := transferRecordPagination(ctx)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
 	}
-	records, total, amountTotal, err := s.uc.ListDownlineSubscribeOrders(ctx, token, page, pageSize)
+	fundSource := strings.ToLower(strings.TrimSpace(ctx.Request().URL.Query().Get("fund_source")))
+	if fundSource == biz.PayFromWinA {
+		fundSource = biz.PayFromWin
+	}
+	switch fundSource {
+	case "", biz.PayFromRecharge, biz.PayFromReward, biz.PayFromWin:
+	default:
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid fund_source"})
+	}
+	records, total, amountTotal, err := s.uc.ListDownlineSubscribeOrders(ctx, token, page, pageSize, fundSource)
 	if err != nil {
 		return err
 	}
@@ -676,10 +687,16 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 		o := rec.Order
 		amount := o.Principal
 		asset := "USDT"
-		if strings.EqualFold(o.FundSource, biz.PayFromWin) {
+		fundSourceOut := o.FundSource
+		if strings.EqualFold(o.FundSource, biz.PayFromWin) || strings.EqualFold(o.FundSource, biz.PayFromWinA) {
 			asset = biz.TokenWIN
-			if winAmt := strings.TrimSpace(o.FromWin); winAmt != "" && winAmt != "0" {
-				amount = winAmt
+			fundSourceOut = biz.PayFromWin
+			tokenAmt := strings.TrimSpace(o.FromWin)
+			if strings.EqualFold(o.FundSource, biz.PayFromWinA) {
+				tokenAmt = strings.TrimSpace(o.FromWinA)
+			}
+			if tokenAmt != "" && tokenAmt != "0" {
+				amount = tokenAmt
 			}
 		}
 		items = append(items, map[string]any{
@@ -689,7 +706,7 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 			"asset":       asset,
 			"principal":   o.Principal,
 			"from_win":    o.FromWin,
-			"fund_source": o.FundSource,
+			"fund_source": fundSourceOut,
 			"status":      o.Status,
 			"created_at":  o.CreatedTime.Unix(),
 		})
@@ -700,6 +717,7 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 		"total_amount": amountTotal,
 		"page":         page,
 		"page_size":    pageSize,
+		"fund_source":  fundSource,
 	})
 }
 

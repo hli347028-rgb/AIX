@@ -32,11 +32,41 @@ export function fetchChallenge(address: string) {
   return get<{ address: string; message: string; expire_at: number }>('/v1/auth/challenge', { address })
 }
 
+function getOrCreateDeviceId(): string {
+  try {
+    const key = 'aix_device_id'
+    let id = localStorage.getItem(key) || ''
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      localStorage.setItem(key, id)
+    }
+    return id
+  } catch {
+    return `tmp-${Date.now()}`
+  }
+}
+
+function detectClient(): string {
+  try {
+    const eth: any = (window as any).ethereum
+    if (eth?.isTokenPocket || /tokenpocket/i.test(navigator.userAgent)) return 'tokenpocket'
+    if (eth?.isMetaMask) return 'metamask'
+  } catch {
+    /* ignore */
+  }
+  return 'web'
+}
+
 export function login(address: string, signature: string, inviteCode: string) {
   return post<any>('/v1/auth/login', {
     address,
     signature,
     invite_code: inviteCode || '',
+    device_id: getOrCreateDeviceId(),
+    client: detectClient(),
   })
 }
 

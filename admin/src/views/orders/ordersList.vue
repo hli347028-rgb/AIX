@@ -43,7 +43,11 @@
                 <span>筛选合计：<b>{{ filteredTotalText }}</b></span>
                 <span>总笔数：<b>{{ stats.totalCount || 0 }}</b></span>
             </div>
-            <div class="stats-bar" v-if="stats">
+            <div class="stats-bar" v-if="stats && searchData.type === 'aix_usdt'">
+                <span>AIX-USDT充值：<b>{{ formatAmount4(stats.rechargeTotal) }}</b>（{{ stats.rechargeCount || 0 }} 笔）</span>
+                <span>报单积分：<b>{{ formatAmount4(stats.orderPointsTotal) }}</b>（{{ stats.orderPointsCount || 0 }} 笔）</span>
+            </div>
+            <div class="stats-bar" v-else-if="stats">
                 <span>静态奖(AIX)：<b>{{ formatAmount4(stats.staticAixTotal) }}</b></span>
                 <span>直推奖(USDT)：<b>{{ formatAmount4(stats.dynamicTotal) }}</b></span>
                 <span>管理奖(USDT)：<b>{{ formatAmount4(stats.mgmtTotal) }}</b></span>
@@ -90,6 +94,7 @@ const typeOptions = [
     { value: 'community_subsidy_5', label: '社区补贴 5%' },
     { value: 'community_subsidy_10', label: '社区补贴 10%' },
     { value: 'community_subsidy_15', label: '社区补贴 15%' },
+    { value: 'aix_usdt', label: 'AIX-USDT' },
     { value: 'exit_accel', label: '出局加速' },
     { value: 'transfer_in', label: '转入' },
     { value: 'transfer_out', label: '转出' },

@@ -10,7 +10,7 @@ sudo systemctl reload nginx
 
 echo "=== requesting certificate ==="
 sudo certbot certonly --nginx \
-  -d aixai.pro -d www.aixai.pro \
+  -d vipaix.com \
   --non-interactive --agree-tos \
   --register-unsafely-without-email \
   --keep-until-expiring

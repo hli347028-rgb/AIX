@@ -16,6 +16,9 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.GET(p+"/operation_log_list", legacy.HandleOperationLogList)
 	r.GET(p+"/all", legacy.HandleAll)
 	r.GET(p+"/user_list", legacy.HandleUserList)
+	r.GET(p+"/login_device_list", legacy.HandleLoginDeviceList)
+	r.GET(p+"/login_device_users", legacy.HandleLoginDeviceUsers)
+	r.GET(p+"/user_login_devices", legacy.HandleUserLoginDevices)
 	r.GET(p+"/config", legacy.HandleConfig)
 	r.POST(p+"/config_update", legacy.HandleConfigUpdate)
 	r.GET(p+"/buy_list", legacy.HandleBuyList)
@@ -66,6 +69,7 @@ func RegisterAdminLegacyRoutes(srv *http.Server, legacy *service.AdminLegacyServ
 	r.POST(p+"/announcement_detail", legacy.HandleAnnouncementDetail)
 	r.POST(p+"/announcement_save", legacy.HandleAnnouncementSave)
 	r.POST(p+"/announcement_delete", legacy.HandleAnnouncementDelete)
+	r.POST(p+"/announcement_status", legacy.HandleAnnouncementStatus)
 	r.POST(p+"/announcement_move", legacy.HandleAnnouncementMove)
 
 	// 用户端公告（无需登录）

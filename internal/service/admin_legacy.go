@@ -25,32 +25,34 @@ import (
 
 // AdminLegacyService serves /api/admin_dhb/* compatibility routes for the Vue admin UI.
 type AdminLegacyService struct {
-	admin      *biz.AdminUsecase
-	userRepo   biz.UserRepo
-	walletRepo biz.WalletRepo
-	data       *data.Data
-	authCfg    *conf.AuthConfig
-	walletCfg  *conf.WalletConfig
-	partnerCfg *conf.TransferPartnerConfig
+	admin        *biz.AdminUsecase
+	userRepo     biz.UserRepo
+	walletRepo   biz.WalletRepo
+	loginDevices biz.LoginDeviceRepo
+	data         *data.Data
+	authCfg      *conf.AuthConfig
+	walletCfg    *conf.WalletConfig
+	partnerCfg   *conf.TransferPartnerConfig
 }
 
 func NewAdminLegacyService(
 	admin *biz.AdminUsecase,
 	userRepo biz.UserRepo,
 	walletRepo biz.WalletRepo,
+	loginDevices biz.LoginDeviceRepo,
 	data *data.Data,
 	authCfg *conf.AuthConfig,
 	walletCfg *conf.WalletConfig,
 	partnerCfg *conf.TransferPartnerConfig,
 ) *AdminLegacyService {
 	return &AdminLegacyService{
-		admin: admin, userRepo: userRepo, walletRepo: walletRepo,
+		admin: admin, userRepo: userRepo, walletRepo: walletRepo, loginDevices: loginDevices,
 		data: data, authCfg: authCfg, walletCfg: walletCfg, partnerCfg: partnerCfg,
 	}
 }
 
 var legacyMenuPaths = []string{
-	"/home", "/member", "/recharge", "/withdrawList", "/subscription",
+	"/home", "/member", "/loginDevices", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
 	"/exchangeTransfer", "/toExchangeTransfer", "/settlement", "/news", "/newsEdit", "/feedbackList", "/lookChildren",
 }
@@ -755,23 +757,43 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 	}
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
+	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
 
-	var total int64
-	if err := s.rewardListDB(ctx, q).Count(&total).Error; err != nil {
+	var (
+		total       int64
+		rows        []rewardListRow
+		stats       map[string]interface{}
+		err         error
+	)
+	if isAixUsdtTypeFilter(typeFilter) {
+		total, err = s.aixUsdtLedgerCount(ctx, q)
+		if err != nil {
+			return err
+		}
+		stats, err = s.aixUsdtLedgerStats(ctx, q)
+		if err != nil {
+			return err
+		}
+		rows, err = s.aixUsdtLedgerPage(ctx, q, offset, pageSize)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := s.rewardListDB(ctx, q).Count(&total).Error; err != nil {
 		return err
 	}
-	stats, err := s.rewardStats(ctx, q)
-	if err != nil {
-		return err
+		stats, err = s.rewardStats(ctx, q)
+		if err != nil {
+			return err
+		}
+		if err := s.rewardListDB(ctx, q).
+			Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
+				COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
+			Order("rl.id desc").Offset(offset).Limit(pageSize).Scan(&rows).Error; err != nil {
+			return err
+		}
 	}
 
-	var rows []rewardListRow
-	if err := s.rewardListDB(ctx, q).
-		Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
-			COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
-		Order("rl.id desc").Offset(offset).Limit(pageSize).Scan(&rows).Error; err != nil {
-		return err
-	}
 	items := make([]map[string]interface{}, 0, len(rows))
 	for _, r := range rows {
 		items = append(items, rewardRowToItem(r))
@@ -858,12 +880,21 @@ func (s *AdminLegacyService) HandleRewardListExport(ctx khttp.Context) error {
 		return err
 	}
 	q := ctx.Request().URL.Query()
+	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
 	var rows []rewardListRow
-	if err := s.rewardListDB(ctx, q).
-		Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
-			COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
-		Order("rl.id desc").Scan(&rows).Error; err != nil {
-		return err
+	if isAixUsdtTypeFilter(typeFilter) {
+		var err error
+		rows, err = s.aixUsdtLedgerPage(ctx, q, 0, 0)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := s.rewardListDB(ctx, q).
+			Select(`rl.id, rl.type, rl.asset, rl.amount, u.address,
+				COALESCE(fu.address,'') as from_address, rl.settlement_date, rl.created_time`).
+			Order("rl.id desc").Scan(&rows).Error; err != nil {
+			return err
+		}
 	}
 	return writeRewardCSV(ctx.Response(), rows)
 }
@@ -1001,12 +1032,17 @@ func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
 		}
 		list = append(list, item)
 	}
+	staticAmountTotal, err := s.sumSettlementStaticTotal(ctx)
+	if err != nil {
+		return err
+	}
 	return ctx.Result(200, map[string]interface{}{
-		"list":              list,
-		"total":             total,
-		"count":             total,
-		"page":              page,
-		"defaultSettleDate": biz.TodaySettlementDate(jwtpkg.NowChina()),
+		"list":               list,
+		"total":              total,
+		"count":              total,
+		"page":               page,
+		"defaultSettleDate":  biz.TodaySettlementDate(jwtpkg.NowChina()),
+		"staticAmountTotal":  staticAmountTotal.String(),
 	})
 }
 
@@ -1606,6 +1642,34 @@ func (s *AdminLegacyService) HandleAnnouncementDelete(ctx khttp.Context) error {
 	return ctx.Result(200, map[string]string{"status": "ok"})
 }
 
+func (s *AdminLegacyService) HandleAnnouncementStatus(ctx khttp.Context) error {
+	if err := s.requireAdmin(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Request().ParseForm(); err != nil {
+		return errors.BadRequest("INVALID_FORM", "请求格式错误")
+	}
+	id, err := strconv.ParseInt(strings.TrimSpace(ctx.Request().Form.Get("id")), 10, 64)
+	if err != nil || id <= 0 {
+		return errors.BadRequest("INVALID_ID", "公告ID无效")
+	}
+	statusRaw := strings.TrimSpace(ctx.Request().Form.Get("status"))
+	status, err := strconv.ParseInt(statusRaw, 10, 32)
+	if err != nil || (status != 0 && status != 1) {
+		return errors.BadRequest("INVALID_STATUS", "状态只能是 0（关闭）或 1（打开）")
+	}
+	res := s.data.DB().WithContext(ctx).Model(&data.AnnouncementPO{}).
+		Where("id = ?", id).
+		Update("status", int32(status))
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.NotFound("NOT_FOUND", "公告不存在")
+	}
+	return ctx.Result(200, map[string]string{"status": "ok"})
+}
+
 func (s *AdminLegacyService) HandlePublicAnnouncementList(ctx khttp.Context) error {
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
@@ -1848,11 +1912,11 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 		return nil, err
 	}
 
-	buyTotal, err := s.sumOrderPrincipal(ctx, "", nil)
+	buyTotal, err := s.sumAllOrderPrincipal(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	todayBuy, err := s.sumOrderPrincipal(ctx, "", &todayStart)
+	todayBuy, err := s.sumAllOrderPrincipal(ctx, &todayStart)
 	if err != nil {
 		return nil, err
 	}

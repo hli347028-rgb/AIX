@@ -305,6 +305,20 @@ type AdminOperationLogPO struct {
 
 func (AdminOperationLogPO) TableName() string { return "admin_operation_logs" }
 
+// UserLoginLogPO 用户登录设备记录（用于后台排查同设备多账号）。
+type UserLoginLogPO struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement"`
+	UserID      int64     `gorm:"column:user_id;index;not null"`
+	DeviceID    string    `gorm:"column:device_id;size:64;not null;index"`
+	ClientIP    string    `gorm:"column:client_ip;size:64"`
+	UserAgent   string    `gorm:"column:user_agent;size:512"`
+	Client      string    `gorm:"column:client;size:64"` // web / tokenpocket / ...
+	DeviceLabel string    `gorm:"column:device_label;size:128"`
+	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime;index"`
+}
+
+func (UserLoginLogPO) TableName() string { return "user_login_logs" }
+
 // PartnerNoncePO 合作方转账加款接口的 nonce 去重记录。
 //
 // 唯一索引 (partner_id, nonce) 就是防重放的原子操作本身：插入成功=首次出现，

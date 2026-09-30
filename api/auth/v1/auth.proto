@@ -61,6 +61,10 @@ message LoginRequest {
   string signature = 2;
   // 首次登录必填：已登录用户的地址作为邀请码
   string invite_code = 3;
+  // 前端持久化设备 ID（localStorage），用于同设备多账号排查
+  string device_id = 4;
+  // 客户端标识：web / tokenpocket / metamask 等
+  string client = 5;
 }
 
 message LoginReply {

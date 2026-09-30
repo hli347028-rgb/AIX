@@ -73,12 +73,43 @@ function queryParams(url: string) {
   return out
 }
 
+const DEVICE_ID_KEY = 'aix_device_id'
+
+function getOrCreateDeviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY) || ''
+    if (!id) {
+      id =
+        (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+      localStorage.setItem(DEVICE_ID_KEY, id)
+    }
+    return id
+  } catch {
+    return `tmp-${Date.now()}`
+  }
+}
+
+function detectClient(): string {
+  try {
+    const eth: any = (window as any).ethereum
+    if (eth?.isTokenPocket || /tokenpocket/i.test(navigator.userAgent)) return 'tokenpocket'
+    if (eth?.isMetaMask) return 'metamask'
+  } catch {
+    /* ignore */
+  }
+  return 'web'
+}
+
 async function login(address: string, inviteCode: string, signature: string) {
   try {
     const res = await raw.post('/v1/auth/login', {
       address,
       signature,
       invite_code: inviteCode || '',
+      device_id: getOrCreateDeviceId(),
+      client: detectClient(),
     })
     return res.data
   } catch (err: any) {
@@ -1117,7 +1148,10 @@ export async function adaptRequest(
     }
     case 'app_server/downline_subscribe_orders': {
       const page = Math.max(1, Number(mergedParams.page) || 1)
-      const res = await authGet('/v1/wallet/downline-subscribe-orders', { page, page_size: 10 })
+      const fundSource = String(mergedParams.fund_source || mergedParams.fundSource || '').trim().toLowerCase()
+      const query: Record<string, any> = { page, page_size: 10 }
+      if (fundSource) query.fund_source = fundSource
+      const res = await authGet('/v1/wallet/downline-subscribe-orders', query)
       const body = apiBody(res)
       const records = (body.records || []).map((item: any) => ({
         id: item.id,
