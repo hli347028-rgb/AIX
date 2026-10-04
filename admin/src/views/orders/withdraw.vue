@@ -5,6 +5,12 @@
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-input v-model="searchData.address" placeholder="账户地址" @keyup.enter="getListTwo" />
                 </a-col>
+                <a-col :xs="12" :md="8" :lg="8" :xl="5">
+                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
+                        <a-radio-button :value="false">查本人</a-radio-button>
+                        <a-radio-button :value="true">查全团队</a-radio-button>
+                    </a-radio-group>
+                </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select v-model="searchData.asset" placeholder="资产类型" allowClear style="width: 100%">
                         <a-select-option value="">全部</a-select-option>
@@ -55,11 +61,12 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import teamQueryMixin from '../mixin/teamQueryMixin'
 import moment from 'moment'
 
 export default {
     name: 'withdrawList',
-    mixins: [listMixin],
+    mixins: [listMixin, teamQueryMixin],
     data() {
         return {
             pageSize: 20,
@@ -126,6 +133,7 @@ export default {
             ],
             searchData: {
                 address: '',
+                teamQuery: false,
                 asset: '',
                 status: '',
                 dateRange: [],
@@ -134,13 +142,13 @@ export default {
     },
     methods: {
         buildParams() {
-            const params = {
+            const params = this.appendTeamQueryParams({
                 page: this.current,
                 pageSize: this.pageSize,
                 address: this.searchData.address || '',
                 asset: this.searchData.asset || '',
                 status: this.searchData.status || '',
-            }
+            })
             if (this.searchData.dateRange && this.searchData.dateRange.length === 2) {
                 params.startTime = moment(this.searchData.dateRange[0]).format('YYYY-MM-DD HH:mm:ss')
                 params.endTime = moment(this.searchData.dateRange[1]).format('YYYY-MM-DD HH:mm:ss')

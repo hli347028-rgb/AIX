@@ -4,10 +4,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"backend/internal/biz"
 	"backend/internal/conf"
 	authmw "backend/internal/middleware"
+	"backend/internal/pkg/token"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -17,13 +19,15 @@ import (
 // OpenService exposes third-party Open API endpoints (API Key auth).
 type OpenService struct {
 	walletRepo biz.WalletRepo
+	walletUC   *biz.WalletUsecase
 	authCfg    *conf.AuthConfig
 	log        *log.Helper
 }
 
-func NewOpenService(walletRepo biz.WalletRepo, authCfg *conf.AuthConfig, logger log.Logger) *OpenService {
+func NewOpenService(walletRepo biz.WalletRepo, walletUC *biz.WalletUsecase, authCfg *conf.AuthConfig, logger log.Logger) *OpenService {
 	return &OpenService{
 		walletRepo: walletRepo,
+		walletUC:   walletUC,
 		authCfg:    authCfg,
 		log:        log.NewHelper(logger),
 	}
@@ -33,6 +37,7 @@ func NewOpenService(walletRepo biz.WalletRepo, authCfg *conf.AuthConfig, logger 
 func RegisterOpenRoutes(srv *khttp.Server, open *OpenService) {
 	r := srv.Route("/")
 	r.GET("/v1/open/subscribe-orders", open.HandleSubscribeOrders)
+	r.GET("/v1/open/aix-price", open.HandleAixPrice)
 }
 
 func (s *OpenService) requireAPIKey(ctx khttp.Context) (keyHint string, err error) {
@@ -138,5 +143,34 @@ func (s *OpenService) HandleSubscribeOrders(ctx khttp.Context) error {
 		"count":    total,
 		"page":     page,
 		"pageSize": pageSize,
+	})
+}
+
+// HandleAixPrice 返回 AIX/USDT 交易对价格：1 枚 AIX 值多少 USDT。
+// 第三方用该价格自行计算 AIX/WIN。date 缺省为中国时区当天，格式 YYYY-MM-DD。
+func (s *OpenService) HandleAixPrice(ctx khttp.Context) error {
+	req := ctx.Request()
+	ip := clientIP(req)
+	keyHint, err := s.requireAPIKey(ctx)
+	if err != nil {
+		s.log.Warnf("openapi aix-price denied ip=%s key=%s", ip, keyHint)
+		return err
+	}
+	date := strings.TrimSpace(req.URL.Query().Get("date"))
+	if date == "" {
+		date = token.NowChina().Format("2006-01-02")
+	} else if _, parseErr := time.Parse("2006-01-02", date); parseErr != nil {
+		return errors.BadRequest("INVALID_DATE", "date must be YYYY-MM-DD")
+	}
+	price, err := s.walletUC.GetAixPrice(ctx, date)
+	if err != nil {
+		s.log.Errorf("openapi aix-price failed ip=%s key=%s date=%s err=%v", ip, keyHint, date, err)
+		return err
+	}
+	s.log.Infof("openapi aix-price ok ip=%s key=%s date=%s", ip, keyHint, date)
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"pair":  "AIX/USDT",
+		"price": price,
+		"date":  date,
 	})
 }

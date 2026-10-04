@@ -843,3 +843,40 @@ func sumWithdrawalStats(list []*biz.Withdrawal) map[string]interface{} {
 		"reviewCount": reviewCount,
 	}
 }
+
+// sumExchangeStats totals the current exchange-list filter.
+// Rejected rows are omitted from the money totals unless includeRejected is set,
+// because a rejection refunds the AIX and never credits USDT.
+func sumExchangeStats(list []*biz.ExchangeRecord, includeRejected bool) map[string]interface{} {
+	fromTotal := decimal.Zero
+	toTotal := decimal.Zero
+	feeTotal := decimal.Zero
+	reviewCount := 0
+	for _, r := range list {
+		if r == nil {
+			continue
+		}
+		if r.Status == biz.ExchangeStatusReview {
+			reviewCount++
+		}
+		if !includeRejected && r.Status == biz.ExchangeStatusRejected {
+			continue
+		}
+		if from, err := decimal.NewFromString(strings.TrimSpace(r.FromAmount)); err == nil {
+			fromTotal = fromTotal.Add(from)
+		}
+		if to, err := decimal.NewFromString(strings.TrimSpace(r.ToAmount)); err == nil {
+			toTotal = toTotal.Add(to)
+		}
+		if fee, err := decimal.NewFromString(strings.TrimSpace(r.FeeAmount)); err == nil {
+			feeTotal = feeTotal.Add(fee)
+		}
+	}
+	return map[string]interface{}{
+		"totalCount":  len(list),
+		"reviewCount": reviewCount,
+		"fromTotal":   fromTotal.String(),
+		"toTotal":     toTotal.String(),
+		"feeTotal":    feeTotal.String(),
+	}
+}

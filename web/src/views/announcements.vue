@@ -45,7 +45,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { showToast } from 'vant'
-import { errMsg, listAnnouncements, type AnnouncementItem } from '@/api/aix'
+import { errMsg, getAnnouncementDetail, listAnnouncements, type AnnouncementItem } from '@/api/aix'
 
 const router = useRouter()
 const { t: $t } = useI18n()
@@ -61,17 +61,32 @@ function formatTime(ts?: number) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function toggle(id?: number) {
+async function loadDetail(id: number) {
+  const current = list.value.find((item) => item.id === id)
+  if (current?.content) return
+  try {
+    const detail = await getAnnouncementDetail(id)
+    const idx = list.value.findIndex((item) => item.id === id)
+    if (idx >= 0) list.value[idx] = { ...list.value[idx], ...detail }
+  } catch (e) {
+    showToast(errMsg(e, $t('announcement.fetchFailed')))
+  }
+}
+
+async function toggle(id?: number) {
   if (!id) return
   expandedId.value = expandedId.value === id ? null : id
+  if (expandedId.value === id) await loadDetail(id)
 }
 
 onMounted(async () => {
   try {
     const res = await listAnnouncements({ page: 1, page_size: 50 })
     list.value = res.list || []
-    if (list.value.length > 0) {
-      expandedId.value = list.value[0].id ?? null
+    const firstId = list.value[0]?.id
+    if (firstId) {
+      expandedId.value = firstId
+      await loadDetail(firstId)
     }
   } catch (e) {
     showToast(errMsg(e, $t('announcement.fetchFailed')))

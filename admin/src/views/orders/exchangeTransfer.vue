@@ -5,6 +5,12 @@
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-input v-model="searchData.address" placeholder="用户地址" allowClear @keyup.enter="getListTwo" />
                 </a-col>
+                <a-col :xs="12" :md="8" :lg="8" :xl="5">
+                    <a-radio-group v-model="searchData.teamQuery" button-style="solid" @change="getListTwo">
+                        <a-radio-button :value="false">查本人</a-radio-button>
+                        <a-radio-button :value="true">查全团队</a-radio-button>
+                    </a-radio-group>
+                </a-col>
                 <a-col :xs="12" :md="6" :lg="6" :xl="4">
                     <a-select allowClear v-model="searchData.partner_id" style="width:100%" placeholder="合作方"
                         @change="getListTwo">
@@ -56,11 +62,12 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import teamQueryMixin from '../mixin/teamQueryMixin'
 import moment from 'moment'
 
 export default {
     name: 'exchangeTransfer',
-    mixins: [listMixin],
+    mixins: [listMixin, teamQueryMixin],
     data() {
         return {
             stats: null,
@@ -102,6 +109,7 @@ export default {
             ],
             searchData: {
                 address: '',
+                teamQuery: false,
                 partner_id: undefined,
                 asset: undefined,
                 dateRange: [],
@@ -122,10 +130,10 @@ export default {
             })
         },
         buildParams() {
-            const params = {
+            const params = this.appendTeamQueryParams({
                 page: this.current || 1,
                 pageSize: this.pageSize || 50,
-            }
+            })
             const address = (this.searchData.address || '').trim()
             if (address) params.address = address
             const partnerId = this.searchData.partner_id

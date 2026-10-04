@@ -29,7 +29,7 @@ type partnerCreditRow struct {
 	CreatedTime time.Time
 }
 
-func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Values) *gorm.DB {
+func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Values, teamIDs []int64, teamFilter bool) *gorm.DB {
 	db := s.data.DB().WithContext(ctx).
 		Table("recharges r").
 		Select(`r.id, COALESCE(NULLIF(r.from_address,''), u.address) as address,
@@ -38,8 +38,17 @@ func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Valu
 		Where("r.status = ?", biz.RechargeStatusConfirmed).
 		Where("r.tx_hash LIKE ?", "partner:%")
 
-	if address := strings.TrimSpace(q.Get("address")); address != "" {
-		db = db.Where("(r.from_address LIKE ? OR u.address LIKE ?)", "%"+address+"%", "%"+address+"%")
+	if teamFilter {
+		if len(teamIDs) == 0 {
+			db = db.Where("1 = 0")
+		} else {
+			db = db.Where("r.user_id IN ?", teamIDs)
+		}
+	}
+	if !teamFilter {
+		if address := strings.TrimSpace(q.Get("address")); address != "" {
+			db = db.Where("(r.from_address LIKE ? OR u.address LIKE ?)", "%"+address+"%", "%"+address+"%")
+		}
 	}
 	// 空下拉时 antd 会把字面量 "undefined"/"null" 发上来，必须清洗掉，
 	// 否则会被当成真实的 partner_id 而过滤出空列表。
@@ -67,12 +76,12 @@ func (s *AdminLegacyService) partnerCreditListDB(ctx context.Context, q url.Valu
 	return db
 }
 
-func (s *AdminLegacyService) partnerCreditStats(ctx context.Context, q url.Values) (map[string]interface{}, error) {
+func (s *AdminLegacyService) partnerCreditStats(ctx context.Context, q url.Values, teamIDs []int64, teamFilter bool) (map[string]interface{}, error) {
 	var row struct {
 		TotalCount  int64
 		AmountTotal decimal.Decimal
 	}
-	err := s.partnerCreditListDB(ctx, q).
+	err := s.partnerCreditListDB(ctx, q, teamIDs, teamFilter).
 		Select("COUNT(*) as total_count, COALESCE(SUM(r.amount),0) as amount_total").
 		Scan(&row).Error
 	if err != nil {
@@ -108,14 +117,18 @@ func (s *AdminLegacyService) HandlePartnerCreditList(ctx khttp.Context) error {
 	}
 	q := ctx.Request().URL.Query()
 	page, pageSize, offset := parsePage(q)
+	teamIDs, teamFilter, err := s.teamUserIDsForQuery(ctx, q)
+	if err != nil {
+		return err
+	}
 
-	stats, err := s.partnerCreditStats(ctx, q)
+	stats, err := s.partnerCreditStats(ctx, q, teamIDs, teamFilter)
 	if err != nil {
 		return errors.InternalServer("DB_ERROR", "查询失败")
 	}
 
 	var rows []partnerCreditRow
-	if err := s.partnerCreditListDB(ctx, q).
+	if err := s.partnerCreditListDB(ctx, q, teamIDs, teamFilter).
 		Order("r.id DESC").
 		Offset(offset).Limit(pageSize).
 		Scan(&rows).Error; err != nil {
@@ -143,7 +156,7 @@ func (s *AdminLegacyService) HandlePartnerCreditList(ctx khttp.Context) error {
 	}
 
 	var total int64
-	_ = s.partnerCreditListDB(ctx, q).Count(&total).Error
+	_ = s.partnerCreditListDB(ctx, q, teamIDs, teamFilter).Count(&total).Error
 
 	return ctx.Result(200, map[string]interface{}{
 		"list":  list,

@@ -481,6 +481,16 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	assetFilter := strings.ToUpper(strings.TrimSpace(q.Get("asset")))
 	statusFilter := strings.TrimSpace(q.Get("status"))
 	start, end := parseLegacyTimeRange(q)
+	teamIDs, teamFilter, err := s.teamUserIDsForQuery(ctx, q)
+	if err != nil {
+		return err
+	}
+	teamSet := map[int64]struct{}{}
+	if teamFilter {
+		for _, id := range teamIDs {
+			teamSet[id] = struct{}{}
+		}
+	}
 
 	list, err := s.admin.ListAllWithdrawals(ctx, s.token(ctx))
 	if err != nil {
@@ -488,7 +498,12 @@ func (s *AdminLegacyService) HandleWithdrawList(ctx khttp.Context) error {
 	}
 	filtered := make([]*biz.Withdrawal, 0, len(list))
 	for _, w := range list {
-		if addressFilter != "" && !strings.Contains(strings.ToLower(w.Address), strings.ToLower(addressFilter)) {
+		if teamFilter {
+			if _, ok := teamSet[w.UserID]; !ok {
+				continue
+			}
+		}
+		if !teamFilter && addressFilter != "" && !strings.Contains(strings.ToLower(w.Address), strings.ToLower(addressFilter)) {
 			continue
 		}
 		if assetFilter != "" && strings.ToUpper(strings.TrimSpace(w.Asset)) != assetFilter {
@@ -560,12 +575,7 @@ func (s *AdminLegacyService) HandleExchangeList(ctx khttp.Context) error {
 	total := len(filtered)
 	pageItems := paginateSlice(filtered, offset, pageSize)
 	items := make([]map[string]interface{}, 0, len(pageItems))
-	reviewCount := 0
-	for _, r := range filtered {
-		if r.Status == biz.ExchangeStatusReview {
-			reviewCount++
-		}
-	}
+	stats := sumExchangeStats(filtered, statusFilter == biz.ExchangeStatusRejected)
 	for _, r := range pageItems {
 		items = append(items, map[string]interface{}{
 			"id":            r.ID,
@@ -586,9 +596,7 @@ func (s *AdminLegacyService) HandleExchangeList(ctx khttp.Context) error {
 		"list":  items,
 		"count": total,
 		"page":  page,
-		"stats": map[string]interface{}{
-			"reviewCount": reviewCount,
-		},
+		"stats": stats,
 	})
 }
 
@@ -1679,7 +1687,9 @@ func (s *AdminLegacyService) HandlePublicAnnouncementList(ctx khttp.Context) err
 		return err
 	}
 	var rows []data.AnnouncementPO
-	if err := db.Order("sort_order asc, id asc").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
+	// 列表不读 content。正文是 longtext，顶栏每次进站都会拉列表，带上全文会占掉绝大部分出站流量。
+	if err := db.Select("id", "title", "sort_order", "created_time").
+		Order("sort_order asc, id asc").Offset(offset).Limit(pageSize).Find(&rows).Error; err != nil {
 		return err
 	}
 	items := make([]map[string]interface{}, 0, len(rows))
@@ -1687,7 +1697,6 @@ func (s *AdminLegacyService) HandlePublicAnnouncementList(ctx khttp.Context) err
 		items = append(items, map[string]interface{}{
 			"id":         row.ID,
 			"title":      row.Title,
-			"content":    row.Content,
 			"sort_order": row.SortOrder,
 			"created_at": formatLegacyTime(row.CreatedTime),
 			"add_time":   row.CreatedTime.Unix(),

@@ -20,6 +20,10 @@
                 </a-col>
             </a-row>
             <div class="stats-bar" v-if="stats">
+                <span>筛选笔数：<b>{{ stats.totalCount || 0 }}</b></span>
+                <span>支付 AIX：<b>{{ formatAmount4(stats.fromTotal) }}</b></span>
+                <span>到账 USDT：<b>{{ formatAmount4(stats.toTotal) }}</b></span>
+                <span>手续费：<b>{{ formatAmount4(stats.feeTotal) }}</b></span>
                 <span>待审核：<b>{{ stats.reviewCount || 0 }}</b></span>
             </div>
             <a-table :loading="loading" :columns="columns" :dataSource="data"
@@ -33,6 +37,7 @@
 <script type="text/jsx">
 import Gai from '../../api/Gai'
 import listMixin from '../mixin/listMixin'
+import { formatAmount4 } from '../../utils/formatAmount'
 
 const statusText = {
     review: '待审核',
@@ -134,6 +139,7 @@ export default {
         }
     },
     methods: {
+        formatAmount4,
         buildParams() {
             const params = {
                 page: this.current || 1,

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultDepositContract     = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
+	DefaultDepositContract     = "0x5e92fA58BFFD99528b9690BA2C28A9dEcD282B3c"
 	DefaultWinDepositContract  = "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
 	DefaultWinADepositContract = "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
 	DefaultSdtDepositContract  = "0x285d60af560663c5538D8fa8214361713B6c00aD" // AIX-USDT BuySomething

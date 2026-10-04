@@ -41,7 +41,7 @@ func wireApp(confServer *conf.Server, dbCfg *conf.DatabaseConfig, authCfg *conf.
 	adminUsecase := biz.NewAdminUsecase(userRepo, walletRepo, settingsRepo, settlementUsecase, authCfg, walletCfg, logger)
 	adminService := service.NewAdminService(adminUsecase)
 	adminLegacyService := service.NewAdminLegacyService(adminUsecase, userRepo, walletRepo, loginDeviceRepo, dataData, authCfg, walletCfg, partnerCfg)
-	openService := service.NewOpenService(walletRepo, authCfg, logger)
+	openService := service.NewOpenService(walletRepo, walletUsecase, authCfg, logger)
 	partnerNonceRepo := data.NewPartnerNonceRepo(dataData, logger)
 	transferCreditUsecase := biz.NewTransferCreditUsecase(walletRepo, partnerNonceRepo, partnerCfg, logger)
 	transferCreditService := service.NewTransferCreditService(transferCreditUsecase, partnerCfg, logger)
