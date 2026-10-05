@@ -641,6 +641,83 @@ func (r *walletRepo) ListOrdersByUserIDs(
 	return out, total, principalSum.String(), nil
 }
 
+func (r *walletRepo) ListDownlinePointsByUserIDs(
+	ctx context.Context, userIDs []int64, offset, limit int, source string,
+) ([]*biz.AdminOrderDetail, int64, string, error) {
+	if len(userIDs) == 0 {
+		return nil, 0, "0", nil
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	apply := func(db *gorm.DB, pointsCol, sourceCol string) *gorm.DB {
+		db = db.Where(pointsCol + " > 0")
+		switch source {
+		case biz.PointsSourceRecharge:
+			db = db.Where("LOWER("+sourceCol+") = ?", biz.PointsSourceRecharge)
+		case biz.PointsSourceWin:
+			db = db.Where("LOWER("+sourceCol+") = ?", biz.PointsSourceWin)
+		case biz.PointsSourceReinvest:
+			db = db.Where("LOWER("+sourceCol+") IN ?", []string{biz.PointsSourceTransferReinvest, biz.PointsSourceRewardLegacy})
+		}
+		return db
+	}
+
+	var total int64
+	countQ := apply(r.data.db.WithContext(ctx).Model(&OrderPO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status <> ?", biz.OrderStatusCancelled), "points", "points_source")
+	if err := countQ.Count(&total).Error; err != nil {
+		return nil, 0, "0", err
+	}
+	var pointsSum decimal.Decimal
+	sumQ := apply(r.data.db.WithContext(ctx).Model(&OrderPO{}).
+		Where("user_id IN ?", userIDs).
+		Where("status <> ?", biz.OrderStatusCancelled), "points", "points_source")
+	if err := sumQ.Select("COALESCE(SUM(points),0)").Scan(&pointsSum).Error; err != nil {
+		return nil, 0, "0", err
+	}
+
+	type row struct {
+		ID           int64
+		UserID       int64
+		Points       decimal.Decimal
+		PointsSource string
+		CreatedTime  time.Time
+		Address      string
+	}
+	var rows []row
+	listQ := apply(r.data.db.WithContext(ctx).Table("orders AS o").
+		Where("o.user_id IN ?", userIDs).
+		Where("o.status <> ?", biz.OrderStatusCancelled), "o.points", "o.points_source")
+	if err := listQ.
+		Select("o.id, o.user_id, o.points, o.points_source, o.created_time, COALESCE(u.address,'') AS address").
+		Joins("LEFT JOIN users AS u ON u.id = o.user_id").
+		Order("o.id DESC").
+		Offset(offset).Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return nil, 0, "0", err
+	}
+	out := make([]*biz.AdminOrderDetail, 0, len(rows))
+	for _, rw := range rows {
+		o := &biz.Order{
+			ID:           rw.ID,
+			UserID:       rw.UserID,
+			Points:       rw.Points.String(),
+			PointsSource: rw.PointsSource,
+			CreatedTime:  rw.CreatedTime,
+		}
+		out = append(out, &biz.AdminOrderDetail{Order: o, UserAddress: rw.Address})
+	}
+	return out, total, pointsSum.String(), nil
+}
+
 func (r *walletRepo) Subscribe(ctx context.Context, userID int64, in biz.SubscribeInput) (*biz.Order, string, error) {
 	principal, err := decimal.NewFromString(in.Amount)
 	if err != nil {
@@ -1373,10 +1450,10 @@ func (r *walletRepo) ListSubscribeOrdersPaged(ctx context.Context, offset, limit
 	for _, rw := range rows {
 		o := &biz.Order{
 			ID: rw.ID, UserID: rw.UserID,
-			Principal: rw.Principal.String(),
-			Points:    rw.Points.String(),
-			FundSource: rw.FundSource,
-			Status:    rw.Status,
+			Principal:   rw.Principal.String(),
+			Points:      rw.Points.String(),
+			FundSource:  rw.FundSource,
+			Status:      rw.Status,
 			CreatedTime: rw.CreatedTime,
 		}
 		if o.Points == "" || o.Points == "0" {
@@ -2232,8 +2309,8 @@ func withdrawalPOToBiz(po *WithdrawalPO, userAddr string) *biz.Withdrawal {
 		Status: po.Status, TxHash: po.TxHash, Asset: po.Asset,
 		PayoutNonce: po.PayoutNonce,
 		Remark:      po.Remark,
-		CreatedAt: po.CreatedTime,
-		UpdatedAt: po.UpdatedTime,
+		CreatedAt:   po.CreatedTime,
+		UpdatedAt:   po.UpdatedTime,
 	}
 }
 

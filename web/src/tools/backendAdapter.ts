@@ -1146,6 +1146,27 @@ export async function adaptRequest(
         page: Number(body.page || page),
       }
     }
+    case 'app_server/downline_aix_usdt_rewards': {
+      const page = Math.max(1, Number(mergedParams.page) || 1)
+      const source = String(mergedParams.source || '').trim().toLowerCase()
+      const query: Record<string, any> = { page, page_size: 10 }
+      if (source) query.source = source
+      const res = await authGet('/v1/wallet/downline-aix-usdt-rewards', query)
+      const body = apiBody(res)
+      const records = (body.records || []).map((item: any) => ({
+        id: item.id,
+        address: item.address || '',
+        amount: trimAmountText(item.amount),
+        pointsSource: String(item.points_source || item.pointsSource || '').toLowerCase(),
+        createdAt: formatUnixTime(item.created_at ?? item.createdAt),
+      }))
+      return {
+        count: Number(body.count || 0),
+        total_amount: String(body.total_amount ?? body.totalAmount ?? '0'),
+        list: records,
+        page: Number(body.page || page),
+      }
+    }
     case 'app_server/downline_subscribe_orders': {
       const page = Math.max(1, Number(mergedParams.page) || 1)
       const fundSource = String(mergedParams.fund_source || mergedParams.fundSource || '').trim().toLowerCase()

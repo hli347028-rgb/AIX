@@ -394,6 +394,32 @@ func (uc *WalletUsecase) ListDownlineSubscribeOrders(
 	return uc.walletRepo.ListOrdersByUserIDs(ctx, ids, offset, pageSize, fundSource)
 }
 
+// ListDownlineAixUsdtRewards 当前用户所有下级认购产生的 AIX-USDT。
+// source 为空统计全部；recharge / win / reinvest 时列表与合计只含该分类。
+func (uc *WalletUsecase) ListDownlineAixUsdtRewards(
+	ctx context.Context, tokenString string, page, pageSize int, source string,
+) ([]*AdminOrderDetail, int64, string, error) {
+	user, err := uc.resolveUser(ctx, tokenString)
+	if err != nil {
+		return nil, 0, "0", err
+	}
+	ids, err := uc.userRepo.ListUserIDsUnder(ctx, user.ID)
+	if err != nil {
+		return nil, 0, "0", err
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	return uc.walletRepo.ListDownlinePointsByUserIDs(ctx, ids, offset, pageSize, source)
+}
+
 func (uc *WalletUsecase) CreateWithdraw(ctx context.Context, tokenString, amount, toAddress, signature string, withdrawAt int64) (*Withdrawal, string, error) {
 	return nil, "", errors.BadRequest("USDT_WITHDRAW_FORBIDDEN", "仅支持提现 WIN 代币，不支持提现 USDT")
 }

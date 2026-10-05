@@ -250,6 +250,17 @@
             <span class="tab-label">{{ $t('community.downlineExchangeWin') }}</span>
             <span class="tab-total">{{ formatLedgerTotal(downlineExchangeWinTotal, 4) }}</span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            class="direct-ledger-tab"
+            :class="{ active: directLedgerTab === 'aixUsdt' }"
+            :aria-selected="directLedgerTab === 'aixUsdt'"
+            @click="switchDirectLedgerTab('aixUsdt')"
+          >
+            <span class="tab-label">{{ $t('community.downlineAixUsdtReward') }}</span>
+            <span class="tab-total">{{ formatLedgerTotal(downlineAixUsdtTotal, 4) }}</span>
+          </button>
         </div>
       </div>
 
@@ -356,6 +367,42 @@
         <p v-else class="empty-state">{{ $t('common.noData') }}</p>
       </div>
 
+      <div v-show="directLedgerTab === 'aixUsdt'" class="ledger" role="tabpanel">
+        <div class="subscribe-type-filters" role="group" :aria-label="$t('community.aixUsdtSource')">
+          <button
+            v-for="opt in aixUsdtSourceOptions"
+            :key="opt.value || 'all'"
+            type="button"
+            class="subscribe-type-filter"
+            :class="{ active: aixUsdtSourceFilter === opt.value }"
+            :aria-pressed="aixUsdtSourceFilter === opt.value"
+            @click="setAixUsdtSourceFilter(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <div class="ledger-head">
+          <span>{{ $t('community.walletAddress') }}</span>
+          <span class="type">{{ $t('community.aixUsdtSource') }}</span>
+          <span class="num">{{ $t('community.aixUsdtAmount') }}</span>
+          <span class="time">{{ $t('community.time') }}</span>
+        </div>
+        <template v-if="downlineAixUsdtList.length > 0">
+          <div class="ledger-row" v-for="(item, index) in downlineAixUsdtList" :key="item.id || index">
+            <span class="aix-mono">{{ formatAddr(item.address) }}</span>
+            <span class="type">{{ formatAixUsdtSource(item.pointsSource) }}</span>
+            <span class="num">{{ formatRechargeAmount(item.amount) }}</span>
+            <span class="time">{{ item.createdAt }}</span>
+          </div>
+          <Pagination
+            v-model="downlineAixUsdtPage"
+            :page-count="downlineAixUsdtPageCount"
+            mode="simple"
+            @change="getDownlineAixUsdt"
+          />
+        </template>
+        <p v-else class="empty-state">{{ $t('common.noData') }}</p>
+      </div>
 
       <div class="safe-bottom"></div>
     </div>
@@ -548,7 +595,18 @@ let downlineExchangeWinList = $ref<any[]>([])
 let downlineExchangeWinPage = $ref(1)
 let downlineExchangeWinPageCount = $ref(1)
 let downlineExchangeWinTotal = $ref('0')
-let directLedgerTab = $ref<'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin'>('subscribe')
+let downlineAixUsdtList = $ref<any[]>([])
+let downlineAixUsdtPage = $ref(1)
+let downlineAixUsdtPageCount = $ref(1)
+let downlineAixUsdtTotal = $ref('0')
+let aixUsdtSourceFilter = $ref('')
+const aixUsdtSourceOptions = computed(() => [
+  { value: '', label: $t('community.subscribeTypeAll') },
+  { value: 'recharge', label: $t('community.aixUsdtSourceUsdt') },
+  { value: 'win', label: $t('community.aixUsdtSourceWin') },
+  { value: 'reinvest', label: $t('community.aixUsdtSourceReinvest') },
+])
+let directLedgerTab = $ref<'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin' | 'aixUsdt'>('subscribe')
 
 const formatAddress = (value: string) => {
   if (!value) return ''
@@ -589,6 +647,13 @@ const formatSubscribeType = (fundSource: string) => {
   if (key === 'reward') return $t('community.subscribeTypeReward')
   if (key === 'win' || key === 'win_a') return $t('community.subscribeTypeWin')
   return $t('community.subscribeTypeRecharge')
+}
+
+const formatAixUsdtSource = (source: string) => {
+  const key = String(source || '').toLowerCase()
+  if (key === 'win') return $t('community.aixUsdtSourceWin')
+  if (key === 'reinvest') return $t('community.aixUsdtSourceReinvest')
+  return $t('community.aixUsdtSourceUsdt')
 }
 
 const normalizeMember = (item: any) => {
@@ -692,7 +757,23 @@ const getDownlineExchangeWin = async (pageNum: number = 1) => {
   downlineExchangeWinTotal = String(res.total_amount ?? res.totalAmount ?? '0')
 }
 
-const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin') => {
+const getDownlineAixUsdt = async (pageNum: number = 1) => {
+  const params: Record<string, any> = { page: pageNum }
+  if (aixUsdtSourceFilter) params.source = aixUsdtSourceFilter
+  const res: any = await request.get('app_server/downline_aix_usdt_rewards', { params })
+  downlineAixUsdtPageCount = Math.ceil((res.count || 0) / 10) || 1
+  downlineAixUsdtList = res.list || []
+  downlineAixUsdtTotal = String(res.total_amount ?? res.totalAmount ?? '0')
+}
+
+const setAixUsdtSourceFilter = (value: string) => {
+  if (aixUsdtSourceFilter === value) return
+  aixUsdtSourceFilter = value
+  downlineAixUsdtPage = 1
+  void getDownlineAixUsdt(1)
+}
+
+const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin' | 'exchangeWin' | 'aixUsdt') => {
   if (directLedgerTab === tab) return
   directLedgerTab = tab
   if (tab === 'subscribe' && downlineOrderList.length === 0) {
@@ -706,6 +787,9 @@ const switchDirectLedgerTab = (tab: 'subscribe' | 'recharge' | 'rechargeWin' | '
   }
   if (tab === 'exchangeWin' && downlineExchangeWinList.length === 0) {
     void getDownlineExchangeWin(downlineExchangeWinPage)
+  }
+  if (tab === 'aixUsdt' && downlineAixUsdtList.length === 0) {
+    void getDownlineAixUsdt(downlineAixUsdtPage)
   }
 }
 
@@ -768,6 +852,7 @@ const refreshTeamPage = async () => {
       loadTeamMembers(),
       loadTeamHeavyProfile(true),
       getDownlineOrders(downlinePage),
+      getDownlineAixUsdt(downlineAixUsdtPage),
     ])
   } finally {
     refreshCooldownTimer = setTimeout(() => {
@@ -1187,21 +1272,38 @@ onBeforeUnmount(() => {
 
 .direct-ledger-section {
   align-items: stretch;
+  min-width: 0;
 }
 
 .direct-ledger-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-top: 2px;
-  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  padding: 2px 0 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.direct-ledger-tabs::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .direct-ledger-tab {
-  min-height: 44px;
-  min-width: 0;
-  width: 100%;
-  padding: 6px 4px;
+  flex: 0 0 148px;
+  width: 148px;
+  min-height: 52px;
+  scroll-snap-align: start;
+  padding: 8px 10px;
   border: 1px solid var(--hair-2);
   border-radius: 12px;
   background: transparent;
@@ -1221,9 +1323,7 @@ onBeforeUnmount(() => {
 
 .direct-ledger-tab .tab-label {
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .direct-ledger-tab .tab-total {

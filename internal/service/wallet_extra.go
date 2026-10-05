@@ -38,6 +38,7 @@ func RegisterWalletExtraRoutes(srv *khttp.Server, wallet *WalletService) {
 	r.GET("/v1/wallet/downline-usdt-recharges", wallet.HandleDownlineUSDTRecharges)
 	r.GET("/v1/wallet/downline-win-recharges", wallet.HandleDownlineWINRecharges)
 	r.GET("/v1/wallet/downline-subscribe-orders", wallet.HandleDownlineSubscribeOrders)
+	r.GET("/v1/wallet/downline-aix-usdt-rewards", wallet.HandleDownlineAixUsdtRewards)
 	r.GET("/v1/wallet/points-records", wallet.HandlePointsRecords)
 	r.POST("/v1/wallet/recharge-win", wallet.HandleCreateWinRecharge)
 	r.POST("/v1/wallet/recharge-win/confirm", wallet.HandleConfirmWinRecharge)
@@ -510,60 +511,60 @@ func (s *WalletService) HandleAixProfile(ctx khttp.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"address":              user.Address,
-		"username":             user.Username,
-		"usdt_recharge":        recharge,
-		"usdt_reward":          reward,
-		"aix_balance":          aix,
-		"win_balance":            user.WinBalance,
-		"win_recharge_balance":   user.WinRechargeBalance,
-		"win_a_recharge_balance": user.WinARechargeBalance,
-		"usdt_withdrawable":      zeroIfEmpty(user.UsdtWithdrawable),
-		"pending_mgmt_reward":  overflow, // 兼容旧字段，值为溢出奖励
-		"overflow_reward":      overflow,
-		"is_zero_account":          isZeroAccount,
-		"is_community_subsidy":     isCommunitySubsidy,
-		"community_subsidy_rate":   user.CommunitySubsidyRate,
+		"address":                   user.Address,
+		"username":                  user.Username,
+		"usdt_recharge":             recharge,
+		"usdt_reward":               reward,
+		"aix_balance":               aix,
+		"win_balance":               user.WinBalance,
+		"win_recharge_balance":      user.WinRechargeBalance,
+		"win_a_recharge_balance":    user.WinARechargeBalance,
+		"usdt_withdrawable":         zeroIfEmpty(user.UsdtWithdrawable),
+		"pending_mgmt_reward":       overflow, // 兼容旧字段，值为溢出奖励
+		"overflow_reward":           overflow,
+		"is_zero_account":           isZeroAccount,
+		"is_community_subsidy":      isCommunitySubsidy,
+		"community_subsidy_rate":    user.CommunitySubsidyRate,
 		"zero_account_reward_total": zeroAccountReward,
 		"community_subsidy_total":   communitySubsidyReward,
-		"points":               zeroIfEmpty(user.Points),
-		"points_all":           zeroIfEmpty(user.PointsAll),
-		"static_usdt_total":    staticTotal,
-		"pending_amount":       pending,
-		"unexited_amount":      unexited,
-		"total_nodes":          totalNodes,
-		"mgmt_level":           mgmtLevel,
-		"mgmt_reward_released": mgmtSummary.Released,
-		"mgmt_reward_pending":  mgmtSummary.Pending,
-		"mgmt_reward_total":    mgmtSummary.Total,
-		"direct_reward_total":  directRewardTotal,
-		"large_area_perf":      largeArea,
-		"small_area_perf":      smallArea,
-		"team_perf":            teamPerf,
+		"points":                    zeroIfEmpty(user.Points),
+		"points_all":                zeroIfEmpty(user.PointsAll),
+		"static_usdt_total":         staticTotal,
+		"pending_amount":            pending,
+		"unexited_amount":           unexited,
+		"total_nodes":               totalNodes,
+		"mgmt_level":                mgmtLevel,
+		"mgmt_reward_released":      mgmtSummary.Released,
+		"mgmt_reward_pending":       mgmtSummary.Pending,
+		"mgmt_reward_total":         mgmtSummary.Total,
+		"direct_reward_total":       directRewardTotal,
+		"large_area_perf":           largeArea,
+		"small_area_perf":           smallArea,
+		"team_perf":                 teamPerf,
 		"area_funding": map[string]any{
-			"large":          areaLarge,
-			"small":          areaSmall,
+			"large":           areaLarge,
+			"small":           areaSmall,
 			"team_total_usdt": teamFundingUsdt,
 		},
 		"team_active_subscribe_principal": teamActiveSubscribe,
-		"server_time":          serverTime,
-		"next_release_at":      nextReleaseAt,
-		"aix_price":            aixPriceStr,
-		"win_price":            winPrice,
-		"aix_to_win_rate":      aixToWinRate,
-		"exchange_fee_rate":    biz.GetExchangeFeeRate(),
-		"exchange_enabled":     user == nil || user.ExchangeEnabled,
+		"server_time":                     serverTime,
+		"next_release_at":                 nextReleaseAt,
+		"aix_price":                       aixPriceStr,
+		"win_price":                       winPrice,
+		"aix_to_win_rate":                 aixToWinRate,
+		"exchange_fee_rate":               biz.GetExchangeFeeRate(),
+		"exchange_enabled":                user == nil || user.ExchangeEnabled,
 		"exchange_bind_address": func() string {
 			if user == nil {
 				return ""
 			}
 			return user.ExchangeBindAddress
 		}(),
-		"aix_contract":         "", // TODO
-		"win_contract":           s.uc.WinContract(),
-		"win_a_recharge_enabled": false,
-		"min_usdt_recharge":    s.uc.MinUsdtRecharge(),
-		"min_win_recharge":     s.uc.MinWinRecharge(),
+		"aix_contract":                 "", // TODO
+		"win_contract":                 s.uc.WinContract(),
+		"win_a_recharge_enabled":       false,
+		"min_usdt_recharge":            s.uc.MinUsdtRecharge(),
+		"min_win_recharge":             s.uc.MinWinRecharge(),
 		"exchange_transfer_min_amount": s.uc.ExchangeTransferMinAmount(),
 	})
 }
@@ -721,6 +722,46 @@ func (s *WalletService) HandleDownlineSubscribeOrders(ctx khttp.Context) error {
 	})
 }
 
+// HandleDownlineAixUsdtRewards 当前用户所有下级认购产生的 AIX-USDT。
+// Query source: 空=全部；recharge|usdt=USDT 认购；win=WIN 认购；reinvest|reward=复投。
+func (s *WalletService) HandleDownlineAixUsdtRewards(ctx khttp.Context) error {
+	token := tokenFromRequest(ctx, "")
+	page, pageSize, err := transferRecordPagination(ctx)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": err.Error()})
+	}
+	source, ok := biz.ParseDownlinePointsSource(ctx.Request().URL.Query().Get("source"))
+	if !ok {
+		return ctx.JSON(http.StatusBadRequest, map[string]any{"code": 400, "message": "invalid source"})
+	}
+	records, total, amountTotal, err := s.uc.ListDownlineAixUsdtRewards(ctx, token, page, pageSize, source)
+	if err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(records))
+	for _, rec := range records {
+		if rec == nil || rec.Order == nil {
+			continue
+		}
+		o := rec.Order
+		items = append(items, map[string]any{
+			"id":            o.ID,
+			"address":       rec.UserAddress,
+			"amount":        o.Points,
+			"points_source": biz.DownlinePointsCategory(o.PointsSource),
+			"created_at":    o.CreatedTime.Unix(),
+		})
+	}
+	return ctx.JSON(http.StatusOK, map[string]any{
+		"records":      items,
+		"count":        total,
+		"total_amount": amountTotal,
+		"page":         page,
+		"page_size":    pageSize,
+		"source":       source,
+	})
+}
+
 // HandlePointsRecords 用户端：积分获取记录（认购产生，时间=订单创建时间）
 func (s *WalletService) HandlePointsRecords(ctx khttp.Context) error {
 	token := tokenFromRequest(ctx, "")
@@ -870,14 +911,14 @@ func (s *WalletService) HandleWithdrawUSDT(ctx khttp.Context) error {
 		return err
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"withdraw_id":     w.ID,
-		"asset":           w.Asset,
-		"amount":          w.Amount,
-		"to_address":      w.ToAddress,
-		"status":          w.Status,
-		"tx_hash":         w.TxHash,
+		"withdraw_id":       w.ID,
+		"asset":             w.Asset,
+		"amount":            w.Amount,
+		"to_address":        w.ToAddress,
+		"status":            w.Status,
+		"tx_hash":           w.TxHash,
 		"usdt_withdrawable": left,
-		"usdt_contract":   s.uc.UsdtContract(),
+		"usdt_contract":     s.uc.UsdtContract(),
 	})
 }
 
@@ -896,18 +937,18 @@ func (s *WalletService) HandleCreateWinRecharge(ctx khttp.Context) error {
 		return err
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"recharge_id":        recharge.ID,
-		"asset":              biz.TokenWIN,
-		"amount":             recharge.Amount,
-		"deposit_address":    s.uc.DepositAddress(),
-		"deposit_addresses":  s.uc.DepositAddresses(),
-		"win_contract":       s.uc.WinContract(),
-		"win_decimals":       s.uc.WinDecimals(),
-		"token_symbol":       biz.TokenWIN,
-		"message":            recharge.Message,
-		"expire_at":          recharge.ExpireAt.Unix(),
-		"dev_mode":           s.uc.IsDevMode(),
-		"win_price":          biz.GetWinPrice(),
+		"recharge_id":       recharge.ID,
+		"asset":             biz.TokenWIN,
+		"amount":            recharge.Amount,
+		"deposit_address":   s.uc.DepositAddress(),
+		"deposit_addresses": s.uc.DepositAddresses(),
+		"win_contract":      s.uc.WinContract(),
+		"win_decimals":      s.uc.WinDecimals(),
+		"token_symbol":      biz.TokenWIN,
+		"message":           recharge.Message,
+		"expire_at":         recharge.ExpireAt.Unix(),
+		"dev_mode":          s.uc.IsDevMode(),
+		"win_price":         biz.GetWinPrice(),
 	})
 }
 

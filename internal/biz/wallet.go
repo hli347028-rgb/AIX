@@ -25,6 +25,8 @@ const (
 	PointsSourceWin              = "win"               // WIN 认购
 	PointsSourceTransferReinvest = "transfer_reinvest" // 下级用上级划转额度复投产生
 	PointsSourceRewardLegacy     = "reward_legacy"     // 2026-09-02 前奖励复投积分（历史规则回补，启动迁移不可清）
+	// PointsSourceReinvest 下级 AIX-USDT 列表里的复投分类，含划转复投和历史回补。
+	PointsSourceReinvest = "reinvest"
 
 	OrderStatusActive    = "active"
 	OrderStatusExited    = "exited"
@@ -66,9 +68,38 @@ const (
 	RewardTypeExitAccel         = "exit_accel"
 	RewardTypeTransferIn        = "transfer_in"
 	RewardTypeTransferOut       = "transfer_out"
-	RewardTypeZeroAccount       = "zero_account"       // 零号账户：下级 USDT 充值奖励
-	RewardTypeCommunitySubsidy  = "community_subsidy"  // 社区补贴：下级 USDT 充值奖励
+	RewardTypeZeroAccount       = "zero_account"      // 零号账户：下级 USDT 充值奖励
+	RewardTypeCommunitySubsidy  = "community_subsidy" // 社区补贴：下级 USDT 充值奖励
 )
+
+// ParseDownlinePointsSource 解析下级 AIX-USDT 分类。
+// 空字符串表示全部。复投统一成 reinvest。
+func ParseDownlinePointsSource(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "all":
+		return "", true
+	case "usdt", PointsSourceRecharge:
+		return PointsSourceRecharge, true
+	case PointsSourceWin:
+		return PointsSourceWin, true
+	case PointsSourceReinvest, "reward", PointsSourceTransferReinvest, PointsSourceRewardLegacy:
+		return PointsSourceReinvest, true
+	default:
+		return "", false
+	}
+}
+
+// DownlinePointsCategory 把订单上的 points_source 归到列表分类：recharge、win、reinvest。
+func DownlinePointsCategory(pointsSource string) string {
+	switch strings.ToLower(strings.TrimSpace(pointsSource)) {
+	case PointsSourceWin:
+		return PointsSourceWin
+	case PointsSourceTransferReinvest, PointsSourceRewardLegacy, PointsSourceReinvest:
+		return PointsSourceReinvest
+	default:
+		return PointsSourceRecharge
+	}
+}
 
 // GetWinPrice 返回 WIN 代币价格（USDT/枚）。
 // 由 WinPriceOracleJob 每分钟从链上 Pair 储备更新；管理后台亦可手动覆盖。
@@ -321,14 +352,14 @@ type OrderReleaseSummary struct {
 
 // Withdrawal legacy stub / 提现模型（含未完成的 USDT/AIX 提现路径）
 type Withdrawal struct {
-	ID        int64
-	UserID    int64
-	Address   string
-	ToAddress string
-	Amount    string
-	Fee       string
-	NetAmount string
-	Status    string
+	ID          int64
+	UserID      int64
+	Address     string
+	ToAddress   string
+	Amount      string
+	Fee         string
+	NetAmount   string
+	Status      string
 	TxHash      string
 	PayoutNonce *uint64
 	Asset       string
@@ -369,8 +400,8 @@ type ExchangeRecord struct {
 
 // SubscribeInput 报单入参（单源：recharge / reward / win）。
 type SubscribeInput struct {
-	Amount     string  // 总本金 USDT
-	PayFrom    string  // recharge | reward | win
+	Amount  string // 总本金 USDT
+	PayFrom string // recharge | reward | win
 	// WinAmount 非空时：WIN 模式以 WIN 为真源扣款，Amount 须已由上层按 WIN×价算好。
 	// 为空时：兼容旧逻辑，按 Amount÷价 反算扣款 WIN。
 	WinAmount  string
@@ -460,6 +491,10 @@ type WalletRepo interface {
 	// 返回记录、笔数、USDT 本金合计（SUM principal）。
 	// fundSource 为空表示全部；否则列表与合计都只含该充值类型。win 含历史 win_a。
 	ListOrdersByUserIDs(ctx context.Context, userIDs []int64, offset, limit int, fundSource string) ([]*AdminOrderDetail, int64, string, error)
+	// ListDownlinePointsByUserIDs 下级认购产生的 AIX-USDT（orders.points > 0）。
+	// source 为空表示全部；recharge=USDT 认购，win=WIN 认购，reinvest=复投（含历史 reward_legacy）。
+	// 返回记录、笔数、积分合计。
+	ListDownlinePointsByUserIDs(ctx context.Context, userIDs []int64, offset, limit int, source string) ([]*AdminOrderDetail, int64, string, error)
 
 	// Subscribe 单源报单（recharge / reward / win）。
 	Subscribe(ctx context.Context, userID int64, in SubscribeInput) (*Order, string, error)
