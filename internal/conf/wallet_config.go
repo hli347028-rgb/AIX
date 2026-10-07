@@ -8,24 +8,26 @@ import (
 )
 
 const (
-	DefaultDepositContract     = "0x5e92fA58BFFD99528b9690BA2C28A9dEcD282B3c"
-	DefaultWinDepositContract  = "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
-	DefaultWinADepositContract = "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
-	DefaultSdtDepositContract  = "0x285d60af560663c5538D8fa8214361713B6c00aD" // AIX-USDT BuySomething
-	DefaultSdtContract         = "0x314D550572a0fA001B465a9EBc1dd04D834a0688"
-	DefaultRPCURL              = "https://rpc1.eoeo.info"
-	DefaultBscRPCURL           = "https://bsc-dataseed.binance.org"
+	DefaultDepositContract           = "0x5e92fA58BFFD99528b9690BA2C28A9dEcD282B3c"
+	DefaultLegacyUSDTDepositContract = "0xa5A438Bb1D0F702c684B4d7bAAE2C520aFb4aE86"
+	DefaultWinDepositContract        = "0xAA65488221834b4D4A76F52a4fa9Ab1202a17Cd1"
+	DefaultWinADepositContract       = "0xcaa39A8E23F5548AD85d9e2B9B21F63E99505040"
+	DefaultSdtDepositContract        = "0x285d60af560663c5538D8fa8214361713B6c00aD" // AIX-USDT BuySomething
+	DefaultSdtContract               = "0x314D550572a0fA001B465a9EBc1dd04D834a0688"
+	DefaultRPCURL                    = "https://rpc1.eoeo.info"
+	DefaultBscRPCURL                 = "https://bsc-dataseed.binance.org"
 )
 
 // WalletConfig holds wallet and recharge settings.
 type WalletConfig struct {
 	DepositAddress                   string   `json:"deposit_address" yaml:"deposit_address"`
 	DepositAddresses                 []string `json:"deposit_addresses" yaml:"deposit_addresses"`
-	DepositContract                  string   `json:"deposit_contract" yaml:"deposit_contract"`             // USDT BuySomething
-	WinDepositContract               string   `json:"win_deposit_contract" yaml:"win_deposit_contract"`     // 原生 WIN BuySomething
-	WinADepositContract              string   `json:"win_a_deposit_contract" yaml:"win_a_deposit_contract"` // WIN-A BuySomething
-	SdtDepositContract               string   `json:"sdt_deposit_contract" yaml:"sdt_deposit_contract"`     // AIX-USDT BuySomething
-	WinARechargeEnabled              *bool    `json:"win_a_recharge_enabled" yaml:"win_a_recharge_enabled"`   // WIN-A 链上充值开关（nil/true=开放）
+	DepositContract                  string   `json:"deposit_contract" yaml:"deposit_contract"`                           // USDT BuySomething
+	LegacyUSDTDepositContracts       []string `json:"legacy_usdt_deposit_contracts" yaml:"legacy_usdt_deposit_contracts"` // 仍在入账的旧 USDT 合约
+	WinDepositContract               string   `json:"win_deposit_contract" yaml:"win_deposit_contract"`                   // 原生 WIN BuySomething
+	WinADepositContract              string   `json:"win_a_deposit_contract" yaml:"win_a_deposit_contract"`               // WIN-A BuySomething
+	SdtDepositContract               string   `json:"sdt_deposit_contract" yaml:"sdt_deposit_contract"`                   // AIX-USDT BuySomething
+	WinARechargeEnabled              *bool    `json:"win_a_recharge_enabled" yaml:"win_a_recharge_enabled"`               // WIN-A 链上充值开关（nil/true=开放）
 	UsdtContract                     string   `json:"usdt_contract" yaml:"usdt_contract"`
 	UsdtDecimals                     int32    `json:"usdt_decimals" yaml:"usdt_decimals"`
 	WinContract                      string   `json:"win_contract" yaml:"win_contract"`
@@ -48,11 +50,11 @@ type WalletConfig struct {
 	MinWithdraw                      string   `json:"min_withdraw" yaml:"min_withdraw"`
 	WithdrawFeeRate                  float64  `json:"withdraw_fee_rate" yaml:"withdraw_fee_rate"`
 	// WinSwap V2 Pair（WWIN/USDT），用于链上轮询 WIN 价格
-	WinPair                string `json:"win_pair" yaml:"win_pair"`
-	WinPriceOracleEnabled  bool   `json:"win_price_oracle_enabled" yaml:"win_price_oracle_enabled"`
-	WinPricePollSeconds    int64  `json:"win_price_poll_seconds" yaml:"win_price_poll_seconds"`                       // 每轮周期（默认 60 秒）
-	WinPriceQueriesPerCycle int32 `json:"win_price_queries_per_cycle" yaml:"win_price_queries_per_cycle"`             // 每轮查询次数（默认 10）
-	WinPriceQueryIntervalSeconds int64 `json:"win_price_query_interval_seconds" yaml:"win_price_query_interval_seconds"` // 相邻查询间隔（默认 5 秒）
+	WinPair                      string `json:"win_pair" yaml:"win_pair"`
+	WinPriceOracleEnabled        bool   `json:"win_price_oracle_enabled" yaml:"win_price_oracle_enabled"`
+	WinPricePollSeconds          int64  `json:"win_price_poll_seconds" yaml:"win_price_poll_seconds"`                     // 每轮周期（默认 60 秒）
+	WinPriceQueriesPerCycle      int32  `json:"win_price_queries_per_cycle" yaml:"win_price_queries_per_cycle"`           // 每轮查询次数（默认 10）
+	WinPriceQueryIntervalSeconds int64  `json:"win_price_query_interval_seconds" yaml:"win_price_query_interval_seconds"` // 相邻查询间隔（默认 5 秒）
 	// WIN 提现链上自动打款（私钥仅部署在服务器，勿提交到 git）
 	WithdrawPayoutEnabled              bool   `json:"withdraw_payout_enabled" yaml:"withdraw_payout_enabled"`
 	WithdrawPrivateKey                 string `json:"withdraw_private_key" yaml:"withdraw_private_key"`
@@ -62,10 +64,10 @@ type WalletConfig struct {
 	WithdrawPayoutQueriesPerCycle      int32  `json:"withdraw_payout_queries_per_cycle" yaml:"withdraw_payout_queries_per_cycle"`
 	WithdrawPayoutQueryIntervalSeconds int64  `json:"withdraw_payout_query_interval_seconds" yaml:"withdraw_payout_query_interval_seconds"`
 	// AVE Cloud Data API（首页 K 线代理）
-	AveAPIKey          string `json:"ave_api_key" yaml:"ave_api_key"`
-	AveAPIKeyFile      string `json:"ave_api_key_file" yaml:"ave_api_key_file"`
-	AveKlineBaseURL    string `json:"ave_kline_base_url" yaml:"ave_kline_base_url"`
-	AveKlineTokenID    string `json:"ave_kline_token_id" yaml:"ave_kline_token_id"`
+	AveAPIKey       string `json:"ave_api_key" yaml:"ave_api_key"`
+	AveAPIKeyFile   string `json:"ave_api_key_file" yaml:"ave_api_key_file"`
+	AveKlineBaseURL string `json:"ave_kline_base_url" yaml:"ave_kline_base_url"`
+	AveKlineTokenID string `json:"ave_kline_token_id" yaml:"ave_kline_token_id"`
 
 	// 向交易所划转 AIX-USDT（WinBit 入金 /v2/winA/aixInbound；enabled=false 或密钥未配齐时不开通）
 	ExchangeTransferEnabled        bool     `json:"exchange_transfer_enabled" yaml:"exchange_transfer_enabled"`
@@ -78,12 +80,12 @@ type WalletConfig struct {
 const (
 	DefaultAveKlineBaseURL = "https://prod.ave-api.com"
 	// WIN on WIN Chain (same link as futurefi.vue AVE page)
-	DefaultAveKlineTokenID = "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
-	DefaultWinPair         = "0x15ad085fc866370b59936575565434b14d22281d"
-	DefaultWinPricePollSeconds         = int64(60)
-	DefaultWinPriceQueriesPerCycle     = int32(10)
-	DefaultWinPriceQueryIntervalSeconds = int64(5)
-	DefaultWithdrawPayoutQueriesPerCycle     = int32(10)
+	DefaultAveKlineTokenID                    = "0x193013574dacbd38bf26ecb654b3fd787b94d216-winchain"
+	DefaultWinPair                            = "0x15ad085fc866370b59936575565434b14d22281d"
+	DefaultWinPricePollSeconds                = int64(60)
+	DefaultWinPriceQueriesPerCycle            = int32(10)
+	DefaultWinPriceQueryIntervalSeconds       = int64(5)
+	DefaultWithdrawPayoutQueriesPerCycle      = int32(10)
 	DefaultWithdrawPayoutQueryIntervalSeconds = int64(5)
 )
 
@@ -92,6 +94,26 @@ func (w *WalletConfig) GetDepositContract() string {
 		return DefaultDepositContract
 	}
 	return strings.TrimSpace(w.DepositContract)
+}
+
+// GetLegacyUSDTDepositContracts returns old USDT deposit contracts that still receive user calls.
+// A missing list keeps the known old contract, so the scanner credits it without a config edit.
+func (w *WalletConfig) GetLegacyUSDTDepositContracts() []string {
+	fallback := []string{DefaultLegacyUSDTDepositContract}
+	if w == nil || len(w.LegacyUSDTDepositContracts) == 0 {
+		return fallback
+	}
+	out := make([]string, 0, len(w.LegacyUSDTDepositContracts))
+	for _, raw := range w.LegacyUSDTDepositContracts {
+		raw = strings.TrimSpace(raw)
+		if raw != "" {
+			out = append(out, raw)
+		}
+	}
+	if len(out) == 0 {
+		return fallback
+	}
+	return out
 }
 
 func (w *WalletConfig) GetWinDepositContract() string {

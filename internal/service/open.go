@@ -146,8 +146,8 @@ func (s *OpenService) HandleSubscribeOrders(ctx khttp.Context) error {
 	})
 }
 
-// HandleAixPrice 返回 AIX/USDT 交易对价格：1 枚 AIX 值多少 USDT。
-// 第三方用该价格自行计算 AIX/WIN。date 缺省为中国时区当天，格式 YYYY-MM-DD。
+// HandleAixPrice 直接返回当天 AIX 价格：1 枚 AIX 值多少 USDT。
+// date 缺省为中国时区当天，格式 YYYY-MM-DD。
 func (s *OpenService) HandleAixPrice(ctx khttp.Context) error {
 	req := ctx.Request()
 	ip := clientIP(req)
@@ -169,7 +169,6 @@ func (s *OpenService) HandleAixPrice(ctx khttp.Context) error {
 	}
 	s.log.Infof("openapi aix-price ok ip=%s key=%s date=%s", ip, keyHint, date)
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"pair":  "AIX/USDT",
 		"price": price,
 		"date":  date,
 	})

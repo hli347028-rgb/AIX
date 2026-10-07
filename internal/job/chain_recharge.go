@@ -131,11 +131,34 @@ func (j *ChainRechargeJob) runOnce(ctx context.Context) {
 	}
 }
 
-// DepositOnly syncs the USDT BuySomething ledger on EOEO → usdt_recharge.
+// DepositOnly syncs the current USDT BuySomething ledger and any legacy USDT contracts still receiving deposits.
 func (j *ChainRechargeJob) DepositOnly(ctx context.Context) (*DepositOnlyResult, error) {
-	return j.syncDepositLedger(ctx, "USDT", j.cfg.GetDepositContract(), j.cfg.GetRPCURL(), func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
+	credit := func(ctx context.Context, recordHash, fromAddress, contractAddress, amount string, index uint64) (bool, error) {
 		return j.walletRepo.AutoCreditChainRecharge(ctx, recordHash, fromAddress, contractAddress, amount, index)
-	})
+	}
+	contracts := []string{j.cfg.GetDepositContract()}
+	current := strings.ToLower(strings.TrimSpace(contracts[0]))
+	for _, extra := range j.cfg.GetLegacyUSDTDepositContracts() {
+		extra = strings.TrimSpace(extra)
+		if extra == "" || strings.ToLower(extra) == current {
+			continue
+		}
+		contracts = append(contracts, extra)
+	}
+	var primary *DepositOnlyResult
+	for i, contract := range contracts {
+		res, err := j.syncDepositLedger(ctx, "USDT", contract, j.cfg.GetRPCURL(), credit)
+		if i == 0 {
+			primary = res
+		}
+		if err != nil {
+			return primary, fmt.Errorf("%s: %w", contract, err)
+		}
+		if i > 0 && res != nil && res.Scanned > 0 {
+			j.log.Infof("USDT legacy depositOnly: contract=%s credited=%d skipped=%d scanned=%d", res.Contract, res.Credited, res.Skipped, res.Scanned)
+		}
+	}
+	return primary, nil
 }
 
 // DepositOnlyWin syncs the native WIN BuySomething ledger on EOEO → win_recharge_balance.
