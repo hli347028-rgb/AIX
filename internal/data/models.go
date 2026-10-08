@@ -9,47 +9,47 @@ import (
 const decimalType = "decimal(36,18)"
 
 type UserPO struct {
-	ID                int64           `gorm:"primaryKey;autoIncrement"`
-	Address           string          `gorm:"uniqueIndex;size:42;not null"`
-	InviterID         *int64          `gorm:"index"`
-	InviteCode        string          `gorm:"uniqueIndex;size:64;not null"`
-	Username          string          `gorm:"column:username;size:64;default:'';not null"` // 用户端「我的团队」名称设置
-	UsdtRecharge      decimal.Decimal `gorm:"column:usdt_recharge;type:decimal(36,18);default:0;not null"`
-	UsdtReward        decimal.Decimal `gorm:"column:usdt_reward;type:decimal(36,18);default:0;not null"`
-	AixBalance        decimal.Decimal `gorm:"column:aix_balance;type:decimal(36,18);default:0;not null"`         // AIX 代币数（静态换算入账）
-	WinBalance          decimal.Decimal `gorm:"column:win_balance;type:decimal(36,18);default:0;not null"`                 // WIN 提现钱包（AIX 兑换）
-	WinRechargeBalance  decimal.Decimal `gorm:"column:win_recharge_balance;type:decimal(36,18);default:0;not null"`       // WIN 充值钱包
-	WinARechargeBalance decimal.Decimal `gorm:"column:win_a_recharge_balance;type:decimal(36,18);default:0;not null"`     // WIN-A 充值钱包
-	UsdtWithdrawable    decimal.Decimal `gorm:"column:usdt_withdrawable;type:decimal(36,18);default:0;not null"`           // 可提 U 余额（0号/社区补贴）
-	PendingMgmtReward decimal.Decimal `gorm:"column:pending_mgmt_reward;type:decimal(36,18);default:0;not null"` // 兼容旧列；= OverflowReward
-	OverflowReward    decimal.Decimal `gorm:"column:overflow_reward;type:decimal(36,18);default:0;not null"`     // 管理奖溢出
-	OverflowDirect    decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`     // 直推奖溢出
-	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                         // 当前 AIX-USDT
-	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                     // 累计 AIX-USDT
-	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`       // 上级划入累计的复投额度；下级复投可产生 AIX-USDT
-	TransferReinvestBlocked decimal.Decimal `gorm:"column:transfer_reinvest_blocked;type:decimal(36,18);default:0;not null"`     // 历史阻断额（已停用传递；存量可人工清零）
-	StaticUsdtTotal   decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`   // 静态总收益（USDT 金本位累计）
-	MgmtLevel         int32           `gorm:"column:mgmt_level;default:0;not null"`
-	MgmtLevelLocked   bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
-	LargeAreaPerf     decimal.Decimal `gorm:"column:large_area_perf;type:decimal(36,18);default:0;not null"`
-	SmallAreaPerf     decimal.Decimal `gorm:"column:small_area_perf;type:decimal(36,18);default:0;not null"`
-	TeamPerf          decimal.Decimal `gorm:"column:team_perf;type:decimal(36,18);default:0;not null"`
-	IsZeroAccount          bool            `gorm:"column:is_zero_account;default:false;not null"` // 已废弃，补贴合并后仅作历史迁移
-	IsCommunitySubsidy     bool            `gorm:"column:is_community_subsidy;default:false;not null"`
-	CommunitySubsidyRate   int32           `gorm:"column:community_subsidy_rate;default:0;not null"` // 补贴档位：5 / 10 / 15
-	ZeroAccountSetAt       *time.Time      `gorm:"column:zero_account_set_at"`
-	CommunitySubsidySetAt  *time.Time      `gorm:"column:community_subsidy_set_at"`
-	ZeroAccountRewardTotal decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`
-	CommunitySubsidyTotal  decimal.Decimal `gorm:"column:community_subsidy_total;type:decimal(36,18);default:0;not null"`
-	Status            int32           `gorm:"default:1;not null"`
-	IsFrozen          bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结：禁登录/资金操作；无静态/动态/社区补贴入账；他人不可向其划转
-	FrozenAt          *time.Time      `gorm:"column:frozen_at"`
-	ExchangeEnabled   bool            `gorm:"column:exchange_enabled;default:true;not null"` // 关闭后禁止 AIX→可提 U 兑换
+	ID                      int64           `gorm:"primaryKey;autoIncrement"`
+	Address                 string          `gorm:"uniqueIndex;size:42;not null"`
+	InviterID               *int64          `gorm:"index"`
+	InviteCode              string          `gorm:"uniqueIndex;size:64;not null"`
+	Username                string          `gorm:"column:username;size:64;default:'';not null"` // 用户端「我的团队」名称设置
+	UsdtRecharge            decimal.Decimal `gorm:"column:usdt_recharge;type:decimal(36,18);default:0;not null"`
+	UsdtReward              decimal.Decimal `gorm:"column:usdt_reward;type:decimal(36,18);default:0;not null"`
+	AixBalance              decimal.Decimal `gorm:"column:aix_balance;type:decimal(36,18);default:0;not null"`               // AIX 代币数（静态换算入账）
+	WinBalance              decimal.Decimal `gorm:"column:win_balance;type:decimal(36,18);default:0;not null"`               // WIN 提现钱包（AIX 兑换）
+	WinRechargeBalance      decimal.Decimal `gorm:"column:win_recharge_balance;type:decimal(36,18);default:0;not null"`      // WIN 充值钱包
+	WinARechargeBalance     decimal.Decimal `gorm:"column:win_a_recharge_balance;type:decimal(36,18);default:0;not null"`    // WIN-A 充值钱包
+	UsdtWithdrawable        decimal.Decimal `gorm:"column:usdt_withdrawable;type:decimal(36,18);default:0;not null"`         // 可提 U 余额（0号/社区补贴）
+	PendingMgmtReward       decimal.Decimal `gorm:"column:pending_mgmt_reward;type:decimal(36,18);default:0;not null"`       // 兼容旧列；= OverflowReward
+	OverflowReward          decimal.Decimal `gorm:"column:overflow_reward;type:decimal(36,18);default:0;not null"`           // 管理奖溢出
+	OverflowDirect          decimal.Decimal `gorm:"column:overflow_direct;type:decimal(36,18);default:0;not null"`           // 直推奖溢出
+	Points                  decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`                    // 当前 AIX-USDT
+	PointsAll               decimal.Decimal `gorm:"column:points_all;type:decimal(36,18);default:0;not null"`                // 累计 AIX-USDT
+	TransferReinvestCredit  decimal.Decimal `gorm:"column:transfer_reinvest_credit;type:decimal(36,18);default:0;not null"`  // 上级划入累计的复投额度；下级复投可产生 AIX-USDT
+	TransferReinvestBlocked decimal.Decimal `gorm:"column:transfer_reinvest_blocked;type:decimal(36,18);default:0;not null"` // 历史阻断额（已停用传递；存量可人工清零）
+	StaticUsdtTotal         decimal.Decimal `gorm:"column:static_usdt_total;type:decimal(36,18);default:0;not null"`         // 静态总收益（USDT 金本位累计）
+	MgmtLevel               int32           `gorm:"column:mgmt_level;default:0;not null"`
+	MgmtLevelLocked         bool            `gorm:"column:mgmt_level_locked;default:false;not null"`
+	LargeAreaPerf           decimal.Decimal `gorm:"column:large_area_perf;type:decimal(36,18);default:0;not null"`
+	SmallAreaPerf           decimal.Decimal `gorm:"column:small_area_perf;type:decimal(36,18);default:0;not null"`
+	TeamPerf                decimal.Decimal `gorm:"column:team_perf;type:decimal(36,18);default:0;not null"`
+	IsZeroAccount           bool            `gorm:"column:is_zero_account;default:false;not null"` // 已废弃，补贴合并后仅作历史迁移
+	IsCommunitySubsidy      bool            `gorm:"column:is_community_subsidy;default:false;not null"`
+	CommunitySubsidyRate    int32           `gorm:"column:community_subsidy_rate;default:0;not null"` // 补贴档位：5 / 10 / 15
+	ZeroAccountSetAt        *time.Time      `gorm:"column:zero_account_set_at"`
+	CommunitySubsidySetAt   *time.Time      `gorm:"column:community_subsidy_set_at"`
+	ZeroAccountRewardTotal  decimal.Decimal `gorm:"column:zero_account_reward_total;type:decimal(36,18);default:0;not null"`
+	CommunitySubsidyTotal   decimal.Decimal `gorm:"column:community_subsidy_total;type:decimal(36,18);default:0;not null"`
+	Status                  int32           `gorm:"default:1;not null"`
+	IsFrozen                bool            `gorm:"column:is_frozen;default:false;not null"` // 冻结：禁登录/资金操作；无静态/动态/社区补贴入账；他人不可向其划转
+	FrozenAt                *time.Time      `gorm:"column:frozen_at"`
+	ExchangeEnabled         bool            `gorm:"column:exchange_enabled;default:true;not null"` // 关闭后禁止 AIX→可提 U 兑换
 	// 未绑定必须为 NULL（唯一索引允许多个 NULL）；禁止写空串 ''，否则会撞唯一键导致注册失败。
-	ExchangeBindAddress *string        `gorm:"column:exchange_bind_address;size:42;uniqueIndex"`
-	Role              string          `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
-	CreatedTime       time.Time       `gorm:"column:created_time;autoCreateTime"`
-	UpdatedTime       time.Time       `gorm:"column:updated_time;autoUpdateTime"`
+	ExchangeBindAddress *string   `gorm:"column:exchange_bind_address;size:42;uniqueIndex"`
+	Role                string    `gorm:"size:16;default:user;not null"` // app admin helper, not in business DDL
+	CreatedTime         time.Time `gorm:"column:created_time;autoCreateTime"`
+	UpdatedTime         time.Time `gorm:"column:updated_time;autoUpdateTime"`
 }
 
 func (UserPO) TableName() string { return "users" }
@@ -63,10 +63,10 @@ type OrderPO struct {
 	DirectBase   decimal.Decimal `gorm:"column:direct_base;type:decimal(36,18);default:0;not null"`
 	FromRecharge decimal.Decimal `gorm:"column:from_recharge;type:decimal(36,18);default:0;not null"`
 	FromReward   decimal.Decimal `gorm:"column:from_reward;type:decimal(36,18);default:0;not null"`
-	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"`       // WIN 扣款数量（按认购时 win_price 折算）
-	FromWinA     decimal.Decimal `gorm:"column:from_win_a;type:decimal(36,18);default:0;not null"`     // WIN-A 扣款数量（按认购时 win_a_price 折算）
-	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`         // 本单获得 AIX-USDT
-	PointsSource string          `gorm:"column:points_source;size:32;default:'';not null"`             // recharge | win | transfer_reinvest
+	FromWin      decimal.Decimal `gorm:"column:from_win;type:decimal(36,18);default:0;not null"`   // WIN 扣款数量（按认购时 win_price 折算）
+	FromWinA     decimal.Decimal `gorm:"column:from_win_a;type:decimal(36,18);default:0;not null"` // WIN-A 扣款数量（按认购时 win_a_price 折算）
+	Points       decimal.Decimal `gorm:"column:points;type:decimal(36,18);default:0;not null"`     // 本单获得 AIX-USDT
+	PointsSource string          `gorm:"column:points_source;size:32;default:'';not null"`         // recharge | win | transfer_reinvest
 	FundSource   string          `gorm:"column:fund_source;size:16;not null"`
 	Status       string          `gorm:"size:16;default:active;not null"`
 	ExitedTime   *time.Time      `gorm:"column:exited_time"`
@@ -132,16 +132,16 @@ func (WithdrawalPO) TableName() string { return "withdrawals" }
 
 // WithdrawalPayoutPO tracks each on-chain payout attempt for idempotency.
 type WithdrawalPayoutPO struct {
-	ID           int64           `gorm:"primaryKey;autoIncrement"`
-	WithdrawID   int64           `gorm:"column:withdraw_id;index;not null"`
-	TxHash       string          `gorm:"column:tx_hash;uniqueIndex;size:66;not null"`
-	Nonce        uint64          `gorm:"not null"`
-	FromAddress  string          `gorm:"column:from_address;size:42;not null"`
-	ToAddress    string          `gorm:"column:to_address;size:42;not null"`
-	Amount       decimal.Decimal `gorm:"type:decimal(36,18);not null"`
-	Status       string          `gorm:"size:16;not null"` // submitted, confirmed, failed
-	CreatedTime  time.Time       `gorm:"column:created_time;autoCreateTime"`
-	UpdatedTime  time.Time       `gorm:"column:updated_time;autoUpdateTime"`
+	ID          int64           `gorm:"primaryKey;autoIncrement"`
+	WithdrawID  int64           `gorm:"column:withdraw_id;index;not null"`
+	TxHash      string          `gorm:"column:tx_hash;uniqueIndex;size:66;not null"`
+	Nonce       uint64          `gorm:"not null"`
+	FromAddress string          `gorm:"column:from_address;size:42;not null"`
+	ToAddress   string          `gorm:"column:to_address;size:42;not null"`
+	Amount      decimal.Decimal `gorm:"type:decimal(36,18);not null"`
+	Status      string          `gorm:"size:16;not null"` // submitted, confirmed, failed
+	CreatedTime time.Time       `gorm:"column:created_time;autoCreateTime"`
+	UpdatedTime time.Time       `gorm:"column:updated_time;autoUpdateTime"`
 }
 
 func (WithdrawalPayoutPO) TableName() string { return "withdrawal_payouts" }
@@ -155,9 +155,9 @@ type ExchangeRecordPO struct {
 	ToAsset       string          `gorm:"column:to_asset;size:16;not null"` // 固定 WIN
 	ToAmount      decimal.Decimal `gorm:"column:to_amount;type:decimal(36,18);not null"`
 	FeeAmount     decimal.Decimal `gorm:"column:fee_amount;type:decimal(36,18);not null;default:0"`
-	ExchangePrice decimal.Decimal `gorm:"column:exchange_price;type:decimal(36,18);not null"` // 兑换时的 WIN 价格（USDT/枚）
+	ExchangePrice decimal.Decimal `gorm:"column:exchange_price;type:decimal(36,18);not null"`    // 兑换时的 WIN 价格（USDT/枚）
 	FeeRate       decimal.Decimal `gorm:"column:fee_rate;type:decimal(12,6);not null;default:0"` // 兑换时的手续费率
-	Status        string          `gorm:"size:16;default:completed;not null"`                 // completed
+	Status        string          `gorm:"size:16;default:completed;not null"`                    // completed
 	Remark        string          `gorm:"size:255"`
 	CreatedTime   time.Time       `gorm:"column:created_time;autoCreateTime"`
 }
@@ -236,21 +236,21 @@ type SettlementBatchPO struct {
 	// 当日兑换额度快照：静态结算成功后按全网 aix_balance 计算一次，当天兑换审核沿用此值
 	ExchangeQuotaBase  decimal.Decimal `gorm:"column:exchange_quota_base;type:decimal(36,18);default:0;not null"`
 	ExchangeQuotaLimit decimal.Decimal `gorm:"column:exchange_quota_limit;type:decimal(36,18);default:0;not null"`
-	StartedTime    *time.Time      `gorm:"column:started_time"`
-	FinishedTime   *time.Time      `gorm:"column:finished_time"`
-	ErrorMsg       string          `gorm:"column:error_msg;size:512"`
-	CreatedTime    time.Time       `gorm:"column:created_time;autoCreateTime"`
+	StartedTime        *time.Time      `gorm:"column:started_time"`
+	FinishedTime       *time.Time      `gorm:"column:finished_time"`
+	ErrorMsg           string          `gorm:"column:error_msg;size:512"`
+	CreatedTime        time.Time       `gorm:"column:created_time;autoCreateTime"`
 }
 
 func (SettlementBatchPO) TableName() string { return "settlement_batches" }
 
 // DailyExchangeQuotaPO 每日兑换审核额度快照（中国时区自然日 0 点锁定一次，与结算无关）。
 type DailyExchangeQuotaPO struct {
-	ID             int64           `gorm:"primaryKey;autoIncrement"`
-	QuotaDate      string          `gorm:"column:quota_date;type:date;uniqueIndex;not null"`
-	QuotaBase      decimal.Decimal `gorm:"column:quota_base;type:decimal(36,18);default:0;not null"`
-	QuotaLimit     decimal.Decimal `gorm:"column:quota_limit;type:decimal(36,18);default:0;not null"`
-	CreatedTime    time.Time       `gorm:"column:created_time;autoCreateTime"`
+	ID          int64           `gorm:"primaryKey;autoIncrement"`
+	QuotaDate   string          `gorm:"column:quota_date;type:date;uniqueIndex;not null"`
+	QuotaBase   decimal.Decimal `gorm:"column:quota_base;type:decimal(36,18);default:0;not null"`
+	QuotaLimit  decimal.Decimal `gorm:"column:quota_limit;type:decimal(36,18);default:0;not null"`
+	CreatedTime time.Time       `gorm:"column:created_time;autoCreateTime"`
 }
 
 func (DailyExchangeQuotaPO) TableName() string { return "daily_exchange_quotas" }
@@ -270,7 +270,7 @@ type AnnouncementPO struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement"`
 	Title       string    `gorm:"size:256;not null"`
 	Content     string    `gorm:"type:longtext;not null"`
-	Status      int32     `gorm:"default:1;not null"` // 1=发布 0=下架
+	Status      int32     `gorm:"default:1;not null"`                         // 1=发布 0=下架
 	SortOrder   int32     `gorm:"column:sort_order;default:0;not null;index"` // 越小越靠前
 	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime"`
 	UpdatedTime time.Time `gorm:"column:updated_time;autoUpdateTime"`
@@ -290,15 +290,26 @@ type FeedbackPO struct {
 
 func (FeedbackPO) TableName() string { return "feedbacks" }
 
+// AdminTeamWatchPO 管理后台「团队统计」关注地址。名字只存在这张表，不写到用户资料。
+type AdminTeamWatchPO struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement"`
+	Address     string    `gorm:"column:address;size:42;not null;uniqueIndex"`
+	DisplayName string    `gorm:"column:display_name;size:64;not null;default:''"`
+	CreatedTime time.Time `gorm:"column:created_time;autoCreateTime"`
+	UpdatedTime time.Time `gorm:"column:updated_time;autoUpdateTime"`
+}
+
+func (AdminTeamWatchPO) TableName() string { return "admin_team_watches" }
+
 // AdminOperationLogPO 管理后台操作审计日志。
 type AdminOperationLogPO struct {
 	ID           int64     `gorm:"primaryKey;autoIncrement"`
-	Operator     string    `gorm:"column:operator;size:64;not null;index"`     // 主账户名或子账户名
-	OperatorType string    `gorm:"column:operator_type;size:16;not null"`      // main | sub
-	Action       string    `gorm:"column:action;size:128;not null;index"`      // 请求路径
-	ActionLabel  string    `gorm:"column:action_label;size:128;not null"`      // 操作说明
+	Operator     string    `gorm:"column:operator;size:64;not null;index"` // 主账户名或子账户名
+	OperatorType string    `gorm:"column:operator_type;size:16;not null"`  // main | sub
+	Action       string    `gorm:"column:action;size:128;not null;index"`  // 请求路径
+	ActionLabel  string    `gorm:"column:action_label;size:128;not null"`  // 操作说明
 	Method       string    `gorm:"column:method;size:16;not null"`
-	Params       string    `gorm:"column:params;size:2048"`                    // 请求参数摘要
+	Params       string    `gorm:"column:params;size:2048"` // 请求参数摘要
 	ClientIP     string    `gorm:"column:client_ip;size:64"`
 	CreatedTime  time.Time `gorm:"column:created_time;autoCreateTime;index"`
 }
@@ -336,18 +347,18 @@ func (PartnerNoncePO) TableName() string { return "partner_nonces" }
 
 // ExchangeTransferPO 用户向交易所划转 AIX-USDT（扣 points，调用第三方加款）。
 type ExchangeTransferPO struct {
-	ID            int64           `gorm:"primaryKey;autoIncrement"`
-	UserID        int64           `gorm:"column:user_id;index;not null"`
-	Address       string          `gorm:"column:address;size:42;not null;index"`
-	Asset         string          `gorm:"size:16;default:SDT;not null"`
-	Amount        decimal.Decimal `gorm:"type:decimal(36,18);not null"`
-	Status        string          `gorm:"size:16;default:pending;not null;index"` // pending | completed | failed
-	Nonce         string          `gorm:"column:nonce;size:64;not null;uniqueIndex"`
-	PartnerTxnID  string          `gorm:"column:partner_txn_id;size:128"`
-	PartnerCode   string          `gorm:"column:partner_code;size:32"`
-	Remark        string          `gorm:"size:512"`
-	CreatedTime   time.Time       `gorm:"column:created_time;autoCreateTime;index"`
-	UpdatedTime   time.Time       `gorm:"column:updated_time;autoUpdateTime"`
+	ID           int64           `gorm:"primaryKey;autoIncrement"`
+	UserID       int64           `gorm:"column:user_id;index;not null"`
+	Address      string          `gorm:"column:address;size:42;not null;index"`
+	Asset        string          `gorm:"size:16;default:SDT;not null"`
+	Amount       decimal.Decimal `gorm:"type:decimal(36,18);not null"`
+	Status       string          `gorm:"size:16;default:pending;not null;index"` // pending | completed | failed
+	Nonce        string          `gorm:"column:nonce;size:64;not null;uniqueIndex"`
+	PartnerTxnID string          `gorm:"column:partner_txn_id;size:128"`
+	PartnerCode  string          `gorm:"column:partner_code;size:32"`
+	Remark       string          `gorm:"size:512"`
+	CreatedTime  time.Time       `gorm:"column:created_time;autoCreateTime;index"`
+	UpdatedTime  time.Time       `gorm:"column:updated_time;autoUpdateTime"`
 }
 
 func (ExchangeTransferPO) TableName() string { return "exchange_transfers" }

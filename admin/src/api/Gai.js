@@ -545,5 +545,34 @@ export default {
             method: 'post',
             data: parameter
         })
+    },
+    team_stats_list: (parameter) => {
+        return axios({
+            url: `${api8005}/team_stats_list`,
+            method: 'get',
+            params: parameter
+        })
+    },
+    team_stats_export: (parameter) => {
+        return axios({
+            url: `${api8005}/team_stats_export`,
+            method: 'get',
+            params: parameter,
+            responseType: 'blob'
+        })
+    },
+    team_stats_save: (parameter) => {
+        return axios({
+            url: `${api8005}/team_stats_save`,
+            method: 'post',
+            data: parameter
+        })
+    },
+    team_stats_delete: (parameter) => {
+        return axios({
+            url: `${api8005}/team_stats_delete`,
+            method: 'post',
+            data: parameter
+        })
     }
 }

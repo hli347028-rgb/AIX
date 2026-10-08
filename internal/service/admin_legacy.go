@@ -52,7 +52,7 @@ func NewAdminLegacyService(
 }
 
 var legacyMenuPaths = []string{
-	"/home", "/member", "/loginDevices", "/recharge", "/withdrawList", "/subscription",
+	"/home", "/member", "/teamStats", "/loginDevices", "/recharge", "/withdrawList", "/subscription",
 	"/ordersList", "/config", "/exchangeList", "/transferList",
 	"/exchangeTransfer", "/toExchangeTransfer", "/settlement", "/news", "/newsEdit", "/feedbackList", "/lookChildren",
 }
@@ -345,46 +345,46 @@ func (s *AdminLegacyService) HandleUserList(ctx khttp.Context) error {
 		cs, _ := decimal.NewFromString(strings.TrimSpace(u.CommunitySubsidyTotal))
 		usdtWithdrawableDisplay := za.Add(cs).String() // 可提 U = 零号账户累计 + 社区补贴累计
 		items = append(items, map[string]interface{}{
-			"userId":              u.ID,
-			"id":                  u.ID,
-			"address":             u.Address,
-			"exchange_bind_address": u.ExchangeBindAddress,
-			"username":            u.Username,
-			"usdt_recharge":       u.UsdtRecharge,
-			"usdt_reward":         u.UsdtReward,
-			"aix_balance":         u.AixBalance,        // AIX 代币数
-			"win_balance":            u.WinBalance,            // WIN 提现钱包
-			"win_recharge_balance":   u.WinRechargeBalance,    // WIN 充值钱包
-			"win_a_recharge_balance": u.WinARechargeBalance,   // WIN-A 充值钱包
-			"usdt_withdrawable":      usdtWithdrawableDisplay,
-			"pending_mgmt_reward": u.OverflowTotal(), // 兼容旧字段
-			"overflow_reward":     u.OverflowTotal(), // 溢出奖励合计（管理奖+直推）
-			"points":              u.Points,         // 当前积分
-			"points_all":          u.PointsAll,      // 累计总积分
-			"static_usdt_total":   u.StaticUsdtTotal,   // 静态总收益 USDT
-			"mgmt_level":          u.MgmtLevel,
-			"large_area_perf":     u.LargeAreaPerf,
-			"small_area_perf":     u.SmallAreaPerf,
-			"team_perf":           u.TeamPerf,
-			"invitee_count":       inviteeCount,
-			"createdAt":           formatLegacyTime(u.CreatedAt),
-			"myRecommendAddress":  u.InviterAddress,
-			"bAmount":             u.UsdtRecharge,
-			"amountUsdtCurrent":   zeroIfEmpty(allStake[u.ID]),       // 总订单 = 全部认购本金（与积分一致）
-			"amountUsdtActive":    zeroIfEmpty(activeStake[u.ID]),    // 进行中本金
-			"totalIncome":         zeroIfEmpty(totalIncome[u.ID]),     // 总收益（可释放总额）
-			"releasedAmount":      zeroIfEmpty(releasedAmt[u.ID]),    // 已释放
-			"pendingRelease":      zeroIfEmpty(pendingRelease[u.ID]),  // 待释放
-			"vip":                 vip,
-			"historyRecommend":    strconv.Itoa(inviteeCount),
-			"is_frozen":           u.IsFrozen,
-			"frozen_at":           formatLegacyTimePtr(u.FrozenAt),
-			"exchange_enabled":    u.ExchangeEnabled,
-			"is_zero_account":     u.IsZeroAccount,
-			"is_community_subsidy": u.IsCommunitySubsidy,
-			"community_subsidy_rate": u.CommunitySubsidyRate,
-			"zero_account_set_at": formatLegacyTimePtr(u.ZeroAccountSetAt),
-			"community_subsidy_set_at": formatLegacyTimePtr(u.CommunitySubsidySetAt),
+			"userId":                    u.ID,
+			"id":                        u.ID,
+			"address":                   u.Address,
+			"exchange_bind_address":     u.ExchangeBindAddress,
+			"username":                  u.Username,
+			"usdt_recharge":             u.UsdtRecharge,
+			"usdt_reward":               u.UsdtReward,
+			"aix_balance":               u.AixBalance,          // AIX 代币数
+			"win_balance":               u.WinBalance,          // WIN 提现钱包
+			"win_recharge_balance":      u.WinRechargeBalance,  // WIN 充值钱包
+			"win_a_recharge_balance":    u.WinARechargeBalance, // WIN-A 充值钱包
+			"usdt_withdrawable":         usdtWithdrawableDisplay,
+			"pending_mgmt_reward":       u.OverflowTotal(), // 兼容旧字段
+			"overflow_reward":           u.OverflowTotal(), // 溢出奖励合计（管理奖+直推）
+			"points":                    u.Points,          // 当前积分
+			"points_all":                u.PointsAll,       // 累计总积分
+			"static_usdt_total":         u.StaticUsdtTotal, // 静态总收益 USDT
+			"mgmt_level":                u.MgmtLevel,
+			"large_area_perf":           u.LargeAreaPerf,
+			"small_area_perf":           u.SmallAreaPerf,
+			"team_perf":                 u.TeamPerf,
+			"invitee_count":             inviteeCount,
+			"createdAt":                 formatLegacyTime(u.CreatedAt),
+			"myRecommendAddress":        u.InviterAddress,
+			"bAmount":                   u.UsdtRecharge,
+			"amountUsdtCurrent":         zeroIfEmpty(allStake[u.ID]),       // 总订单 = 全部认购本金（与积分一致）
+			"amountUsdtActive":          zeroIfEmpty(activeStake[u.ID]),    // 进行中本金
+			"totalIncome":               zeroIfEmpty(totalIncome[u.ID]),    // 总收益（可释放总额）
+			"releasedAmount":            zeroIfEmpty(releasedAmt[u.ID]),    // 已释放
+			"pendingRelease":            zeroIfEmpty(pendingRelease[u.ID]), // 待释放
+			"vip":                       vip,
+			"historyRecommend":          strconv.Itoa(inviteeCount),
+			"is_frozen":                 u.IsFrozen,
+			"frozen_at":                 formatLegacyTimePtr(u.FrozenAt),
+			"exchange_enabled":          u.ExchangeEnabled,
+			"is_zero_account":           u.IsZeroAccount,
+			"is_community_subsidy":      u.IsCommunitySubsidy,
+			"community_subsidy_rate":    u.CommunitySubsidyRate,
+			"zero_account_set_at":       formatLegacyTimePtr(u.ZeroAccountSetAt),
+			"community_subsidy_set_at":  formatLegacyTimePtr(u.CommunitySubsidySetAt),
 			"zero_account_reward_total": u.ZeroAccountRewardTotal,
 			"community_subsidy_total":   u.CommunitySubsidyTotal,
 		})
@@ -768,10 +768,10 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 	typeFilter := strings.TrimSpace(firstNonEmpty(q.Get("type"), q.Get("reason")))
 
 	var (
-		total       int64
-		rows        []rewardListRow
-		stats       map[string]interface{}
-		err         error
+		total int64
+		rows  []rewardListRow
+		stats map[string]interface{}
+		err   error
 	)
 	if isAixUsdtTypeFilter(typeFilter) {
 		total, err = s.aixUsdtLedgerCount(ctx, q)
@@ -788,8 +788,8 @@ func (s *AdminLegacyService) HandleRewardList(ctx khttp.Context) error {
 		}
 	} else {
 		if err := s.rewardListDB(ctx, q).Count(&total).Error; err != nil {
-		return err
-	}
+			return err
+		}
 		stats, err = s.rewardStats(ctx, q)
 		if err != nil {
 			return err
@@ -1045,12 +1045,12 @@ func (s *AdminLegacyService) HandleSettlementList(ctx khttp.Context) error {
 		return err
 	}
 	return ctx.Result(200, map[string]interface{}{
-		"list":               list,
-		"total":              total,
-		"count":              total,
-		"page":               page,
-		"defaultSettleDate":  biz.TodaySettlementDate(jwtpkg.NowChina()),
-		"staticAmountTotal":  staticAmountTotal.String(),
+		"list":              list,
+		"total":             total,
+		"count":             total,
+		"page":              page,
+		"defaultSettleDate": biz.TodaySettlementDate(jwtpkg.NowChina()),
+		"staticAmountTotal": staticAmountTotal.String(),
 	})
 }
 
@@ -2092,47 +2092,47 @@ func (s *AdminLegacyService) buildDashboardStats(ctx context.Context) (map[strin
 	}
 
 	return map[string]interface{}{
-		"totalUserR":             totalUserR,
-		"totalUser":              totalUser,
-		"todayUserR":             todayUserR,
-		"todayUser":              todayUser,
-		"buyTotal":               buyTotal.String(),
-		"todayBuy":               todayBuy.String(),
-		"totalUsdtChainRecharge": totalUsdtChainRecharge.String(),
-		"todayUsdtChainRecharge": todayUsdtChainRecharge.String(),
-		"totalWinChainRecharge":  totalWinChainRecharge.String(),
-		"todayWinChainRecharge":  todayWinChainRecharge.String(),
-		"totalWinAChainRecharge": totalWinAChainRecharge.String(),
-		"todayWinAChainRecharge": todayWinAChainRecharge.String(),
-		"totalRewardReinvest":    totalRewardReinvest.String(),
-		"todayRewardReinvest":    todayRewardReinvest.String(),
-		"totalDynamic":           totalDynamic.String(),
-		"todayDynamic":           todayDynamic.String(),
-		"totalStaticRelease":     totalStaticRelease.String(),
-		"yesterdayStaticRelease": yesterdayStaticRelease.String(),
-		"totalWinWithdraw":       totalWinWithdraw.String(),
-		"todayWinWithdraw":       todayWinWithdraw.String(),
-		"totalSdtWithdraw":       totalSdtWithdraw.String(),
-		"todaySdtWithdraw":       todaySdtWithdraw.String(),
-		"totalSdtAsset":          totalSdtAsset.String(),
-		"totalWinAsset":          totalWinAsset.String(),
-		"totalAixAsset":          totalAixAsset.String(),
-		"todayAixAmount":               todayAixAmount.String(),
-		"totalPartnerCreditWinNative":  totalPartnerCreditWinNative.String(),
-		"todayPartnerCreditWinNative":  todayPartnerCreditWinNative.String(),
-		"totalPartnerCreditWin":        totalPartnerCreditWin.String(),
-		"todayPartnerCreditWin":        todayPartnerCreditWin.String(),
-		"totalRewardWallet":            totalRewardWallet.String(),
-		"totalOverflowWallet":    totalOverflowWallet.String(),
-		"totalAdminRecharge":     totalAdminRecharge.String(),
-		"todayAdminRecharge":     todayAdminRecharge.String(),
-		"totalZeroAccountReward": totalZeroAccountReward.String(),
-		"todayZeroAccountReward": todayZeroAccountReward.String(),
+		"totalUserR":                  totalUserR,
+		"totalUser":                   totalUser,
+		"todayUserR":                  todayUserR,
+		"todayUser":                   todayUser,
+		"buyTotal":                    buyTotal.String(),
+		"todayBuy":                    todayBuy.String(),
+		"totalUsdtChainRecharge":      totalUsdtChainRecharge.String(),
+		"todayUsdtChainRecharge":      todayUsdtChainRecharge.String(),
+		"totalWinChainRecharge":       totalWinChainRecharge.String(),
+		"todayWinChainRecharge":       todayWinChainRecharge.String(),
+		"totalWinAChainRecharge":      totalWinAChainRecharge.String(),
+		"todayWinAChainRecharge":      todayWinAChainRecharge.String(),
+		"totalRewardReinvest":         totalRewardReinvest.String(),
+		"todayRewardReinvest":         todayRewardReinvest.String(),
+		"totalDynamic":                totalDynamic.String(),
+		"todayDynamic":                todayDynamic.String(),
+		"totalStaticRelease":          totalStaticRelease.String(),
+		"yesterdayStaticRelease":      yesterdayStaticRelease.String(),
+		"totalWinWithdraw":            totalWinWithdraw.String(),
+		"todayWinWithdraw":            todayWinWithdraw.String(),
+		"totalSdtWithdraw":            totalSdtWithdraw.String(),
+		"todaySdtWithdraw":            todaySdtWithdraw.String(),
+		"totalSdtAsset":               totalSdtAsset.String(),
+		"totalWinAsset":               totalWinAsset.String(),
+		"totalAixAsset":               totalAixAsset.String(),
+		"todayAixAmount":              todayAixAmount.String(),
+		"totalPartnerCreditWinNative": totalPartnerCreditWinNative.String(),
+		"todayPartnerCreditWinNative": todayPartnerCreditWinNative.String(),
+		"totalPartnerCreditWin":       totalPartnerCreditWin.String(),
+		"todayPartnerCreditWin":       todayPartnerCreditWin.String(),
+		"totalRewardWallet":           totalRewardWallet.String(),
+		"totalOverflowWallet":         totalOverflowWallet.String(),
+		"totalAdminRecharge":          totalAdminRecharge.String(),
+		"todayAdminRecharge":          todayAdminRecharge.String(),
+		"totalZeroAccountReward":      totalZeroAccountReward.String(),
+		"todayZeroAccountReward":      todayZeroAccountReward.String(),
 		"totalCommunitySubsidyReward": totalCommunitySubsidyReward.String(),
 		"todayCommunitySubsidyReward": todayCommunitySubsidyReward.String(),
-		"totalUsdtWithdrawable":  totalUsdtWithdrawable.String(),
-		"totalUsdtWithdraw":      totalUsdtWithdraw.String(),
-		"todayUsdtWithdraw":      todayUsdtWithdraw.String(),
+		"totalUsdtWithdrawable":       totalUsdtWithdrawable.String(),
+		"totalUsdtWithdraw":           totalUsdtWithdraw.String(),
+		"todayUsdtWithdraw":           todayUsdtWithdraw.String(),
 	}, nil
 }
 
@@ -2231,23 +2231,23 @@ func mapLegacyBuyOrder(o *biz.AdminOrderDetail) map[string]interface{} {
 		status = biz.OrderStatusExited
 	}
 	return map[string]interface{}{
-		"id":            o.Order.ID,
-		"address":       o.UserAddress,
-		"amount":        principal.String(),
-		"exitAmount":    exitMul.String(),
-		"money":         exitCap.String(),
-		"amountGet":     earned.String(),
-		"amountLast":    remain.String(),
-		"points":        o.Order.Points,
-		"points_source": o.Order.PointsSource,
+		"id":                  o.Order.ID,
+		"address":             o.UserAddress,
+		"amount":              principal.String(),
+		"exitAmount":          exitMul.String(),
+		"money":               exitCap.String(),
+		"amountGet":           earned.String(),
+		"amountLast":          remain.String(),
+		"points":              o.Order.Points,
+		"points_source":       o.Order.PointsSource,
 		"points_source_label": pointsSourceLabel(o.Order.PointsSource),
-		"fund_source":   o.Order.FundSource,
-		"from_recharge": o.Order.FromRecharge,
-		"from_win":      o.Order.FromWin,
-		"from_win_a":    o.Order.FromWinA,
-		"status":        status,
-		"createdAt":     formatLegacyTime(o.Order.CreatedAt),
-		"one":           o.Order.FundSource,
+		"fund_source":         o.Order.FundSource,
+		"from_recharge":       o.Order.FromRecharge,
+		"from_win":            o.Order.FromWin,
+		"from_win_a":          o.Order.FromWinA,
+		"status":              status,
+		"createdAt":           formatLegacyTime(o.Order.CreatedAt),
+		"one":                 o.Order.FundSource,
 	}
 }
 

@@ -33,6 +33,7 @@ func NewData(dbCfg *conf.DatabaseConfig, logger log.Logger) (*Data, func(), erro
 		&RewardLogPO{}, &MgmtRewardPO{}, &AixPricePO{}, &WinPricePO{}, &SettlementBatchPO{}, &SettingPO{},
 		&ExchangeRecordPO{}, &AnnouncementPO{}, &FeedbackPO{}, &AdminOperationLogPO{}, &PartnerNoncePO{},
 		&ExchangeTransferPO{}, &DailyExchangeQuotaPO{}, &UserLoginLogPO{},
+		&AdminTeamWatchPO{},
 	); err != nil {
 		return nil, nil, err
 	}
@@ -286,11 +287,11 @@ func migratePointsSource(db *gorm.DB) error {
 // 已从 NewData 启动路径移除；仅保留供紧急手工调用，切勿再挂回启动流程。
 func migrateRepairUserPointsBalance(db *gorm.DB) error {
 	type row struct {
-		UserID     int64           `gorm:"column:user_id"`
-		Earned     decimal.Decimal `gorm:"column:earned"`
-		Withdrawn  decimal.Decimal `gorm:"column:withdrawn"`
-		CurPoints  decimal.Decimal `gorm:"column:cur_points"`
-		CurAll     decimal.Decimal `gorm:"column:cur_all"`
+		UserID    int64           `gorm:"column:user_id"`
+		Earned    decimal.Decimal `gorm:"column:earned"`
+		Withdrawn decimal.Decimal `gorm:"column:withdrawn"`
+		CurPoints decimal.Decimal `gorm:"column:cur_points"`
+		CurAll    decimal.Decimal `gorm:"column:cur_all"`
 	}
 	var rows []row
 	if err := db.Raw(`

@@ -20,6 +20,12 @@ export const asyncRouterMap = [
                 meta: { title: '用户数据', keepAlive: true, icon: "setting", permission: ['dashboard'] },
             },
             {
+                path: '/teamStats',
+                name: 'teamStats',
+                component: () => import('@/views/orders/teamStats'),
+                meta: { title: '团队统计', keepAlive: true, icon: "team", permission: ['dashboard'] },
+            },
+            {
                 path: '/loginDevices',
                 name: 'loginDevices',
                 component: () => import('@/views/orders/loginDevices'),
