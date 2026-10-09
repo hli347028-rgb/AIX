@@ -131,6 +131,8 @@ func (s *AdminLegacyService) teamStatsItem(ctx khttp.Context, row data.AdminTeam
 		"display_name":    row.DisplayName,
 		"usdt_recharge":   "0",
 		"win_recharge":    "0",
+		"sdt_withdraw":    "0",
+		"usdt_withdraw":   "0",
 		"downline_count":  0,
 		"team_perf":       "0",
 		"large_area_perf": "0",
@@ -151,9 +153,9 @@ func (s *AdminLegacyService) teamStatsItem(ctx khttp.Context, row data.AdminTeam
 	}
 	db := s.data.DB().WithContext(ctx)
 	if start == nil && end == nil {
-		item["team_perf"] = blankPerf(user.TeamPerf)
-		item["large_area_perf"] = blankPerf(user.LargeAreaPerf)
-		item["small_area_perf"] = blankPerf(user.SmallAreaPerf)
+		item["team_perf"] = formatStatAmountString(user.TeamPerf)
+		item["large_area_perf"] = formatStatAmountString(user.LargeAreaPerf)
+		item["small_area_perf"] = formatStatAmountString(user.SmallAreaPerf)
 		item["downline_count"] = len(ids)
 	} else {
 		count, err := countDownlineInRange(db, ids, start, end)
@@ -185,6 +187,22 @@ func (s *AdminLegacyService) teamStatsItem(ctx khttp.Context, row data.AdminTeam
 	}
 	item["usdt_recharge"] = formatStatAmount(usdt)
 	item["win_recharge"] = formatStatAmount(win)
+	sdtWithdrawWhere, sdtWithdrawArgs := withCreatedTime(`
+		status = ? AND UPPER(asset) = ?
+	`, []interface{}{biz.WithdrawStatusCompleted, biz.TokenSDT}, start, end)
+	sdtWithdraw, err := sumDownlineWithdrawal(db, ids, sdtWithdrawWhere, sdtWithdrawArgs...)
+	if err != nil {
+		return nil, err
+	}
+	usdtWithdrawWhere, usdtWithdrawArgs := withCreatedTime(`
+		status = ? AND UPPER(asset) = ?
+	`, []interface{}{biz.WithdrawStatusCompleted, biz.TokenUSDT}, start, end)
+	usdtWithdraw, err := sumDownlineWithdrawal(db, ids, usdtWithdrawWhere, usdtWithdrawArgs...)
+	if err != nil {
+		return nil, err
+	}
+	item["sdt_withdraw"] = formatStatAmount(sdtWithdraw)
+	item["usdt_withdraw"] = formatStatAmount(usdtWithdraw)
 	return item, nil
 }
 
@@ -318,7 +336,7 @@ func writeTeamStatsCSV(w http.ResponseWriter, items []map[string]interface{}) er
 		return err
 	}
 	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"名字", "地址", "下级USDT充值", "下级WIN充值", "下级人数", "团队总业绩", "大区业绩", "小区业绩"}); err != nil {
+	if err := cw.Write([]string{"名字", "地址", "下级USDT充值", "下级WIN充值", "下级AIX-USDT提现", "下级USDT提现", "下级人数", "团队总业绩", "大区业绩", "小区业绩"}); err != nil {
 		return err
 	}
 	for _, item := range items {
@@ -327,6 +345,8 @@ func writeTeamStatsCSV(w http.ResponseWriter, items []map[string]interface{}) er
 			fmt.Sprint(item["address"]),
 			fmt.Sprint(item["usdt_recharge"]),
 			fmt.Sprint(item["win_recharge"]),
+			fmt.Sprint(item["sdt_withdraw"]),
+			fmt.Sprint(item["usdt_withdraw"]),
 			fmt.Sprint(item["downline_count"]),
 			fmt.Sprint(item["team_perf"]),
 			fmt.Sprint(item["large_area_perf"]),
@@ -337,6 +357,32 @@ func writeTeamStatsCSV(w http.ResponseWriter, items []map[string]interface{}) er
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func sumDownlineWithdrawal(db *gorm.DB, ids []int64, where string, args ...interface{}) (decimal.Decimal, error) {
+	total := decimal.Zero
+	if len(ids) == 0 {
+		return total, nil
+	}
+	const chunk = 500
+	for start := 0; start < len(ids); start += chunk {
+		end := start + chunk
+		if end > len(ids) {
+			end = len(ids)
+		}
+		var part decimal.Decimal
+		q := append([]interface{}{}, args...)
+		q = append(q, ids[start:end])
+		err := db.Model(&data.WithdrawalPO{}).
+			Where(where+" AND user_id IN ?", q...).
+			Select("COALESCE(SUM(amount), 0)").
+			Scan(&part).Error
+		if err != nil {
+			return decimal.Zero, err
+		}
+		total = total.Add(part)
+	}
+	return total, nil
 }
 
 func sumDownlineRecharge(db *gorm.DB, ids []int64, where string, args ...interface{}) (decimal.Decimal, error) {
@@ -366,19 +412,17 @@ func sumDownlineRecharge(db *gorm.DB, ids []int64, where string, args ...interfa
 }
 
 func formatStatAmount(d decimal.Decimal) string {
-	s := d.StringFixed(4)
-	s = strings.TrimRight(s, "0")
-	s = strings.TrimRight(s, ".")
-	if s == "" || s == "-" {
-		return "0"
-	}
-	return s
+	return d.StringFixed(2)
 }
 
-func blankPerf(v string) string {
+func formatStatAmountString(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
-		return "0"
+		return "0.00"
 	}
-	return v
+	d, err := decimal.NewFromString(v)
+	if err != nil {
+		return "0.00"
+	}
+	return formatStatAmount(d)
 }

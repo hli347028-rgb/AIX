@@ -139,7 +139,7 @@ export default {
     downlineSubscribeAmount: '下级认购金额',
     downlineRechargeUsdt: '下级充值USDT金额',
     downlineRechargeWin: '下级充值WIN金额',
-    downlineExchangeWin: '下级交易所划转金额',
+    downlineExchangeWin: '交易所WIN划转金额',
     downlineAixUsdtReward: '下级AIX-USDT奖励',
     aixUsdtSource: '来源',
     aixUsdtAmount: 'AIX-USDT',
@@ -191,7 +191,7 @@ export default {
     generation: '代数',
     reward: '奖励',
     time: '时间', directReferralReward: '直推奖励', managementReward: '管理奖',
-    usdtAmount: '充值USDT金额', winAmount: '充值WIN金额', rechargeSource: '充值来源', rechargeSourceChain: '链上充值', rechargeSourceExchange: '交易所划转', subscribeAmount: '认购金额', subscribeType: '充值类型', subscribeTypeAll: '全部', subscribeTypeRecharge: 'USDT认购', subscribeTypeReward: '复投', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
+    usdtAmount: '充值USDT金额', winAmount: '充值WIN金额', rechargeSource: '充值来源', rechargeSourceChain: '链上充值', rechargeSourceExchange: '交易所划转', subscribeAmount: '认购金额', subscribeType: '充值类型', subscribeTypeAll: '全部', subscribeTypeRecharge: 'USDT认购', subscribeTypeReward: '奖励金额', subscribeTypeWin: 'WIN支付', subscribeTypeWinA: 'WIN-A', brc20Amount: 'BRC20 数量', myTeam: '我的团队', refresh: '刷新', teamTotalMembers: '团队总人数', username: '用户名', usernameSetting: '名称设置', editUsername: '编辑', saveUsername: '保存', cancelUsername: '取消', usernameSaved: '用户名已保存', usernameRequired: '请输入用户名', usernameTooLong: '用户名最多 24 个字符', notSet: '未设置', teamMembers: '团队成员档案', noTeamMembers: '暂无团队成员', active: '有效', directMembers: '直属人数', joinedAt: '加入时间'
   },
   count: {
     myNodes: '我的节点', myIncome: '我的收益', matrix: '矩阵图', level: '级别', sharedNodes: '分享节点',

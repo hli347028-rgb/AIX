@@ -24,7 +24,7 @@
                     <a-button style="margin-left: 8px" :loading="exporting" @click="exportList">导出表格</a-button>
                 </a-col>
             </a-row>
-            <p class="hint">下级 USDT 为已入账的 USDT 充值合计。下级 WIN 为已入账的 WIN 充值与划转合计。人数不含本人。未选时间时，业绩为累计值；选定时间后，充值、人数和业绩只统计该时间段内的记录。</p>
+            <p class="hint">下级 USDT 为已入账的 USDT 充值合计。下级 WIN 为已入账的 WIN 充值与划转合计。下级 AIX-USDT 提现、下级 USDT 提现为已转账的提现金额合计。人数不含本人。未选时间时，业绩为累计值；选定时间后，充值、提现、人数和业绩只统计该时间段内的记录。</p>
             <a-table
                 rowKey="id"
                 :loading="loading"
@@ -69,6 +69,8 @@ export default {
                 { title: '地址', dataIndex: 'address' },
                 { title: '下级USDT充值', dataIndex: 'usdt_recharge' },
                 { title: '下级WIN充值', dataIndex: 'win_recharge' },
+                { title: '下级AIX-USDT提现', dataIndex: 'sdt_withdraw' },
+                { title: '下级USDT提现', dataIndex: 'usdt_withdraw' },
                 { title: '下级人数', dataIndex: 'downline_count' },
                 { title: '团队总业绩', dataIndex: 'team_perf' },
                 { title: '大区业绩', dataIndex: 'large_area_perf' },
